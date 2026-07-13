@@ -41,7 +41,7 @@ fun SettingsScreen(
     val bootstrapSettingsTitle = "Bootstrap DNS 解析设置"
     val latencySettingsTitle = "DNS 查询测速"
     val cacheSettingsTitle = "DNS 缓存设置"
-    val raceModeSettingsTitle = "竞速模式"
+    val raceModeSettingsTitle = "解析模式"
     val ruleManagementTitle = "域名规则"
     val logRetentionTitle = "日志保留"
     val dataCleanupTitle = "数据清理"
@@ -58,13 +58,7 @@ fun SettingsScreen(
         "已自定义"
     }
 
-    val raceModeEnabled = AppSettings.isRaceModeEnabled(context)
-    val raceStrategy = AppSettings.getRaceModeStrategy(context)
-    val raceModeSummary = if (raceModeEnabled) {
-        "已启用 · ${raceStrategy.displayName}"
-    } else {
-        "未启用 · ${raceStrategy.displayName}"
-    }
+    val raceModeSummary = AppSettings.getDnsResolutionMode(context).displayName
 
     val cachePolicy = remember { AppSettings.getDnsCachePolicy(context) }
     val cachePreset = remember { AppSettings.getDnsCachePreset(context) }
@@ -138,7 +132,7 @@ fun SettingsScreen(
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = raceModeSettingsTitle,
-                    subtitle = "选择参与竞速的 DNS 服务商和竞速策略",
+                    subtitle = "选择单服务、智慧预测、并行竞速或主备容灾",
                     value = raceModeSummary,
                     onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                 )

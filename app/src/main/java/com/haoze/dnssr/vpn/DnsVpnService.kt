@@ -16,6 +16,7 @@ import com.haoze.dnssr.MainActivity
 import com.haoze.dnssr.R
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.ui.AppSettings
+import com.haoze.dnssr.ui.DnsResolutionMode
 import com.haoze.dnssr.ui.RaceModeStrategy
 import com.haoze.dnssr.vpn.cache.DnsCacheController
 import com.haoze.dnssr.vpn.cache.DnsCachePolicy
@@ -89,6 +90,8 @@ class DnsVpnService : VpnService() {
     @Volatile
     private var activeRaceModeStrategy: RaceModeStrategy = RaceModeStrategy.SMART_PREDICTION
     @Volatile
+    private var activeResolutionMode: DnsResolutionMode = DnsResolutionMode.SINGLE
+    @Volatile
     private var activeBlockResponseMode: BlockResponseMode = BlockResponseMode.NXDOMAIN
 
     override fun onCreate() {
@@ -99,6 +102,7 @@ class DnsVpnService : VpnService() {
         val logRetentionDays = AppSettings.logRetentionDays(this)
         activeDnsCachePolicy = AppSettings.getDnsCachePolicy(this)
         activeRaceModeStrategy = AppSettings.getRaceModeStrategy(this)
+        activeResolutionMode = AppSettings.getDnsResolutionMode(this)
         activeBlockResponseMode = AppSettings.getBlockResponseMode(this)
         dnsCache = DnsResponseCache(db.dnsCacheDao(), activeDnsCachePolicy, serviceScope)
         blockListManager = BlockListManager(db.blockRuleDao())
@@ -201,6 +205,7 @@ class DnsVpnService : VpnService() {
                 val oldResolvers = resolvers
                 val newCachePolicy = AppSettings.getDnsCachePolicy(this@DnsVpnService)
                 val newRaceModeStrategy = AppSettings.getRaceModeStrategy(this@DnsVpnService)
+                val newResolutionMode = AppSettings.getDnsResolutionMode(this@DnsVpnService)
                 val newBlockResponseMode = AppSettings.getBlockResponseMode(this@DnsVpnService)
                 val newResolvers = runCatching {
                     resolveDnsProviders(null).map { provider ->
@@ -215,6 +220,7 @@ class DnsVpnService : VpnService() {
                     onSuccess = { updatedResolvers ->
                         activeDnsCachePolicy = newCachePolicy
                         activeRaceModeStrategy = newRaceModeStrategy
+                        activeResolutionMode = newResolutionMode
                         activeBlockResponseMode = newBlockResponseMode
                         dnsCache.updatePolicy(newCachePolicy)
                         resolvers = updatedResolvers
@@ -231,6 +237,7 @@ class DnsVpnService : VpnService() {
                     onFailure = { error ->
                         activeDnsCachePolicy = newCachePolicy
                         activeRaceModeStrategy = newRaceModeStrategy
+                        activeResolutionMode = newResolutionMode
                         activeBlockResponseMode = newBlockResponseMode
                         dnsCache.updatePolicy(newCachePolicy)
                         startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -248,7 +255,7 @@ class DnsVpnService : VpnService() {
 
     private fun buildForegroundNotification(): Notification {
         val notificationText = when {
-            resolvers.size > 1 -> "已连接 · ${activeRaceModeStrategy.displayName}（${resolvers.size} 个服务商）"
+            resolvers.size > 1 -> "已连接 · ${activeResolutionMode.displayName}（${resolvers.size} 个服务商）"
             resolvers.isNotEmpty() -> "已连接 · ${resolvers.first().provider.name}"
             else -> "已连接"
         }
@@ -327,9 +334,23 @@ class DnsVpnService : VpnService() {
                 )
             }
         }
-        if (AppSettings.isRaceModeEnabled(this)) {
-            val raceProviders = DnsProvider.loadRaceProviders(this)
-            if (raceProviders.size >= 2) return raceProviders
+        when (AppSettings.getDnsResolutionMode(this)) {
+            DnsResolutionMode.SINGLE -> Unit
+            DnsResolutionMode.SMART_PREDICTION,
+            DnsResolutionMode.PARALLEL_RACE -> {
+                val ids = if (AppSettings.getDnsResolutionMode(this) == DnsResolutionMode.SMART_PREDICTION) {
+                    AppSettings.getSmartPredictionProviderIds(this)
+                } else {
+                    AppSettings.getParallelRaceProviderIds(this)
+                }
+                val raceProviders = DnsProvider.loadRuntimeProviders(this).filter { it.id in ids }
+                if (raceProviders.size >= 2) return raceProviders
+            }
+            DnsResolutionMode.PRIMARY_BACKUP -> {
+                val byId = DnsProvider.loadRuntimeProviders(this).associateBy { it.id }
+                val ordered = AppSettings.getPrimaryBackupProviderIds(this).mapNotNull(byId::get)
+                if (ordered.size >= 2) return ordered
+            }
         }
         return listOf(DnsProvider.loadSelected(this))
     }
@@ -473,9 +494,11 @@ class DnsVpnService : VpnService() {
             val cacheResult = if (question != null) {
                 dnsCache.resolve(question, query) {
                     if (currentResolvers.size > 1) {
-                        when (activeRaceModeStrategy) {
-                            RaceModeStrategy.BRUTE_FORCE_PARALLEL -> resolveRacing(currentResolvers, query, qname, qtype)
-                            RaceModeStrategy.SMART_PREDICTION -> resolveSmartPrediction(currentResolvers, query, qname, qtype)
+                        when (activeResolutionMode) {
+                            DnsResolutionMode.PARALLEL_RACE -> resolveRacing(currentResolvers, query, qname, qtype)
+                            DnsResolutionMode.SMART_PREDICTION -> resolveSmartPrediction(currentResolvers, query, qname, qtype)
+                            DnsResolutionMode.PRIMARY_BACKUP -> resolvePrimaryBackup(currentResolvers, query, qname, qtype)
+                            DnsResolutionMode.SINGLE -> resolveWithHealth(currentResolvers.first(), query)
                         }
                     } else {
                         resolveWithHealth(currentResolvers.first(), query)
@@ -483,9 +506,11 @@ class DnsVpnService : VpnService() {
                 }
             } else {
                 val response = if (currentResolvers.size > 1) {
-                    when (activeRaceModeStrategy) {
-                        RaceModeStrategy.BRUTE_FORCE_PARALLEL -> resolveRacing(currentResolvers, query, qname, qtype)
-                        RaceModeStrategy.SMART_PREDICTION -> resolveSmartPrediction(currentResolvers, query, qname, qtype)
+                    when (activeResolutionMode) {
+                        DnsResolutionMode.PARALLEL_RACE -> resolveRacing(currentResolvers, query, qname, qtype)
+                        DnsResolutionMode.SMART_PREDICTION -> resolveSmartPrediction(currentResolvers, query, qname, qtype)
+                        DnsResolutionMode.PRIMARY_BACKUP -> resolvePrimaryBackup(currentResolvers, query, qname, qtype)
+                        DnsResolutionMode.SINGLE -> resolveWithHealth(currentResolvers.first(), query)
                     }
                 } else {
                     resolveWithHealth(currentResolvers.first(), query)
@@ -554,6 +579,49 @@ class DnsVpnService : VpnService() {
                 throw error
             }
         )
+    }
+
+    private suspend fun resolvePrimaryBackup(
+        activeResolvers: List<ActiveDnsResolver>,
+        query: ByteArray,
+        queryName: String?,
+        queryType: Int
+    ): ByteArray {
+        val startedAt = System.nanoTime()
+        var lastError: Throwable? = null
+        activeResolvers.forEachIndexed { index, resolver ->
+            val outcome = runCatching { resolveWithHealthOutcome(resolver, query) }
+            outcome.onSuccess { success ->
+                val elapsedMs = max(1L, (System.nanoTime() - startedAt) / 1_000_000L)
+                raceLogger.log(
+                    queryName = queryName ?: "?",
+                    queryType = queryType,
+                    strategy = RaceModeStrategy.PRIMARY_BACKUP,
+                    providerCount = activeResolvers.size,
+                    success = true,
+                    elapsedMs = elapsedMs,
+                    selectedProvider = activeResolvers.first().provider,
+                    winnerProvider = resolver.provider,
+                    winnerElapsedMs = success.elapsedMs,
+                    fallbackUsed = index > 0,
+                    fallbackSuccess = index > 0
+                )
+                return success.response
+            }.onFailure { lastError = it }
+        }
+        val error = lastError ?: IOException("All DNS upstreams failed")
+        raceLogger.log(
+            queryName = queryName ?: "?",
+            queryType = queryType,
+            strategy = RaceModeStrategy.PRIMARY_BACKUP,
+            providerCount = activeResolvers.size,
+            success = false,
+            elapsedMs = max(1L, (System.nanoTime() - startedAt) / 1_000_000L),
+            selectedProvider = activeResolvers.firstOrNull()?.provider,
+            fallbackUsed = activeResolvers.size > 1,
+            message = error.message
+        )
+        throw error
     }
 
     private suspend fun resolveParallel(

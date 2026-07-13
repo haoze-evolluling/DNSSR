@@ -52,6 +52,10 @@ object Routes {
     const val BOOTSTRAP_SETTINGS = "bootstrap_settings"
     const val RACE_MODE_LATENCY = "race_mode_latency"
     const val RACE_MODE_PROVIDERS = "race_mode_providers"
+    const val RESOLUTION_SINGLE = "resolution_single"
+    const val RESOLUTION_SMART = "resolution_smart"
+    const val RESOLUTION_PARALLEL = "resolution_parallel"
+    const val RESOLUTION_BACKUP = "resolution_backup"
     const val CACHE_SETTINGS = "cache_settings"
     const val LOG_RETENTION_SETTINGS = "log_retention_settings"
     const val FOREGROUND_BACKGROUND_SETTINGS = "foreground_background_settings"
@@ -230,13 +234,16 @@ fun AppNavHost(
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNS 查询测速"
             )
         }
-        composable(titledRoute(Routes.RACE_MODE_PROVIDERS), arguments = listOf(screenTitleArgument("竞速模式"))) { entry ->
-            RaceModeProviderSettingsScreen(
+        composable(titledRoute(Routes.RACE_MODE_PROVIDERS), arguments = listOf(screenTitleArgument("解析模式"))) { entry ->
+            ResolutionModeHomeScreen(
                 onBack = { navController.popBackStack() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "竞速模式",
-                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+                onOpenMode = { mode -> navController.navigate(mode.route) }
             )
         }
+        composable(Routes.RESOLUTION_SINGLE) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popBackStack() }) }
+        composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popBackStack() }) }
+        composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popBackStack() }) }
+        composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popBackStack() }) }
         composable(titledRoute(Routes.CACHE_SETTINGS), arguments = listOf(screenTitleArgument("DNS 缓存设置"))) { entry ->
             CacheSettingsScreen(
                 onBack = { navController.popBackStack() },
@@ -282,3 +289,11 @@ fun AppNavHost(
         }
     }
 }
+
+private val DnsResolutionMode.route: String
+    get() = when (this) {
+        DnsResolutionMode.SINGLE -> Routes.RESOLUTION_SINGLE
+        DnsResolutionMode.SMART_PREDICTION -> Routes.RESOLUTION_SMART
+        DnsResolutionMode.PARALLEL_RACE -> Routes.RESOLUTION_PARALLEL
+        DnsResolutionMode.PRIMARY_BACKUP -> Routes.RESOLUTION_BACKUP
+    }

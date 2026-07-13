@@ -9,11 +9,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,6 +37,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.ui.components.SettingsCheckboxItem
@@ -52,9 +62,9 @@ import com.haoze.dnssr.vpn.ProviderHealthStore
 import java.util.Locale
 
 @Composable
-fun RaceModeProviderSettingsScreen(
+private fun LegacyRaceModeProviderSettingsScreen(
     onBack: () -> Unit,
-    title: String = "竞速模式",
+    title: String = "解析模式",
     onRuntimeDnsSettingsChanged: () -> Unit,
     viewModel: RaceModeSettingsViewModel = viewModel()
 ) {
@@ -64,6 +74,8 @@ fun RaceModeProviderSettingsScreen(
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val raceModeEnabled by viewModel.raceModeEnabled.collectAsStateWithLifecycle()
     val raceModeStrategy by viewModel.raceModeStrategy.collectAsStateWithLifecycle()
+    val resolutionMode by viewModel.resolutionMode.collectAsStateWithLifecycle()
+    val primaryBackupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
     var selectedProtocol by remember { mutableStateOf(DnsProtocol.DOH) }
@@ -106,32 +118,7 @@ fun RaceModeProviderSettingsScreen(
 
     SettingsScaffold(
         title = title,
-        onBack = onBack,
-        titleTrailing = {
-            val actionColor = if (raceModeEnabled) {
-                MaterialTheme.colorScheme.error
-            } else {
-                Color(0xFF2E7D32)
-            }
-            Button(
-                onClick = {
-                    if (viewModel.setRaceModeEnabled(!raceModeEnabled)) {
-                        onRuntimeDnsSettingsChanged()
-                    }
-                },
-                enabled = raceModeEnabled || selectedIds.size >= 2,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = actionColor,
-                    contentColor = Color.White,
-                    disabledContainerColor = actionColor.copy(alpha = 0.38f),
-                    disabledContentColor = Color.White.copy(alpha = 0.74f)
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text(text = if (raceModeEnabled) "关闭" else "开启")
-            }
-        }
+        onBack = onBack
     ) { innerPadding ->
         if (initialLoading) {
             SettingsLoadingContent(modifier = Modifier.padding(innerPadding))
@@ -143,6 +130,32 @@ fun RaceModeProviderSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 item {
+                    SettingsGroupTitle("解析模式")
+                }
+                item {
+                    SettingsGroup {
+                        DnsResolutionMode.entries.forEachIndexed { index, mode ->
+                            SettingsRadioItem(
+                                title = mode.displayName,
+                                subtitle = when (mode) {
+                                    DnsResolutionMode.SINGLE -> "仅使用首页当前选择的 DNS 服务商"
+                                    DnsResolutionMode.SMART_PREDICTION -> "按健康权重优先选择稳定、快速的服务商"
+                                    DnsResolutionMode.PARALLEL_RACE -> "同时查询全部服务商，采用最快成功响应"
+                                    DnsResolutionMode.PRIMARY_BACKUP -> "主服务失败后，按优先级依次尝试备用服务"
+                                },
+                                selected = resolutionMode == mode,
+                                onClick = {
+                                    if (viewModel.setResolutionMode(mode)) onRuntimeDnsSettingsChanged()
+                                }
+                            )
+                            if (index < DnsResolutionMode.entries.lastIndex) SettingsDivider()
+                        }
+                    }
+                }
+                if (resolutionMode == DnsResolutionMode.SINGLE) {
+                    item { SettingsInfoText("单服务商模式使用首页“解析服务”下拉框中的当前选择。") }
+                }
+                item {
                     val protocols = availableProtocols(providers)
                     ProtocolToggleRow(
                         selectedProtocol = selectedProtocol,
@@ -152,7 +165,7 @@ fun RaceModeProviderSettingsScreen(
                     )
                 }
                 item {
-                    SettingsGroupTitle("参与竞速的 DNS 服务商")
+                    SettingsGroupTitle("参与当前模式的 DNS 服务商")
                 }
                 item {
                     val visibleProviders = providers.filter { it.protocol == selectedProtocol }
@@ -181,37 +194,59 @@ fun RaceModeProviderSettingsScreen(
                 }
                 item {
                     val hint = when {
-                        selectedIds.size < 2 -> "至少选择 2 个服务商后，才能启用竞速模式。"
-                        raceModeStrategy == RaceModeStrategy.BRUTE_FORCE_PARALLEL -> {
-                            "暴力并行会并发请求已选择的 ${selectedIds.size} 个服务商，并使用最快成功结果。"
-                        }
-                        else -> "智慧预测会使用下方健康权重，在已选择的 ${selectedIds.size} 个服务商之间分配查询流量。"
+                        selectedIds.size < 2 -> "多服务商模式至少需要选择 2 个服务商。"
+                        resolutionMode == DnsResolutionMode.PARALLEL_RACE -> "并行查询已选择的 ${selectedIds.size} 个服务商。"
+                        resolutionMode == DnsResolutionMode.SMART_PREDICTION -> "按健康权重在 ${selectedIds.size} 个服务商之间分配查询。"
+                        resolutionMode == DnsResolutionMode.PRIMARY_BACKUP -> "按下方优先级依次查询，成功后停止。"
+                        else -> "这些服务商用于切换到多服务商模式。"
                     }
                     SettingsInfoText(hint)
                 }
-
-                item {
-                    SettingsGroupTitle("竞速模式")
-                }
-                item {
-                    SettingsGroup {
-                        RaceModeStrategy.values().forEachIndexed { index, strategy ->
-                            SettingsRadioItem(
-                                title = strategy.displayName,
-                                subtitle = when (strategy) {
-                                    RaceModeStrategy.BRUTE_FORCE_PARALLEL -> "原有模式：同时查询全部服务商，采用最快成功响应"
-                                    RaceModeStrategy.SMART_PREDICTION -> "使用服务商健康权重，优先查询更稳定、更快的服务商"
-                                },
-                                selected = strategy == raceModeStrategy,
-                                onClick = {
-                                    if (viewModel.setRaceModeStrategy(strategy)) {
-                                        onRuntimeDnsSettingsChanged()
+                if (resolutionMode == DnsResolutionMode.PRIMARY_BACKUP) {
+                    item { SettingsGroupTitle("主备优先级") }
+                    item {
+                        SettingsGroup {
+                            primaryBackupIds.mapNotNull { id -> providers.firstOrNull { it.id == id } }
+                                .forEachIndexed { index, provider ->
+                                    var dragDistance by remember(provider.id) { mutableFloatStateOf(0f) }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .draggable(
+                                                orientation = Orientation.Vertical,
+                                                state = rememberDraggableState { delta ->
+                                                    dragDistance += delta
+                                                    when {
+                                                        dragDistance <= -40f -> {
+                                                            viewModel.movePrimaryBackupProvider(provider.id, -1)
+                                                            dragDistance = 0f
+                                                        }
+                                                        dragDistance >= 40f -> {
+                                                            viewModel.movePrimaryBackupProvider(provider.id, 1)
+                                                            dragDistance = 0f
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                            .padding(start = 8.dp, end = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.DragHandle, contentDescription = "拖动调整优先级")
+                                        Text(
+                                            text = if (index == 0) "主 · ${provider.name}" else "备 $index · ${provider.name}",
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        IconButton(
+                                            onClick = { viewModel.movePrimaryBackupProvider(provider.id, -1) },
+                                            enabled = index > 0
+                                        ) { Icon(Icons.Default.ArrowUpward, contentDescription = "提高优先级") }
+                                        IconButton(
+                                            onClick = { viewModel.movePrimaryBackupProvider(provider.id, 1) },
+                                            enabled = index < primaryBackupIds.lastIndex
+                                        ) { Icon(Icons.Default.ArrowDownward, contentDescription = "降低优先级") }
                                     }
+                                    if (index < primaryBackupIds.lastIndex) SettingsDivider()
                                 }
-                            )
-                            if (index < RaceModeStrategy.values().lastIndex) {
-                                SettingsDivider()
-                            }
                         }
                     }
                 }

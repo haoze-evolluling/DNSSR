@@ -357,6 +357,9 @@ data class DnsProvider(
             if (raceIds.remove(id)) {
                 AppSettings.setRaceProviderIds(context, raceIds)
             }
+            val primaryBackupIds = AppSettings.getPrimaryBackupProviderIds(context).filterNot { it == id }
+            AppSettings.setPrimaryBackupProviderIds(context, primaryBackupIds)
+            AppSettings.removeProviderFromResolutionModes(context, id)
             val latencyIds = AppSettings.getLatencyTestProviderIds(context).toMutableSet()
             if (latencyIds.remove(id)) {
                 AppSettings.setLatencyTestProviderIds(context, latencyIds)

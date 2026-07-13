@@ -11,7 +11,7 @@ DNSSR 是一款 Android 本地 DNS 安全解析工具。它通过 Android VpnSer
 - 支持本地 DNS 缓存，减少重复查询。
 - 支持 DNS 请求日志、缓存记录、竞速统计和 Bootstrap 解析统计。
 - 支持域名屏蔽规则和订阅导入。
-- 支持竞速模式，在多个服务商之间按策略选择解析结果。
+- 支持单服务商、智慧预测、并行竞速和主备容灾四种解析模式。
 - 支持 Bootstrap IP，用于解析 DoH/DoT 服务商域名。
 - 支持快速设置磁贴，便于从系统快捷开关启动或停止服务。
 
@@ -51,7 +51,7 @@ app/build/outputs/apk/debug/app-debug.apk
 
 1. 安装并打开 DNSSR。
 2. 在主界面选择 DNS 服务商，或进入设置页管理服务商。
-3. 按需配置 DNS 缓存、竞速模式、Bootstrap IP、日志保留时间和域名屏蔽规则。
+3. 按需配置 DNS 缓存、解析模式、Bootstrap IP、日志保留时间和域名屏蔽规则。
 4. 启动 DNS 服务后，系统会弹出 VPN 授权确认。授权后应用开始处理 DNS 查询。
 5. 在日志页查看 DNS 请求、缓存、竞速统计和 Bootstrap 解析统计。
 

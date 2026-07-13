@@ -164,6 +164,7 @@ private fun MainContent(
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
     val raceModeEnabled by viewModel.raceModeEnabled.collectAsStateWithLifecycle()
+    val resolutionMode by viewModel.resolutionMode.collectAsStateWithLifecycle()
     val raceProviderIds by viewModel.raceProviderIds.collectAsStateWithLifecycle()
     val homeProviderVisibility by viewModel.homeProviderVisibility.collectAsStateWithLifecycle()
 
@@ -192,7 +193,8 @@ private fun MainContent(
         PowerToggleButton(
             isRunning = uiState.isRunning,
             isBusy = uiState.isBusy,
-            enabled = !uiState.isBusy && (selectedProvider != null || raceModeEnabled),
+            enabled = !uiState.isBusy && selectedProvider != null &&
+                (resolutionMode == DnsResolutionMode.SINGLE || raceProviderIds.size >= 2),
             onCenterChanged = onPowerButtonCenterChanged,
             onToggle = onToggle
         )
@@ -232,7 +234,7 @@ private fun MainContent(
                     .padding(top = 8.dp)
             ) {
                 Crossfade(
-                    targetState = raceModeEnabled,
+                    targetState = resolutionMode != DnsResolutionMode.SINGLE,
                     animationSpec = tween(160),
                     label = "RaceModeProviderContent"
                 ) { enabled ->
@@ -243,7 +245,7 @@ private fun MainContent(
                             readOnly = true,
                             enabled = true,
                             singleLine = true,
-                            label = { Text("解析服务（竞速模式）") },
+                            label = { Text("解析服务（${resolutionMode.displayName}）") },
                             shape = SettingsCornerShape,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -296,7 +298,7 @@ private fun MainContent(
                 }
             }
 
-            if (raceModeEnabled) {
+            if (resolutionMode != DnsResolutionMode.SINGLE) {
                 ProviderEndpointList(providers = raceProviders)
             } else {
                 selectedProvider?.let { provider ->
@@ -314,7 +316,7 @@ private fun MainContent(
         }
 
         val raceButtonContainerColor by animateColorAsState(
-            targetValue = if (raceModeEnabled) {
+            targetValue = if (resolutionMode != DnsResolutionMode.SINGLE) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
                 Color.Transparent
@@ -323,7 +325,7 @@ private fun MainContent(
             label = "RaceModeButtonContainerColor"
         )
         val raceButtonContentColor by animateColorAsState(
-            targetValue = if (raceModeEnabled) {
+            targetValue = if (resolutionMode != DnsResolutionMode.SINGLE) {
                 MaterialTheme.colorScheme.onPrimaryContainer
             } else {
                 MaterialTheme.colorScheme.primary
@@ -332,7 +334,7 @@ private fun MainContent(
             label = "RaceModeButtonContentColor"
         )
         Button(
-            onClick = { viewModel.setRaceModeEnabled(!raceModeEnabled) },
+            onClick = onNavigateToRaceModeSettings,
             colors = ButtonDefaults.buttonColors(
                 containerColor = raceButtonContainerColor,
                 contentColor = raceButtonContentColor
@@ -341,7 +343,7 @@ private fun MainContent(
             enabled = !uiState.isBusy,
             modifier = Modifier.padding(top = 24.dp)
         ) {
-            Text(text = "竞速模式")
+            Text(text = "模式切换 · ${resolutionMode.displayName}")
         }
     }
 }

@@ -39,6 +39,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _raceProviderIds = MutableStateFlow<Set<String>>(emptySet())
     val raceProviderIds: StateFlow<Set<String>> = _raceProviderIds.asStateFlow()
 
+    private val _resolutionMode = MutableStateFlow(DnsResolutionMode.SINGLE)
+    val resolutionMode: StateFlow<DnsResolutionMode> = _resolutionMode.asStateFlow()
+
     private val _homeProviderVisibility = MutableStateFlow(HomeProviderVisibility())
     val homeProviderVisibility: StateFlow<HomeProviderVisibility> = _homeProviderVisibility.asStateFlow()
 
@@ -91,7 +94,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _providers.value = DnsProvider.loadRuntimeProviders(context)
         _selectedProvider.value = DnsProvider.loadSelected(context)
         _raceModeEnabled.value = AppSettings.isRaceModeEnabled(context)
-        _raceProviderIds.value = DnsProvider.loadRaceProviderIds(context)
+        val mode = AppSettings.getDnsResolutionMode(context)
+        _resolutionMode.value = mode
+        _raceProviderIds.value = when (mode) {
+            DnsResolutionMode.SINGLE -> emptySet()
+            DnsResolutionMode.SMART_PREDICTION -> AppSettings.getSmartPredictionProviderIds(context)
+            DnsResolutionMode.PARALLEL_RACE -> AppSettings.getParallelRaceProviderIds(context)
+            DnsResolutionMode.PRIMARY_BACKUP -> AppSettings.getPrimaryBackupProviderIds(context).toSet()
+        }.intersect(_providers.value.map { it.id }.toSet())
         _homeProviderVisibility.value = AppSettings.getHomeProviderVisibility(context)
     }
 

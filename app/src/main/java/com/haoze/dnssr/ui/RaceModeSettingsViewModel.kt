@@ -51,6 +51,21 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
     private val _raceModeStrategy = MutableStateFlow(RaceModeStrategy.SMART_PREDICTION)
     val raceModeStrategy: StateFlow<RaceModeStrategy> = _raceModeStrategy.asStateFlow()
 
+    private val _resolutionMode = MutableStateFlow(DnsResolutionMode.SINGLE)
+    val resolutionMode: StateFlow<DnsResolutionMode> = _resolutionMode.asStateFlow()
+
+    private val _primaryBackupIds = MutableStateFlow<List<String>>(emptyList())
+    val primaryBackupIds: StateFlow<List<String>> = _primaryBackupIds.asStateFlow()
+
+    private val _smartPredictionIds = MutableStateFlow<Set<String>>(emptySet())
+    val smartPredictionIds: StateFlow<Set<String>> = _smartPredictionIds.asStateFlow()
+
+    private val _parallelRaceIds = MutableStateFlow<Set<String>>(emptySet())
+    val parallelRaceIds: StateFlow<Set<String>> = _parallelRaceIds.asStateFlow()
+
+    private val _singleProviderId = MutableStateFlow("")
+    val singleProviderId: StateFlow<String> = _singleProviderId.asStateFlow()
+
     private val _testDomain = MutableStateFlow("")
     val testDomain: StateFlow<String> = _testDomain.asStateFlow()
 
@@ -86,6 +101,11 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
             val domain = AppSettings.getRaceTestDomain(context)
             val raceModeEnabled = AppSettings.isRaceModeEnabled(context)
             val strategy = AppSettings.getRaceModeStrategy(context)
+            val resolutionMode = AppSettings.getDnsResolutionMode(context)
+            val primaryBackupIds = AppSettings.getPrimaryBackupProviderIds(context)
+                .filter { id -> all.any { it.id == id } }
+            val smartIds = AppSettings.getSmartPredictionProviderIds(context).filterTo(mutableSetOf()) { id -> all.any { it.id == id } }
+            val parallelIds = AppSettings.getParallelRaceProviderIds(context).filterTo(mutableSetOf()) { id -> all.any { it.id == id } }
             withContext(Dispatchers.Main) {
                 _providers.value = all
                 _healthByProvider.value = health
@@ -93,6 +113,11 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
                 _latencyTestSelectedIds.value = latencyIds
                 _raceModeEnabled.value = raceModeEnabled
                 _raceModeStrategy.value = strategy
+                _resolutionMode.value = resolutionMode
+                _primaryBackupIds.value = primaryBackupIds
+                _smartPredictionIds.value = smartIds
+                _parallelRaceIds.value = parallelIds
+                _singleProviderId.value = DnsProvider.loadSelected(context).id
                 _testDomain.value = domain
                 _results.value = emptyList()
                 _initialLoading.value = false
@@ -107,9 +132,14 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
                 if (contains(id)) remove(id) else add(id)
             }
             DnsProvider.saveRaceProviderIds(context, updated)
+            val ordered = _primaryBackupIds.value.toMutableList().apply {
+                if (id in updated && id !in this) add(id) else if (id !in updated) remove(id)
+            }
+            AppSettings.setPrimaryBackupProviderIds(context, ordered)
             RuntimeDnsSettingsRefresher.refreshIfRunning(context, "race_providers_changed")
             withContext(Dispatchers.Main) {
                 _selectedIds.value = updated
+                _primaryBackupIds.value = ordered
             }
         }
     }
@@ -133,6 +163,76 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
         AppSettings.setRaceModeStrategy(context, strategy)
         _raceModeStrategy.value = strategy
         return true
+    }
+
+    fun setResolutionMode(mode: DnsResolutionMode): Boolean {
+        if (_resolutionMode.value == mode) return false
+        if (!isModeValid(mode)) {
+            _message.value = "至少选择 2 个服务商后才能启用该模式"
+            if (mode == DnsResolutionMode.PRIMARY_BACKUP) _message.value = "主备容灾至少需要 1 个主服务和 1 个备用服务"
+            return false
+        }
+        val context = getApplication<Application>()
+        AppSettings.setDnsResolutionMode(context, mode)
+        _resolutionMode.value = mode
+        RuntimeDnsSettingsRefresher.refreshIfRunning(context, "resolution_mode_changed")
+        _message.value = "已切换为${mode.displayName}"
+        return true
+    }
+
+    fun isModeValid(mode: DnsResolutionMode): Boolean = when (mode) {
+        DnsResolutionMode.SINGLE -> _providers.value.any { it.id == _singleProviderId.value }
+        DnsResolutionMode.SMART_PREDICTION -> _smartPredictionIds.value.size >= 2
+        DnsResolutionMode.PARALLEL_RACE -> _parallelRaceIds.value.size >= 2
+        DnsResolutionMode.PRIMARY_BACKUP -> _primaryBackupIds.value.size >= 2
+    }
+
+    fun selectSingleProvider(id: String) {
+        if (_providers.value.none { it.id == id }) return
+        val context = getApplication<Application>()
+        DnsProvider.saveSelected(context, id)
+        _singleProviderId.value = id
+        if (_resolutionMode.value == DnsResolutionMode.SINGLE) RuntimeDnsSettingsRefresher.refreshIfRunning(context, "single_provider_changed")
+    }
+
+    fun toggleModeProvider(mode: DnsResolutionMode, id: String) {
+        val context = getApplication<Application>()
+        when (mode) {
+            DnsResolutionMode.SMART_PREDICTION -> {
+                val updated = toggle(_smartPredictionIds.value, id)
+                AppSettings.setSmartPredictionProviderIds(context, updated)
+                _smartPredictionIds.value = updated
+            }
+            DnsResolutionMode.PARALLEL_RACE -> {
+                val updated = toggle(_parallelRaceIds.value, id)
+                AppSettings.setParallelRaceProviderIds(context, updated)
+                _parallelRaceIds.value = updated
+            }
+            DnsResolutionMode.PRIMARY_BACKUP -> {
+                val updated = _primaryBackupIds.value.toMutableList().apply { if (!remove(id)) add(id) }
+                AppSettings.setPrimaryBackupProviderIds(context, updated)
+                _primaryBackupIds.value = updated
+            }
+            DnsResolutionMode.SINGLE -> return
+        }
+        if (_resolutionMode.value == mode) RuntimeDnsSettingsRefresher.refreshIfRunning(context, "resolution_mode_providers_changed")
+    }
+
+    private fun toggle(ids: Set<String>, id: String): Set<String> = ids.toMutableSet().apply {
+        if (!remove(id)) add(id)
+    }
+
+    fun movePrimaryBackupProvider(id: String, direction: Int) {
+        val current = _primaryBackupIds.value.toMutableList()
+        val from = current.indexOf(id)
+        val to = from + direction
+        if (from < 0 || to !in current.indices) return
+        val moved = current.removeAt(from)
+        current.add(to, moved)
+        val context = getApplication<Application>()
+        AppSettings.setPrimaryBackupProviderIds(context, current)
+        _primaryBackupIds.value = current
+        if (_resolutionMode.value == DnsResolutionMode.PRIMARY_BACKUP) RuntimeDnsSettingsRefresher.refreshIfRunning(context, "primary_backup_order_changed")
     }
 
     fun setTestDomain(domain: String) {
