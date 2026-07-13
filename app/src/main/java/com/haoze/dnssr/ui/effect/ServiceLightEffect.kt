@@ -21,6 +21,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.cos
@@ -71,6 +74,7 @@ private fun ServiceLightEffectApi33(
     }
     val painter = remember { ServiceLightPainter() }
     val colorStage = remember { Animatable(0f) }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(visible) {
         reveal.animateTo(
@@ -82,27 +86,31 @@ private fun ServiceLightEffectApi33(
         )
     }
 
-    LaunchedEffect(preset, visible) {
+    LaunchedEffect(preset, visible, lifecycleOwner) {
         if (!visible) return@LaunchedEffect
-        var targetStage = floor(colorStage.value) + 1f
-        while (isActive) {
-            delay((preset.colorInterpPeriod * 500).toLong())
-            colorStage.animateTo(
-                targetValue = targetStage,
-                animationSpec = spring(dampingRatio = 0.9f, stiffness = 35f)
-            )
-            targetStage += 1f
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var targetStage = floor(colorStage.value) + 1f
+            while (isActive) {
+                delay((preset.colorInterpPeriod * 500).toLong())
+                colorStage.animateTo(
+                    targetValue = targetStage,
+                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 35f)
+                )
+                targetStage += 1f
+            }
         }
     }
 
     val shouldAnimate = visible || reveal.value > 0f
-    LaunchedEffect(shouldAnimate) {
+    LaunchedEffect(shouldAnimate, lifecycleOwner) {
         if (!shouldAnimate) return@LaunchedEffect
-        val startNanos = withFrameNanos { it }
-        val startTime = animationTime
-        while (isActive) {
-            val now = withFrameNanos { it }
-            animationTime = startTime + (now - startNanos) / 1_000_000_000f
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val startNanos = withFrameNanos { it }
+            val startTime = animationTime
+            while (isActive) {
+                val now = withFrameNanos { it }
+                animationTime = startTime + (now - startNanos) / 1_000_000_000f
+            }
         }
     }
 

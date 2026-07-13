@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.system.Os
 import android.system.OsConstants
+import android.system.StructPollfd
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -458,7 +459,7 @@ class DnsVpnService : VpnService() {
                 }
                 if (length < 0) break
                 if (length == 0) {
-                    delay(IDLE_READ_DELAY_MS)
+                    waitForTunPacket(iface)
                     continue
                 }
 
@@ -478,6 +479,18 @@ class DnsVpnService : VpnService() {
             if (!coroutineContext.isActive) {
                 workers.forEach { it.cancel() }
             }
+        }
+    }
+
+    private suspend fun waitForTunPacket(iface: ParcelFileDescriptor) {
+        try {
+            val pollFd = StructPollfd().apply {
+                fd = iface.fileDescriptor
+                events = OsConstants.POLLIN.toShort()
+            }
+            Os.poll(arrayOf(pollFd), TUN_POLL_TIMEOUT_MS)
+        } catch (_: Exception) {
+            if (vpnInterface != null) delay(READ_ERROR_RETRY_DELAY_MS)
         }
     }
 
@@ -1043,7 +1056,7 @@ class DnsVpnService : VpnService() {
         private const val VPN_ADDRESS_V6 = "fd00:abcd::2"
         private const val DNS_SERVER_V6 = "fd00:abcd::1"
         private const val BUFFER_SIZE = 32767
-        private const val IDLE_READ_DELAY_MS = 10L
+        private const val TUN_POLL_TIMEOUT_MS = 1_000
         private const val READ_ERROR_RETRY_DELAY_MS = 50L
         private const val OLD_RESOLVER_CLOSE_DELAY_MS = 2_000L
         private const val MAX_CONCURRENT_DNS_QUERIES = 64
