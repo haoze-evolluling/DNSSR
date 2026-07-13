@@ -1,6 +1,5 @@
 ---
-alwaysApply: true
 scene: git_message
+语言: 简体中文
 ---
 
-使用中文编写提交信息
