@@ -78,6 +78,8 @@ import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsRadioItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsCornerShape
+import com.haoze.dnssr.ui.components.DnsProtocolBadge
+import com.haoze.dnssr.vpn.DnsProvider
 import com.haoze.dnssr.vpn.DnsProtocol
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -237,7 +239,7 @@ fun ResolutionModeConfigScreen(
                 item {
                     PrimaryBackupOrderGroup(
                         backupIds = backupIds,
-                        providerNames = providers.associate { it.id to it.name },
+                        providersById = providers.associateBy { it.id },
                         listState = listState,
                         listViewportBounds = listViewportBounds,
                         onReorder = viewModel::reorderPrimaryBackupProvider
@@ -251,7 +253,7 @@ fun ResolutionModeConfigScreen(
 @Composable
 private fun PrimaryBackupOrderGroup(
     backupIds: List<String>,
-    providerNames: Map<String, String>,
+    providersById: Map<String, DnsProvider>,
     listState: LazyListState,
     listViewportBounds: Rect?,
     onReorder: (String, Int) -> Unit
@@ -380,7 +382,7 @@ private fun PrimaryBackupOrderGroup(
         ) {}
 
         orderedIds.forEachIndexed { index, providerId ->
-            val providerName = providerNames[providerId] ?: return@forEachIndexed
+            val provider = providersById[providerId] ?: return@forEachIndexed
             key(providerId) {
                 var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 val isDragging = draggedId == providerId
@@ -445,13 +447,24 @@ private fun PrimaryBackupOrderGroup(
                 ) {
                     Text(
                         text = if (displayIndex == 0) {
-                            "主 · $providerName"
+                            "主"
                         } else {
-                            "备 $displayIndex · $providerName"
+                            "备 $displayIndex"
                         },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(
+                        text = provider.name,
+                        style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                    DnsProtocolBadge(
+                        protocol = provider.protocol,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                     Box(
                         modifier = Modifier

@@ -110,8 +110,8 @@ object AppSettings {
     private const val DEFAULT_LOG_RETENTION_DAYS = 7
     private const val DEFAULT_RACE_MODE_ENABLED = false
     private val DEFAULT_RACE_PROVIDER_IDS = setOf(
-        "preset_alidns_dot",
-        "preset_dnspod_dot",
+        "preset_alidns_dns",
+        "preset_dnspod_dns",
     )
     private val DEFAULT_LATENCY_TEST_PROVIDER_IDS = emptySet<String>()
     private const val DEFAULT_RACE_TEST_DOMAIN = "mihoyo.com"

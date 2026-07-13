@@ -61,7 +61,7 @@ data class DnsProvider(
         private const val PREFS_NAME = "dns_vpn_prefs"
         private const val KEY_USER_PROVIDERS_JSON = "user_providers_json"
         private const val KEY_SELECTED_PROVIDER_ID = "selected_provider_id"
-        private const val DEFAULT_SELECTED_PROVIDER_ID = "preset_alidns_doh"
+        private const val DEFAULT_SELECTED_PROVIDER_ID = "preset_alidns_dns"
 
         val PRESETS = listOf(
             DnsProvider(
