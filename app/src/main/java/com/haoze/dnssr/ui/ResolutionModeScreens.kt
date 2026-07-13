@@ -1,18 +1,35 @@
 package com.haoze.dnssr.ui
 
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,14 +43,29 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.ui.components.SettingsCheckboxItem
@@ -45,7 +77,11 @@ import com.haoze.dnssr.ui.components.SettingsLoadingContent
 import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsRadioItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
+import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.vpn.DnsProtocol
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 @Composable
 fun ResolutionModeHomeScreen(
@@ -158,6 +194,8 @@ fun ResolutionModeConfigScreen(
     val singleId by viewModel.singleProviderId.collectAsStateWithLifecycle()
     val loading by viewModel.initialLoading.collectAsStateWithLifecycle()
     var protocol by remember { mutableStateOf(DnsProtocol.DOH) }
+    val listState = rememberLazyListState()
+    var listViewportBounds by remember { mutableStateOf<Rect?>(null) }
     LaunchedEffect(Unit) { viewModel.activate() }
     val selected = when (mode) {
         DnsResolutionMode.SMART_PREDICTION -> smartIds
@@ -167,7 +205,12 @@ fun ResolutionModeConfigScreen(
     }
     SettingsScaffold(title = mode.displayName, onBack = onBack) { padding ->
         if (loading) return@SettingsScaffold SettingsLoadingContent(Modifier.padding(padding))
-        LazyColumn(modifier = Modifier.padding(padding)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .padding(padding)
+                .onGloballyPositioned { listViewportBounds = it.boundsInWindow() }
+        ) {
             item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DnsProtocol.MANAGED_PROTOCOLS.filter { p -> providers.any { it.protocol == p } }.forEach { p ->
@@ -195,6 +238,8 @@ fun ResolutionModeConfigScreen(
                     PrimaryBackupOrderGroup(
                         backupIds = backupIds,
                         providerNames = providers.associate { it.id to it.name },
+                        listState = listState,
+                        listViewportBounds = listViewportBounds,
                         onReorder = viewModel::reorderPrimaryBackupProvider
                     )
                 }
@@ -207,69 +252,244 @@ fun ResolutionModeConfigScreen(
 private fun PrimaryBackupOrderGroup(
     backupIds: List<String>,
     providerNames: Map<String, String>,
+    listState: LazyListState,
+    listViewportBounds: Rect?,
     onReorder: (String, Int) -> Unit
 ) {
     var orderedIds by remember(backupIds) { mutableStateOf(backupIds) }
     var draggedId by remember { mutableStateOf<String?>(null) }
-    val latestOrder = rememberUpdatedState(orderedIds)
-    val reorderThresholdPx = with(LocalDensity.current) { 40.dp.toPx() }
+    var settlingId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var dragStartIndex by remember { mutableIntStateOf(0) }
+    var targetIndex by remember { mutableIntStateOf(0) }
+    var draggedCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
+    val latestBackupOrder = rememberUpdatedState(backupIds)
+    val density = LocalDensity.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    val settleOffset = remember { Animatable(0f) }
+    val reorderThresholdPx = with(density) { 40.dp.toPx() }
+    val edgeOverscrollPx = with(density) { 20.dp.toPx() }
+    val autoScrollEdgePx = with(density) { 72.dp.toPx() }
+    val maxAutoScrollPxPerSecond = with(density) { 720.dp.toPx() }
+    val rowHeight = 48.dp
+    val dividerHeight = 1.dp
+    val itemHeight = rowHeight + dividerHeight
+    val itemHeightPx = with(density) { itemHeight.toPx() }
+    val liftedShape = RoundedCornerShape(6.dp)
+    val rowColor = MaterialTheme.colorScheme.surfaceContainer
 
-    SettingsGroup {
+    fun updateDraggedPosition(providerId: String) {
+        while (true) {
+            val current = orderedIds
+            val from = current.indexOf(providerId)
+            if (from < 0) return
+
+            if (from == 0 && dragOffsetY < -edgeOverscrollPx) {
+                dragOffsetY = -edgeOverscrollPx
+            }
+            if (from == current.lastIndex && dragOffsetY > edgeOverscrollPx) {
+                dragOffsetY = edgeOverscrollPx
+            }
+
+            val direction = when {
+                dragOffsetY <= -reorderThresholdPx -> -1
+                dragOffsetY >= reorderThresholdPx -> 1
+                else -> return
+            }
+            val to = (from + direction).coerceIn(current.indices)
+            if (from == to) return
+
+            orderedIds = current.toMutableList().apply {
+                add(to, removeAt(from))
+            }
+            targetIndex = to
+            dragOffsetY -= direction * itemHeightPx
+        }
+    }
+
+    fun settleDraggedItem(providerId: String) {
+        settleJob?.cancel()
+        settleJob = coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            settleOffset.snapTo(dragOffsetY)
+            settlingId = providerId
+            draggedId = null
+            draggedCoordinates = null
+            settleOffset.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+            if (settlingId == providerId) {
+                dragOffsetY = 0f
+                settlingId = null
+            }
+        }
+    }
+
+    LaunchedEffect(draggedId, listViewportBounds) {
+        val providerId = draggedId ?: return@LaunchedEffect
+        val viewport = listViewportBounds ?: return@LaunchedEffect
+        var previousFrameNanos = withFrameNanos { it }
+
+        while (draggedId == providerId) {
+            val frameNanos = withFrameNanos { it }
+            val frameSeconds = ((frameNanos - previousFrameNanos) / 1_000_000_000f)
+                .coerceAtMost(0.05f)
+            previousFrameNanos = frameNanos
+
+            val coordinates = draggedCoordinates
+            if (coordinates?.isAttached != true) continue
+            val centerY = coordinates.boundsInWindow().center.y
+            val topDistance = centerY - viewport.top
+            val bottomDistance = viewport.bottom - centerY
+            val scrollVelocity = when {
+                topDistance < autoScrollEdgePx && listState.canScrollBackward -> {
+                    -maxAutoScrollPxPerSecond *
+                        (1f - topDistance / autoScrollEdgePx).coerceIn(0f, 1f)
+                }
+                bottomDistance < autoScrollEdgePx && listState.canScrollForward -> {
+                    maxAutoScrollPxPerSecond *
+                        (1f - bottomDistance / autoScrollEdgePx).coerceIn(0f, 1f)
+                }
+                else -> 0f
+            }
+            if (scrollVelocity == 0f) continue
+
+            val consumedScroll = listState.scrollBy(scrollVelocity * frameSeconds)
+            if (consumedScroll != 0f) {
+                dragOffsetY += consumedScroll
+                updateDraggedPosition(providerId)
+            }
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(itemHeight * orderedIds.size - dividerHeight)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = SettingsCornerShape,
+            colors = CardDefaults.cardColors(containerColor = rowColor)
+        ) {}
+
         orderedIds.forEachIndexed { index, providerId ->
             val providerName = providerNames[providerId] ?: return@forEachIndexed
             key(providerId) {
-                var dragDistance by remember { mutableFloatStateOf(0f) }
-                var targetIndex by remember { mutableIntStateOf(index) }
+                var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                val isDragging = draggedId == providerId
+                val isSettling = settlingId == providerId
+                val isRaised = isDragging || isSettling
+                val baseOffset by animateDpAsState(
+                    targetValue = itemHeight * index,
+                    animationSpec = if (isRaised) snap() else tween(durationMillis = 160),
+                    label = "primaryBackupItemPlacement"
+                )
+                val liftedScale by animateFloatAsState(
+                    targetValue = if (isRaised) 1.02f else 1f,
+                    animationSpec = tween(durationMillis = 120),
+                    label = "primaryBackupLiftScale"
+                )
+                val displayIndex = if (isRaised) dragStartIndex else index
+                val accessibilityActions = buildList {
+                    if (index > 0) {
+                        add(CustomAccessibilityAction("提高优先级") {
+                            onReorder(providerId, index - 1)
+                            true
+                        })
+                    }
+                    if (index < orderedIds.lastIndex) {
+                        add(CustomAccessibilityAction("降低优先级") {
+                            onReorder(providerId, index + 1)
+                            true
+                        })
+                    }
+                }
+
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .height(rowHeight)
+                        .offset(y = baseOffset)
+                        .zIndex(if (isRaised) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = when {
+                                isDragging -> dragOffsetY
+                                isSettling -> settleOffset.value
+                                else -> 0f
+                            }
+                            scaleX = liftedScale
+                            scaleY = liftedScale
+                            shadowElevation = if (isDragging) 8.dp.toPx() else 0f
+                            shape = liftedShape
+                        }
+                        .onGloballyPositioned {
+                            rowCoordinates = it
+                            if (isDragging) draggedCoordinates = it
+                        }
+                        .background(
+                            color = if (isRaised) rowColor else Color.Transparent,
+                            shape = liftedShape
+                        )
+                        .semantics(mergeDescendants = true) {
+                            customActions = accessibilityActions
+                        }
                         .padding(start = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        if (index == 0) "主 · $providerName" else "备 $index · $providerName",
-                        Modifier.weight(1f)
+                        text = if (displayIndex == 0) {
+                            "主 · $providerName"
+                        } else {
+                            "备 $displayIndex · $providerName"
+                        },
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .pointerInput(providerId) {
+                            .pointerInput(providerId, itemHeightPx, backupIds) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
+                                        settleJob?.cancel()
+                                        settlingId = null
                                         draggedId = providerId
-                                        targetIndex = latestOrder.value.indexOf(providerId)
-                                        dragDistance = 0f
+                                        draggedCoordinates = rowCoordinates
+                                        dragStartIndex = orderedIds.indexOf(providerId)
+                                        targetIndex = dragStartIndex
+                                        dragOffsetY = 0f
+                                        hapticFeedback.performHapticFeedback(
+                                            HapticFeedbackType.LongPress
+                                        )
                                     },
                                     onDragCancel = {
-                                        orderedIds = backupIds
-                                        draggedId = null
-                                        dragDistance = 0f
+                                        val currentIndex = orderedIds.indexOf(providerId)
+                                        val backupOrder = latestBackupOrder.value
+                                        val originalIndex = backupOrder.indexOf(providerId)
+                                        if (currentIndex >= 0 && originalIndex >= 0) {
+                                            dragOffsetY +=
+                                                (currentIndex - originalIndex) * itemHeightPx
+                                            targetIndex = originalIndex
+                                        }
+                                        orderedIds = backupOrder
+                                        settleDraggedItem(providerId)
                                     },
                                     onDragEnd = {
                                         onReorder(providerId, targetIndex)
-                                        draggedId = null
-                                        dragDistance = 0f
+                                        settleDraggedItem(providerId)
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        dragDistance += dragAmount.y
-                                        val direction = when {
-                                            dragDistance <= -reorderThresholdPx -> -1
-                                            dragDistance >= reorderThresholdPx -> 1
-                                            else -> 0
-                                        }
-                                        if (direction != 0) {
-                                            val current = latestOrder.value
-                                            val from = current.indexOf(providerId)
-                                            val to = (from + direction).coerceIn(current.indices)
-                                            if (from >= 0 && from != to) {
-                                                orderedIds = current.toMutableList().apply {
-                                                    add(to, removeAt(from))
-                                                }
-                                                targetIndex = to
-                                            }
-                                            dragDistance = 0f
-                                        }
+                                        dragOffsetY += dragAmount.y
+                                        updateDraggedPosition(providerId)
                                     }
                                 )
                             },
@@ -278,7 +498,7 @@ private fun PrimaryBackupOrderGroup(
                         Icon(
                             imageVector = Icons.Default.DragHandle,
                             contentDescription = "长按并拖动调整顺序",
-                            tint = if (draggedId == providerId) {
+                            tint = if (isRaised) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -286,8 +506,10 @@ private fun PrimaryBackupOrderGroup(
                         )
                     }
                 }
-                if (index < orderedIds.lastIndex) SettingsDivider()
             }
+        }
+        repeat(orderedIds.lastIndex) { index ->
+            SettingsDivider(Modifier.offset(y = itemHeight * index + rowHeight))
         }
     }
 }
