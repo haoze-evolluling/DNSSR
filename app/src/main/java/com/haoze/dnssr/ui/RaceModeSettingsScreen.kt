@@ -143,7 +143,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
                     }
                 }
                 if (resolutionMode == DnsResolutionMode.SINGLE) {
-                    item { SettingsInfoText("单服务商模式使用首页“解析服务”下拉框中的当前选择。") }
+                    item { SettingsInfoText("一脉直达模式使用首页“解析服务”下拉框中的当前选择。") }
                 }
                 item {
                     val protocols = availableProtocols(providers)

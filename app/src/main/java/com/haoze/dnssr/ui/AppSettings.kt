@@ -18,9 +18,9 @@ enum class RaceModeStrategy(
     val storageValue: String,
     val displayName: String
 ) {
-    BRUTE_FORCE_PARALLEL("brute_force_parallel", "暴力并行"),
-    SMART_PREDICTION("smart_prediction", "智慧预测"),
-    PRIMARY_BACKUP("primary_backup", "主备容灾");
+    BRUTE_FORCE_PARALLEL("brute_force_parallel", "百舸争流"),
+    SMART_PREDICTION("smart_prediction", "择优而行"),
+    PRIMARY_BACKUP("primary_backup", "有备无患");
 
     companion object {
         fun fromStorageValue(value: String?): RaceModeStrategy {
@@ -33,10 +33,10 @@ enum class DnsResolutionMode(
     val storageValue: String,
     val displayName: String
 ) {
-    SINGLE("single", "单服务商"),
-    SMART_PREDICTION("smart_prediction", "智慧预测"),
-    PARALLEL_RACE("parallel_race", "并行竞速"),
-    PRIMARY_BACKUP("primary_backup", "主备容灾");
+    SINGLE("single", "一脉直达"),
+    SMART_PREDICTION("smart_prediction", "择优而行"),
+    PARALLEL_RACE("parallel_race", "百舸争流"),
+    PRIMARY_BACKUP("primary_backup", "有备无患");
 
     companion object {
         fun fromStorageValue(value: String?): DnsResolutionMode? =

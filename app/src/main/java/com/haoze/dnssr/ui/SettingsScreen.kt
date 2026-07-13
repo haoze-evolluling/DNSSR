@@ -132,7 +132,7 @@ fun SettingsScreen(
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = raceModeSettingsTitle,
-                    subtitle = "选择单服务、智慧预测、并行竞速或主备容灾",
+                    subtitle = "选择一脉直达、择优而行、百舸争流或有备无患",
                     value = raceModeSummary,
                     onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                 )

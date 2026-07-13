@@ -169,7 +169,7 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
         if (_resolutionMode.value == mode) return false
         if (!isModeValid(mode)) {
             _message.value = "至少选择 2 个服务商后才能启用该模式"
-            if (mode == DnsResolutionMode.PRIMARY_BACKUP) _message.value = "主备容灾至少需要 1 个主服务和 1 个备用服务"
+            if (mode == DnsResolutionMode.PRIMARY_BACKUP) _message.value = "有备无患至少需要 1 个主服务和 1 个备用服务"
             return false
         }
         val context = getApplication<Application>()

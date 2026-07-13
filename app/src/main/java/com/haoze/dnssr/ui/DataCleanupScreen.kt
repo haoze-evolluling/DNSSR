@@ -89,7 +89,7 @@ fun DataCleanupScreen(
             SettingsGroup {
                 SettingsTextItem(
                     title = "恢复竞速模式默认权重",
-                    subtitle = "清除竞速模式的健康样本，让智慧预测重新按默认权重分配流量",
+                    subtitle = "清除竞速模式的健康样本，让择优而行重新按默认权重分配流量",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.PROVIDER_WEIGHT }
                 )
