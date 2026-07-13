@@ -61,7 +61,7 @@ fun ProviderManagementScreen(
     var showEditDialog by remember { mutableStateOf<DnsProvider?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
     var providerToDelete by remember { mutableStateOf<DnsProvider?>(null) }
-    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DOH) }
+    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DNS) }
 
     LaunchedEffect(Unit) {
         delay(300) // 等待页面进入动画完成后再加载数据

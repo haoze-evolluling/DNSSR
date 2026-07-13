@@ -78,8 +78,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
     val primaryBackupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
-    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DOH) }
-    var initializedProtocolFilter by remember { mutableStateOf(false) }
+    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DNS) }
     val normalizedWeights = ProviderHealthStore.normalizeWeightsToPercent(
         providers
             .filter { it.id in selectedIds }
@@ -100,19 +99,10 @@ private fun LegacyRaceModeProviderSettingsScreen(
         viewModel.activate()
     }
 
-    LaunchedEffect(initialLoading, providers, selectedIds) {
-        if (!initialLoading && providers.isNotEmpty() && !initializedProtocolFilter) {
-            providers.firstOrNull { it.id in selectedIds }?.protocol?.let {
-                selectedProtocol = it
-            }
-            initializedProtocolFilter = true
-        }
-    }
-
     LaunchedEffect(providers) {
         val protocols = availableProtocols(providers)
         if (selectedProtocol !in protocols) {
-            selectedProtocol = protocols.firstOrNull() ?: DnsProtocol.DOH
+            selectedProtocol = protocols.firstOrNull() ?: DnsProtocol.DNS
         }
     }
 
@@ -338,7 +328,7 @@ fun RaceModeLatencySettingsScreen(
     val results by viewModel.results.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
-    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DOH) }
+    var selectedProtocol by remember { mutableStateOf(DnsProtocol.DNS) }
 
     LaunchedEffect(message) {
         message?.let {
@@ -355,7 +345,7 @@ fun RaceModeLatencySettingsScreen(
     LaunchedEffect(providers) {
         val protocols = availableProtocols(providers)
         if (selectedProtocol !in protocols) {
-            selectedProtocol = protocols.firstOrNull() ?: DnsProtocol.DOH
+            selectedProtocol = protocols.firstOrNull() ?: DnsProtocol.DNS
         }
     }
 

@@ -193,7 +193,7 @@ fun ResolutionModeConfigScreen(
     val backupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
     val singleId by viewModel.singleProviderId.collectAsStateWithLifecycle()
     val loading by viewModel.initialLoading.collectAsStateWithLifecycle()
-    var protocol by remember { mutableStateOf(DnsProtocol.DOH) }
+    var protocol by remember { mutableStateOf(DnsProtocol.DNS) }
     val listState = rememberLazyListState()
     var listViewportBounds by remember { mutableStateOf<Rect?>(null) }
     LaunchedEffect(Unit) { viewModel.activate() }
