@@ -95,6 +95,36 @@ class SubscriptionManager(
         }
     }
 
+    /** Saves a remote subscription without downloading its rules. */
+    suspend fun addRemoteSubscription(url: String, name: String): Result<SubscriptionEntity> =
+        withContext(Dispatchers.IO) {
+            val trimmedUrl = url.trim()
+            val trimmedName = name.trim()
+            if (trimmedName.isEmpty()) {
+                return@withContext Result.failure(IllegalArgumentException("订阅名称不能为空"))
+            }
+            if (!trimmedUrl.startsWith("https://") && !trimmedUrl.startsWith("http://")) {
+                return@withContext Result.failure(IllegalArgumentException("订阅链接必须使用 HTTP 或 HTTPS"))
+            }
+            if (subscriptionDao.byUrlAndKind(trimmedUrl, SubscriptionKind.BLOCK) != null) {
+                return@withContext Result.failure(IllegalArgumentException("该订阅链接已存在"))
+            }
+
+            try {
+                val subscription = SubscriptionEntity(
+                    url = trimmedUrl,
+                    name = trimmedName,
+                    sourceType = SubscriptionSourceType.REMOTE,
+                    kind = SubscriptionKind.BLOCK,
+                    enabled = true
+                )
+                Result.success(subscription.copy(id = subscriptionDao.insert(subscription)))
+            } catch (e: Exception) {
+                Log.e(TAG, "保存订阅失败", e)
+                Result.failure(e)
+            }
+        }
+
     suspend fun addLocalSubscription(
         sourceRef: String,
         name: String,

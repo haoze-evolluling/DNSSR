@@ -47,6 +47,7 @@ object Routes {
     const val RULE_LIST = "rule_list"
     const val ALLOW_RULE_LIST = "allow_rule_list"
     const val DATA_CLEANUP = "data_cleanup"
+    const val CONFIG_TRANSFER = "config_transfer"
     const val PROVIDER_MANAGEMENT = "provider_management"
     const val HOME_PROVIDER_VISIBILITY = "home_provider_visibility"
     const val BOOTSTRAP_SETTINGS = "bootstrap_settings"
@@ -120,6 +121,7 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 onNavigateToRuleManagement = { title -> navController.navigateToTitledRoute(Routes.RULE_MANAGEMENT, title) },
                 onNavigateToDataCleanup = { title -> navController.navigateToTitledRoute(Routes.DATA_CLEANUP, title) },
+                onNavigateToConfigTransfer = { title -> navController.navigateToTitledRoute(Routes.CONFIG_TRANSFER, title) },
                 onNavigateToProviderManagement = { title -> navController.navigateToTitledRoute(Routes.PROVIDER_MANAGEMENT, title) },
                 onNavigateToHomeProviderVisibility = { title -> navController.navigateToTitledRoute(Routes.HOME_PROVIDER_VISIBILITY, title) },
                 onNavigateToRaceModeLatency = { title -> navController.navigateToTitledRoute(Routes.RACE_MODE_LATENCY, title) },
@@ -201,6 +203,12 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "数据清理",
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+            )
+        }
+        composable(titledRoute(Routes.CONFIG_TRANSFER), arguments = listOf(screenTitleArgument("导入与导出"))) { entry ->
+            ConfigTransferScreen(
+                onBack = { navController.popBackStack() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出"
             )
         }
         composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("DNS 服务商管理"))) { entry ->

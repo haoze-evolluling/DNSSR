@@ -23,6 +23,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToRuleManagement: (String) -> Unit,
     onNavigateToDataCleanup: (String) -> Unit,
+    onNavigateToConfigTransfer: (String) -> Unit,
     onNavigateToProviderManagement: (String) -> Unit,
     onNavigateToHomeProviderVisibility: (String) -> Unit,
     onNavigateToRaceModeLatency: (String) -> Unit,
@@ -45,6 +46,7 @@ fun SettingsScreen(
     val ruleManagementTitle = "域名规则"
     val logRetentionTitle = "日志保留"
     val dataCleanupTitle = "数据清理"
+    val configTransferTitle = "导入与导出"
     val foregroundBackgroundTitle = "前后台行为"
     val experimentalFeaturesTitle = "实验功能"
     val aboutTitle = "DNSSR 应用信息"
@@ -149,6 +151,12 @@ fun SettingsScreen(
 
             SettingsGroupTitle("数据管理")
             SettingsGroup {
+                SettingsNavigationItem(
+                    title = configTransferTitle,
+                    subtitle = "备份或恢复自定义服务与规则订阅",
+                    onClick = { onNavigateToConfigTransfer(configTransferTitle) }
+                )
+                SettingsDivider()
                 SettingsNavigationItem(
                     title = logRetentionTitle,
                     subtitle = "设置请求日志自动清理时间",
