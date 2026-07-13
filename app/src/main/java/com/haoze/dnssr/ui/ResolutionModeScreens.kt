@@ -2,6 +2,7 @@ package com.haoze.dnssr.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,10 +10,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,23 +54,35 @@ fun ResolutionModeHomeScreen(
     val loading by viewModel.initialLoading.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showModeDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.activate() }
     LaunchedEffect(message) { message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); viewModel.clearMessage() } }
+
+    if (showModeDialog) {
+        ResolutionModePickerDialog(
+            selectedMode = mode,
+            onSelect = { selectedMode ->
+                showModeDialog = false
+                if (!viewModel.setResolutionMode(selectedMode) && mode != selectedMode) {
+                    onOpenMode(selectedMode)
+                }
+            },
+            onDismiss = { showModeDialog = false }
+        )
+    }
 
     SettingsScaffold(title = "解析模式", onBack = onBack) { padding ->
         if (loading) return@SettingsScaffold SettingsLoadingContent(Modifier.padding(padding))
         LazyColumn(modifier = Modifier.padding(padding)) {
             item { SettingsGroupTitle("当前模式") }
             item {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    DnsResolutionMode.entries.forEach { candidate ->
-                        FilterChip(
-                            selected = mode == candidate,
-                            onClick = { if (!viewModel.setResolutionMode(candidate) && mode != candidate) onOpenMode(candidate) },
-                            label = { Text(candidate.displayName, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "解析模式",
+                        subtitle = subtitleFor(mode),
+                        value = mode.displayName,
+                        onClick = { showModeDialog = true }
+                    )
                 }
             }
             item { SettingsGroupTitle("模式配置") }
@@ -93,6 +107,34 @@ fun ResolutionModeHomeScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ResolutionModePickerDialog(
+    selectedMode: DnsResolutionMode,
+    onSelect: (DnsResolutionMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择解析模式") },
+        text = {
+            Column {
+                DnsResolutionMode.entries.forEachIndexed { index, mode ->
+                    SettingsRadioItem(
+                        title = mode.displayName,
+                        subtitle = subtitleFor(mode),
+                        selected = selectedMode == mode,
+                        onClick = { onSelect(mode) }
+                    )
+                    if (index < DnsResolutionMode.entries.lastIndex) SettingsDivider()
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 @Composable
