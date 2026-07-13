@@ -9,6 +9,8 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -186,12 +188,27 @@ class DnsVpnService : VpnService() {
             stopSelf()
             return
         }
+        configureLegacyBlockingMode(vpnInterface!!)
 
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
         stopMonitorService()
         sendStatusBroadcast(true)
         readJob = serviceScope.launch { packetLoop() }
+    }
+
+    private fun configureLegacyBlockingMode(iface: ParcelFileDescriptor) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return
+        runCatching {
+            val flags = Os.fcntlInt(iface.fileDescriptor, OsConstants.F_GETFL, 0)
+            Os.fcntlInt(
+                iface.fileDescriptor,
+                OsConstants.F_SETFL,
+                flags and OsConstants.O_NONBLOCK.inv()
+            )
+        }.onFailure { error ->
+            Log.w(TAG, "Unable to enable blocking TUN reads; using polling fallback", error)
+        }
     }
 
     private fun refreshRuntimeConfig(reason: String) {

@@ -5,8 +5,15 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
+import androidx.room.Transaction
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.haoze.dnssr.data.entity.DnsCacheEntity
+
+data class DnsCacheHitUpdate(
+    val key: String,
+    val count: Int,
+    val lastHitAt: Long
+)
 
 @Dao
 interface DnsCacheDao {
@@ -24,6 +31,13 @@ interface DnsCacheDao {
 
     @Query("UPDATE dns_cache SET hitCount = hitCount + :count, lastHitAt = :lastHitAt WHERE `key` = :key")
     suspend fun recordHits(key: String, count: Int, lastHitAt: Long)
+
+    @Transaction
+    suspend fun recordHitsBatch(updates: List<DnsCacheHitUpdate>) {
+        updates.forEach { update ->
+            recordHits(update.key, update.count, update.lastHitAt)
+        }
+    }
 
     @Query("DELETE FROM dns_cache WHERE `key` = :key")
     suspend fun delete(key: String)

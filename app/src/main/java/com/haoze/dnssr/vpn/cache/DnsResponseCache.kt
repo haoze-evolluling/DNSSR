@@ -1,6 +1,7 @@
 package com.haoze.dnssr.vpn.cache
 
 import com.haoze.dnssr.data.dao.DnsCacheDao
+import com.haoze.dnssr.data.dao.DnsCacheHitUpdate
 import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.vpn.DnsMessageUtils
 import kotlinx.coroutines.CoroutineScope
@@ -245,14 +246,18 @@ class DnsResponseCache(
             if (pendingHits.isEmpty()) {
                 emptyList()
             } else {
-                pendingHits.map { (key, hit) -> key to hit }.also {
+                pendingHits.map { (key, hit) ->
+                    DnsCacheHitUpdate(
+                        key = key,
+                        count = hit.count,
+                        lastHitAt = hit.lastHitAt
+                    )
+                }.also {
                     pendingHits.clear()
                 }
             }
         }
-        hits.forEach { (key, hit) ->
-            dao.recordHits(key, hit.count, hit.lastHitAt)
-        }
+        dao.recordHitsBatch(hits)
     }
 
     private suspend fun clearPendingHits() {
