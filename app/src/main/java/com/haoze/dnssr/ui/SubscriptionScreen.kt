@@ -1,0 +1,772 @@
+package com.haoze.dnssr.ui
+
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.SubscriptionKind
+import com.haoze.dnssr.data.entity.SubscriptionSourceType
+import com.haoze.dnssr.ui.components.SettingsCornerShape
+import com.haoze.dnssr.ui.components.SettingsGroup
+import com.haoze.dnssr.ui.components.SettingsGroupTitle
+import com.haoze.dnssr.ui.components.SettingsInfoText
+import com.haoze.dnssr.ui.components.SettingsScaffold
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+fun SubscriptionScreen(
+    onBack: () -> Unit,
+    onRuntimeDnsSettingsChanged: () -> Unit = {},
+    viewModel: SubscriptionViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
+    val selectedKind by viewModel.selectedKind.collectAsStateWithLifecycle()
+    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
+    val importing by viewModel.importing.collectAsStateWithLifecycle()
+    val operationMessage by viewModel.operationMessage.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val busy = importing || operationMessage != null
+
+    var showAddChoiceDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var localImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showActionDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    var showUrlDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    var showEditDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    var showRenameDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
+    val localImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        localImportUri = uri
+    }
+
+    LaunchedEffect(Unit) {
+        delay(300) // 等待页面进入动画完成后再加载数据
+        viewModel.activate()
+    }
+
+    // 消息自动清除
+    if (message != null) {
+        androidx.compose.runtime.LaunchedEffect(message) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearMessage()
+        }
+    }
+
+    SettingsScaffold(
+        title = "规则订阅",
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = { showAddChoiceDialog = true }, enabled = !busy) {
+                Icon(Icons.Default.Add, contentDescription = "添加规则订阅")
+            }
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            // 导入进度
+            item {
+                SubscriptionKindToggleRow(
+                    selectedKind = selectedKind,
+                    onSelect = viewModel::setSelectedKind,
+                    enabled = !busy,
+                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                )
+            }
+
+            item {
+                AnimatedVisibility(
+                    visible = importing || operationMessage != null,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        val (current, total) = importProgress
+                        Text(
+                            text = when {
+                                importing && total > 0 -> "正在导入${selectedKind.ruleKindLabel()}规则... $current / $total"
+                                importing -> "正在下载订阅规则..."
+                                else -> operationMessage.orEmpty()
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (importing && total > 0) {
+                            LinearProgressIndicator(
+                                progress = { current.toFloat() / total.toFloat() },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+
+            // 操作结果消息
+            message?.let {
+                item {
+                    SettingsInfoText(text = it, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+
+            item {
+                AnimatedContent(
+                    targetState = subscriptions.isEmpty() && !busy,
+                    transitionSpec = {
+                        EnterTransition.None.togetherWith(ExitTransition.None)
+                    },
+                    label = "SubscriptionList"
+                ) { empty ->
+                    if (empty) {
+                        SettingsGroupTitle("${selectedKind.ruleKindLabel()}订阅")
+                        SettingsGroup {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "暂无${selectedKind.ruleKindLabel()}订阅",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "点击右上角 + 添加 AdGuard DNS ${selectedKind.ruleKindLabel()}规则地址",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        Column {
+                            SettingsGroupTitle("${selectedKind.ruleKindLabel()}订阅")
+                            SettingsGroup {
+                                subscriptions.forEachIndexed { index, sub ->
+                                    SubscriptionItem(
+                                        subscription = sub,
+                                        onShowUrl = {
+                                            if (sub.sourceType == SubscriptionSourceType.REMOTE) showUrlDialog = sub
+                                        },
+                                        onShowActions = { showActionDialog = sub },
+                                        actionsEnabled = !busy
+                                    )
+                                    if (index < subscriptions.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                SettingsInfoText(
+                    text = if (selectedKind == SubscriptionKind.ALLOW) {
+                        "白名单订阅支持 @@||domain^ 和普通域名，会在屏蔽规则前优先匹配。"
+                    } else {
+                        "屏蔽订阅支持 AdGuard DNS 过滤规则，会自动解析 ||domain^、hosts 等常见格式。"
+                    },
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        }
+    }
+
+    if (showAddChoiceDialog) {
+        AddSubscriptionChoiceDialog(
+            onDismiss = { showAddChoiceDialog = false },
+            onAddRemote = {
+                showAddChoiceDialog = false
+                showAddDialog = true
+            },
+            onAddLocal = {
+                showAddChoiceDialog = false
+                localImportLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
+            }
+        )
+    }
+
+    if (showAddDialog) {
+        AddSubscriptionDialog(
+            kind = selectedKind,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { url, name ->
+                viewModel.addSubscription(url, name)
+                showAddDialog = false
+            }
+        )
+    }
+
+    localImportUri?.let { uri ->
+        LocalSubscriptionImportDialog(
+            initialName = remember(uri) { context.displayNameFor(uri) },
+            onDismiss = { localImportUri = null },
+            onConfirm = { name ->
+                viewModel.addLocalSubscription(uri, name)
+                localImportUri = null
+            }
+        )
+    }
+
+    showUrlDialog?.let { sub ->
+        AlertDialog(
+            onDismissRequest = { showUrlDialog = null },
+            title = { Text("订阅地址") },
+            text = {
+                SelectionContainer {
+                    Text(
+                        text = sub.url,
+                        style = MaterialTheme.typography.bodyMedium,
+                        softWrap = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showUrlDialog = null }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
+
+    // 订阅操作对话框
+    showActionDialog?.let { sub ->
+        SubscriptionActionDialog(
+            subscription = sub,
+            onDismiss = { showActionDialog = null },
+            onUpdate = {
+                viewModel.updateSubscription(sub.id)
+                showActionDialog = null
+            },
+            onDelete = {
+                showActionDialog = null
+                showDeleteDialog = sub
+            },
+            onEdit = {
+                showActionDialog = null
+                if (sub.sourceType == SubscriptionSourceType.LOCAL) {
+                    showRenameDialog = sub
+                } else {
+                    showEditDialog = sub
+                }
+            },
+            onToggleEnabled = {
+                viewModel.toggleSubscriptionEnabled(sub.id, !sub.enabled)
+                showActionDialog = null
+            }
+        )
+    }
+
+    showEditDialog?.let { sub ->
+        EditSubscriptionDialog(
+            subscription = sub,
+            onDismiss = { showEditDialog = null },
+            onConfirm = { url, name ->
+                viewModel.editSubscription(sub.id, url, name)
+                showEditDialog = null
+            }
+        )
+    }
+
+    showRenameDialog?.let { sub ->
+        RenameSubscriptionDialog(
+            subscription = sub,
+            onDismiss = { showRenameDialog = null },
+            onConfirm = { name ->
+                viewModel.renameSubscription(sub.id, name)
+                showRenameDialog = null
+            }
+        )
+    }
+
+    // 删除确认对话框
+    showDeleteDialog?.let { sub ->
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = null },
+            title = { Text("删除规则订阅") },
+            text = { Text("确定删除「${sub.name}」及其导入的所有规则吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteSubscription(sub.id)
+                    showDeleteDialog = null
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SubscriptionKindToggleRow(
+    selectedKind: String,
+    onSelect: (String) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        listOf(SubscriptionKind.BLOCK, SubscriptionKind.ALLOW).forEach { kind ->
+            FilterChip(
+                selected = selectedKind == kind,
+                onClick = { onSelect(kind) },
+                enabled = enabled,
+                label = {
+                    Text(
+                        text = kind.ruleKindLabel(),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionItem(
+    subscription: SubscriptionEntity,
+    onShowUrl: () -> Unit,
+    onShowActions: () -> Unit,
+    actionsEnabled: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = subscription.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (subscription.enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) "本地文件" else subscription.url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (subscription.sourceType == SubscriptionSourceType.REMOTE) {
+                        Modifier.clickable(onClick = onShowUrl)
+                    } else {
+                        Modifier
+                    }
+                )
+            }
+            IconButton(onClick = onShowActions, enabled = actionsEnabled) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "打开规则订阅操作"
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = if (subscription.enabled) "已启用" else "已禁用",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (subscription.enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Text(
+                text = "${subscription.ruleCount} 条规则",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (subscription.lastUpdated > 0) {
+                val dateStr = remember(subscription.lastUpdated) {
+                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                        .format(Date(subscription.lastUpdated))
+                }
+                Text(
+                    text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) {
+                        "导入于 $dateStr"
+                    } else {
+                        "更新于 $dateStr"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionActionDialog(
+    subscription: SubscriptionEntity,
+    onDismiss: () -> Unit,
+    onUpdate: () -> Unit,
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onToggleEnabled: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(subscription.name) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (subscription.sourceType == SubscriptionSourceType.REMOTE) {
+                    OutlinedButton(
+                        onClick = onUpdate,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "更新规则",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) "重命名订阅" else "编辑订阅",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                OutlinedButton(
+                    onClick = onToggleEnabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (subscription.enabled) "禁用规则" else "启用规则",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                ) {
+                    Text(
+                        text = "删除规则",
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun AddSubscriptionDialog(
+    kind: String,
+    onDismiss: () -> Unit,
+    onConfirm: (url: String, name: String) -> Unit
+) {
+    var url by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("添加规则订阅") },
+        text = {
+            Column {
+                Text(
+                    text = "输入 AdGuard DNS ${kind.ruleKindLabel()}规则订阅地址。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("订阅名称（可选）") },
+                    placeholder = { Text("例如：EasyList China") },
+                    shape = SettingsCornerShape,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("订阅地址") },
+                    placeholder = { Text("https://example.com/filter.txt") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    shape = SettingsCornerShape,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(url.trim(), name.trim()) },
+                enabled = url.trim().startsWith("http")
+            ) {
+                Text("导入规则")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun AddSubscriptionChoiceDialog(
+    onDismiss: () -> Unit,
+    onAddRemote: () -> Unit,
+    onAddLocal: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("添加规则订阅") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onAddRemote, modifier = Modifier.fillMaxWidth()) {
+                    Text("从网络地址导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
+                OutlinedButton(onClick = onAddLocal, modifier = Modifier.fillMaxWidth()) {
+                    Text("从本地文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+@Composable
+private fun LocalSubscriptionImportDialog(
+    initialName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("导入本地规则订阅") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "本地文件导入后无法更新，但可在订阅列表中重命名、启用、禁用或删除。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("订阅名称") },
+                    singleLine = true,
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) { Text("导入规则") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+@Composable
+private fun EditSubscriptionDialog(
+    subscription: SubscriptionEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var name by remember(subscription.id) { mutableStateOf(subscription.name) }
+    var url by remember(subscription.id) { mutableStateOf(subscription.url) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑规则订阅") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = subscription.url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("订阅地址") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    singleLine = true,
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("订阅名称") },
+                    singleLine = true,
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(url.trim(), name.trim()) },
+                enabled = url.trim().isNotEmpty() && name.trim().isNotEmpty()
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun RenameSubscriptionDialog(
+    subscription: SubscriptionEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember(subscription.id) { mutableStateOf(subscription.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("重命名规则订阅") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("订阅名称") },
+                singleLine = true,
+                shape = SettingsCornerShape,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+private fun android.content.Context.displayNameFor(uri: Uri): String {
+    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (nameIndex >= 0 && cursor.moveToFirst()) {
+            cursor.getString(nameIndex)?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+    }
+    return "本地规则"
+}
+
+private fun String.ruleKindLabel(): String {
+    return if (this == SubscriptionKind.ALLOW) "白名单" else "屏蔽"
+}

@@ -1,0 +1,34 @@
+package com.haoze.dnssr.data.entity
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+/**
+ * 规则订阅源实体。
+ */
+@Entity(
+    tableName = "subscription",
+    indices = [Index(value = ["url", "kind"], unique = true)]
+)
+data class SubscriptionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val url: String,
+    val name: String,
+    val sourceType: String = SubscriptionSourceType.REMOTE,
+    val kind: String = SubscriptionKind.BLOCK,
+    val enabled: Boolean = true,
+    val ruleCount: Int = 0,
+    val lastUpdated: Long = 0,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
+object SubscriptionSourceType {
+    const val REMOTE = "remote"
+    const val LOCAL = "local"
+}
+
+object SubscriptionKind {
+    const val BLOCK = "block"
+    const val ALLOW = "allow"
+}
