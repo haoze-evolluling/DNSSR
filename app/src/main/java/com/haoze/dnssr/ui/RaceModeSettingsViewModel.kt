@@ -223,12 +223,16 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun movePrimaryBackupProvider(id: String, direction: Int) {
+        val from = _primaryBackupIds.value.indexOf(id)
+        if (from < 0) return
+        reorderPrimaryBackupProvider(id, from + direction)
+    }
+
+    fun reorderPrimaryBackupProvider(id: String, targetIndex: Int) {
         val current = _primaryBackupIds.value.toMutableList()
         val from = current.indexOf(id)
-        val to = from + direction
-        if (from < 0 || to !in current.indices) return
-        val moved = current.removeAt(from)
-        current.add(to, moved)
+        if (from < 0 || targetIndex !in current.indices || from == targetIndex) return
+        current.add(targetIndex, current.removeAt(from))
         val context = getApplication<Application>()
         AppSettings.setPrimaryBackupProviderIds(context, current)
         _primaryBackupIds.value = current

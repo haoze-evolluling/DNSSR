@@ -1,30 +1,38 @@
 package com.haoze.dnssr.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -184,17 +192,101 @@ fun ResolutionModeConfigScreen(
             if (mode == DnsResolutionMode.PRIMARY_BACKUP && backupIds.isNotEmpty()) {
                 item { SettingsGroupTitle("主备顺序") }
                 item {
-                    SettingsGroup {
-                        backupIds.mapNotNull { id -> providers.firstOrNull { it.id == id } }.forEachIndexed { index, provider ->
-                            Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (index == 0) "主 · ${provider.name}" else "备 $index · ${provider.name}", Modifier.weight(1f))
-                                IconButton({ viewModel.movePrimaryBackupProvider(provider.id, -1) }, enabled = index > 0) { Icon(Icons.Default.ArrowUpward, "提高优先级") }
-                                IconButton({ viewModel.movePrimaryBackupProvider(provider.id, 1) }, enabled = index < backupIds.lastIndex) { Icon(Icons.Default.ArrowDownward, "降低优先级") }
+                    PrimaryBackupOrderGroup(
+                        backupIds = backupIds,
+                        providerNames = providers.associate { it.id to it.name },
+                        onReorder = viewModel::reorderPrimaryBackupProvider
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrimaryBackupOrderGroup(
+    backupIds: List<String>,
+    providerNames: Map<String, String>,
+    onReorder: (String, Int) -> Unit
+) {
+    var orderedIds by remember(backupIds) { mutableStateOf(backupIds) }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    val latestOrder = rememberUpdatedState(orderedIds)
+    val reorderThresholdPx = with(LocalDensity.current) { 40.dp.toPx() }
+
+    SettingsGroup {
+        orderedIds.forEachIndexed { index, providerId ->
+            val providerName = providerNames[providerId] ?: return@forEachIndexed
+            key(providerId) {
+                var dragDistance by remember { mutableFloatStateOf(0f) }
+                var targetIndex by remember { mutableIntStateOf(index) }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (index == 0) "主 · $providerName" else "备 $index · $providerName",
+                        Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .pointerInput(providerId) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedId = providerId
+                                        targetIndex = latestOrder.value.indexOf(providerId)
+                                        dragDistance = 0f
+                                    },
+                                    onDragCancel = {
+                                        orderedIds = backupIds
+                                        draggedId = null
+                                        dragDistance = 0f
+                                    },
+                                    onDragEnd = {
+                                        onReorder(providerId, targetIndex)
+                                        draggedId = null
+                                        dragDistance = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragDistance += dragAmount.y
+                                        val direction = when {
+                                            dragDistance <= -reorderThresholdPx -> -1
+                                            dragDistance >= reorderThresholdPx -> 1
+                                            else -> 0
+                                        }
+                                        if (direction != 0) {
+                                            val current = latestOrder.value
+                                            val from = current.indexOf(providerId)
+                                            val to = (from + direction).coerceIn(current.indices)
+                                            if (from >= 0 && from != to) {
+                                                orderedIds = current.toMutableList().apply {
+                                                    add(to, removeAt(from))
+                                                }
+                                                targetIndex = to
+                                            }
+                                            dragDistance = 0f
+                                        }
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = "长按并拖动调整顺序",
+                            tint = if (draggedId == providerId) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             }
-                            if (index < backupIds.lastIndex) SettingsDivider()
-                        }
+                        )
                     }
                 }
+                if (index < orderedIds.lastIndex) SettingsDivider()
             }
         }
     }
