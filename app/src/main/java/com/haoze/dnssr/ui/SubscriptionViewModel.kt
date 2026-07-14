@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -38,6 +39,7 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
 
     val importProgress: StateFlow<Pair<Int, Int>> = subscriptionManager.importProgress
     val importing: StateFlow<Boolean> = subscriptionManager.importing
+    val importingSubscriptionId: StateFlow<Long?> = subscriptionManager.importingSubscriptionId
 
     private val _updatingSubscriptionId = MutableStateFlow<Long?>(null)
     val updatingSubscriptionId: StateFlow<Long?> = _updatingSubscriptionId.asStateFlow()
@@ -49,6 +51,16 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     val operationMessage: StateFlow<String?> = _operationMessage.asStateFlow()
 
     private var activated = false
+
+    init {
+        viewModelScope.launch {
+            subscriptionManager.importingSubscriptionId.collectLatest { subscriptionId ->
+                if (subscriptionId != null) {
+                    loadSubscriptionsIntoState()
+                }
+            }
+        }
+    }
 
     fun activate() {
         if (!activated) {
@@ -88,13 +100,10 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     fun addLocalSubscription(uri: Uri, name: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
-            val result = try {
-                val content = context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
+            val result = subscriptionManager.addLocalSubscription(uri.toString(), name) {
+                context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
                     reader?.readText()
                 } ?: throw IllegalArgumentException("无法读取所选文件")
-                subscriptionManager.addLocalSubscription(uri.toString(), name, content)
-            } catch (e: Exception) {
-                Result.failure(e)
             }
             if (result.isSuccess) {
                 RuntimeDnsSettingsRefresher.refreshIfRunning(context, "local_subscription_added")

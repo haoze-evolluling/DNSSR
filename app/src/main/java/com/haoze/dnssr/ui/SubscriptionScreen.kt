@@ -2,6 +2,7 @@ package com.haoze.dnssr.ui
 
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.SubscriptionImportState
 import com.haoze.dnssr.data.entity.SubscriptionSourceType
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsGroup
@@ -74,7 +76,7 @@ fun SubscriptionScreen(
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
-    val updatingSubscriptionId by viewModel.updatingSubscriptionId.collectAsStateWithLifecycle()
+    val importingSubscriptionId by viewModel.importingSubscriptionId.collectAsStateWithLifecycle()
     val operationMessage by viewModel.operationMessage.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy = importing || operationMessage != null
@@ -97,8 +99,9 @@ fun SubscriptionScreen(
     }
 
     // 消息自动清除
-    if (message != null) {
-        androidx.compose.runtime.LaunchedEffect(message) {
+    message?.let { resultMessage ->
+        androidx.compose.runtime.LaunchedEffect(resultMessage) {
+            Toast.makeText(context, resultMessage, Toast.LENGTH_LONG).show()
             kotlinx.coroutines.delay(3000)
             viewModel.clearMessage()
         }
@@ -171,7 +174,7 @@ fun SubscriptionScreen(
                                         },
                                         onShowActions = { showActionDialog = sub },
                                         actionsEnabled = !busy,
-                                        isUpdating = importing && updatingSubscriptionId == sub.id,
+                                        isUpdating = importingSubscriptionId == sub.id,
                                         importProgress = importProgress
                                     )
                                     if (index < subscriptions.lastIndex) {
@@ -425,6 +428,14 @@ private fun SubscriptionItem(
             } else {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
+        }
+        if (subscription.importState == SubscriptionImportState.FAILED) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "导入失败：${subscription.importError ?: "未知错误"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }

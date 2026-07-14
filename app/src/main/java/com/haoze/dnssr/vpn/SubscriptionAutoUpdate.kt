@@ -1,6 +1,16 @@
 package com.haoze.dnssr.vpn
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -10,6 +20,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.haoze.dnssr.data.AppDatabase
+import com.haoze.dnssr.MainActivity
+import com.haoze.dnssr.R
 import com.haoze.dnssr.ui.RuntimeDnsSettingsRefresher
 import java.util.concurrent.TimeUnit
 
@@ -70,16 +82,67 @@ class SubscriptionAutoUpdateWorker(
             AllowListManager(database.allowRuleDao())
         )
         var succeeded = false
+        var succeededCount = 0
+        var importedRuleCount = 0
         var failed = false
         manager.remoteSubscriptions().forEach { subscription ->
             manager.updateSubscription(subscription.id).fold(
-                onSuccess = { succeeded = true },
+                onSuccess = { ruleCount ->
+                    succeeded = true
+                    succeededCount++
+                    importedRuleCount += ruleCount
+                },
                 onFailure = { failed = true }
             )
         }
         if (succeeded) {
             RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
+            SubscriptionAutoUpdateNotifier.showSuccess(
+                applicationContext,
+                succeededCount,
+                importedRuleCount
+            )
         }
         return if (failed && runAttemptCount < 3) Result.retry() else Result.success()
+    }
+}
+
+private object SubscriptionAutoUpdateNotifier {
+    private const val CHANNEL_ID = "subscription_auto_update"
+    private const val NOTIFICATION_ID = 4102
+
+    fun showSuccess(context: Context, subscriptionCount: Int, ruleCount: Int) {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notificationManager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "规则订阅自动更新",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+            )
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_dnssr)
+            .setContentTitle("规则订阅已自动更新")
+            .setContentText("已更新 $subscriptionCount 个订阅，共导入 $ruleCount 条规则")
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
     }
 }

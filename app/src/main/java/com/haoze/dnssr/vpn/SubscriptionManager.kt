@@ -3,6 +3,7 @@ package com.haoze.dnssr.vpn
 import android.util.Log
 import com.haoze.dnssr.data.dao.SubscriptionDao
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.SubscriptionImportState
 import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.data.entity.SubscriptionSourceType
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,9 @@ class SubscriptionManager(
     private val _importing = MutableStateFlow(false)
     val importing: StateFlow<Boolean> = _importing.asStateFlow()
 
+    private val _importingSubscriptionId = MutableStateFlow<Long?>(null)
+    val importingSubscriptionId: StateFlow<Long?> = _importingSubscriptionId.asStateFlow()
+
     @Volatile
     private var lastImportSummary: RuleImportSummary? = null
 
@@ -80,8 +84,8 @@ class SubscriptionManager(
         val normalizedKind = SubscriptionKind.BLOCK
 
         _importing.value = true
+        var saved: SubscriptionEntity? = null
         try {
-            // 先创建订阅记录
             val displayName = name?.trim()?.takeIf { it.isNotEmpty() } ?: extractNameFromUrl(trimmedUrl)
             val subscription = SubscriptionEntity(
                 url = trimmedUrl,
@@ -91,32 +95,48 @@ class SubscriptionManager(
                 enabled = true,
                 ruleCount = 0,
                 lastUpdated = 0,
-                addedAt = System.currentTimeMillis()
+                addedAt = System.currentTimeMillis(),
+                importState = SubscriptionImportState.IMPORTING
             )
             val id = subscriptionDao.insert(subscription)
-            val saved = subscription.copy(id = id)
+            saved = subscription.copy(id = id)
+            _importingSubscriptionId.value = id
 
-            // 下载并导入
             val importResult = downloadAndImport(
                 url = trimmedUrl,
                 subscriptionId = id,
                 enabled = true
             )
             if (importResult.isFailure) {
-                // 导入失败则删除订阅记录
                 removeRulesBySource(sourceTag(id))
-                subscriptionDao.deleteById(id)
-                return@withContext Result.failure(importResult.exceptionOrNull() ?: Exception("导入失败"))
+                val error = importResult.exceptionOrNull() ?: Exception("导入失败")
+                subscriptionDao.setImportState(id, SubscriptionImportState.FAILED, error.message)
+                return@withContext Result.failure(error)
             }
 
             val ruleCount = importResult.getOrNull() ?: 0
-            subscriptionDao.update(saved.copy(ruleCount = ruleCount, lastUpdated = System.currentTimeMillis()))
-            Result.success(saved.copy(ruleCount = ruleCount, lastUpdated = System.currentTimeMillis()))
+            val completed = saved.copy(
+                ruleCount = ruleCount,
+                lastUpdated = System.currentTimeMillis(),
+                importState = SubscriptionImportState.READY,
+                importError = null
+            )
+            subscriptionDao.update(completed)
+            Result.success(completed)
         } catch (e: Exception) {
             Log.e(TAG, "添加订阅失败", e)
+            saved?.let { subscription ->
+                removeRulesBySource(sourceTag(subscription.id))
+                subscriptionDao.setImportState(
+                    subscription.id,
+                    SubscriptionImportState.FAILED,
+                    e.message ?: "导入失败"
+                )
+            }
             Result.failure(e)
         } finally {
             _importing.value = false
+            _importingSubscriptionId.value = null
             _importProgress.value = -1 to 0
         }
     }
@@ -154,7 +174,7 @@ class SubscriptionManager(
     suspend fun addLocalSubscription(
         sourceRef: String,
         name: String,
-        content: String
+        contentLoader: () -> String
     ): Result<SubscriptionEntity> = withContext(Dispatchers.IO) {
         if (_importing.value) return@withContext Result.failure(IllegalStateException("正在导入中"))
 
@@ -168,14 +188,8 @@ class SubscriptionManager(
         }
 
         _importing.value = true
-        var id: Long? = null
+        var saved: SubscriptionEntity? = null
         try {
-            val rules = AdGuardRuleParser.parseCategorized(content)
-            if (rules.isEmpty()) {
-                return@withContext Result.failure(IllegalArgumentException("文件中没有可导入的有效 DNS 规则"))
-            }
-            _importProgress.value = 0 to rules.size
-
             val subscription = SubscriptionEntity(
                 url = sourceRef,
                 name = trimmedName,
@@ -184,25 +198,45 @@ class SubscriptionManager(
                 enabled = true,
                 ruleCount = 0,
                 lastUpdated = 0,
-                addedAt = System.currentTimeMillis()
+                addedAt = System.currentTimeMillis(),
+                importState = SubscriptionImportState.IMPORTING
             )
-            id = subscriptionDao.insert(subscription)
+            val id = subscriptionDao.insert(subscription)
+            saved = subscription.copy(id = id)
+            _importingSubscriptionId.value = id
+
+            val content = contentLoader()
+            val rules = AdGuardRuleParser.parseCategorized(content)
+            if (rules.isEmpty()) {
+                throw IllegalArgumentException("文件中没有可导入的有效 DNS 规则")
+            }
+            _importProgress.value = 0 to rules.size
             val summary = importPreparedRules(rules, id, enabled = true)
             lastImportSummary = summary
 
             val importedAt = System.currentTimeMillis()
-            val saved = subscription.copy(id = id, ruleCount = summary.importedCount, lastUpdated = importedAt)
-            subscriptionDao.update(saved)
-            Result.success(saved)
+            val completed = saved.copy(
+                ruleCount = summary.importedCount,
+                lastUpdated = importedAt,
+                importState = SubscriptionImportState.READY,
+                importError = null
+            )
+            subscriptionDao.update(completed)
+            Result.success(completed)
         } catch (e: Exception) {
-            id?.let { subscriptionId ->
-                removeRulesBySource(sourceTag(subscriptionId))
-                subscriptionDao.deleteById(subscriptionId)
+            saved?.let { subscription ->
+                removeRulesBySource(sourceTag(subscription.id))
+                subscriptionDao.setImportState(
+                    subscription.id,
+                    SubscriptionImportState.FAILED,
+                    e.message ?: "导入失败"
+                )
             }
             Log.e(TAG, "本地文件订阅导入失败", e)
             Result.failure(e)
         } finally {
             _importing.value = false
+            _importingSubscriptionId.value = null
             _importProgress.value = -1 to 0
         }
     }
@@ -256,12 +290,12 @@ class SubscriptionManager(
             }
 
             _importing.value = true
+            _importingSubscriptionId.value = id
+            subscriptionDao.setImportState(id, SubscriptionImportState.IMPORTING, null)
             try {
-                val rules = downloadRules(trimmedUrl).getOrElse {
-                    return@withContext Result.failure(it)
-                }
+                val rules = downloadRules(trimmedUrl).getOrElse { throw it }
                 if (rules.isEmpty()) {
-                    return@withContext Result.failure(IllegalArgumentException("订阅中没有可导入的有效 DNS 规则，已保留原规则"))
+                    throw IllegalArgumentException("订阅中没有可导入的有效 DNS 规则，已保留原规则")
                 }
                 _importProgress.value = 0 to rules.size
                 val summary = replacePreparedRules(rules, id, subscription.enabled)
@@ -269,6 +303,7 @@ class SubscriptionManager(
 
                 val updatedAt = System.currentTimeMillis()
                 subscriptionDao.setDetails(id, trimmedName, trimmedUrl, summary.importedCount, updatedAt)
+                subscriptionDao.setImportState(id, SubscriptionImportState.READY, null)
                 Result.success(
                     subscription.copy(
                         name = trimmedName,
@@ -279,9 +314,15 @@ class SubscriptionManager(
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to edit subscription", e)
+                subscriptionDao.setImportState(
+                    id,
+                    SubscriptionImportState.FAILED,
+                    e.message ?: "更新失败"
+                )
                 Result.failure(e)
             } finally {
                 _importing.value = false
+                _importingSubscriptionId.value = null
                 _importProgress.value = -1 to 0
             }
         }
@@ -296,24 +337,37 @@ class SubscriptionManager(
         }
 
         _importing.value = true
+        _importingSubscriptionId.value = id
+        subscriptionDao.setImportState(id, SubscriptionImportState.IMPORTING, null)
         try {
-            val source = sourceTag(id)
-            val rules = downloadRules(subscription.url).getOrElse {
-                return@withContext Result.failure(it)
-            }
+            val rules = downloadRules(subscription.url).getOrElse { throw it }
             if (rules.isEmpty()) {
-                return@withContext Result.failure(IllegalArgumentException("订阅中没有可导入的有效 DNS 规则，已保留原规则"))
+                throw IllegalArgumentException("订阅中没有可导入的有效 DNS 规则，已保留原规则")
             }
+            _importProgress.value = 0 to rules.size
             replacePreparedRules(rules, id, subscription.enabled)
             val ruleCount = rules.size
             lastImportSummary = rules.toSummary(rules.blockRules.size, rules.allowRules.size)
-            subscriptionDao.update(subscription.copy(ruleCount = ruleCount, lastUpdated = System.currentTimeMillis()))
+            subscriptionDao.update(
+                subscription.copy(
+                    ruleCount = ruleCount,
+                    lastUpdated = System.currentTimeMillis(),
+                    importState = SubscriptionImportState.READY,
+                    importError = null
+                )
+            )
             Result.success(ruleCount)
         } catch (e: Exception) {
             Log.e(TAG, "更新订阅失败", e)
+            subscriptionDao.setImportState(
+                id,
+                SubscriptionImportState.FAILED,
+                e.message ?: "更新失败"
+            )
             Result.failure(e)
         } finally {
             _importing.value = false
+            _importingSubscriptionId.value = null
             _importProgress.value = -1 to 0
         }
     }

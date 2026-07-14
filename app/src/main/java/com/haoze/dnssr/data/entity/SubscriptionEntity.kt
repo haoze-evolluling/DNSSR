@@ -20,7 +20,9 @@ data class SubscriptionEntity(
     val enabled: Boolean = true,
     val ruleCount: Int = 0,
     val lastUpdated: Long = 0,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val importState: String = SubscriptionImportState.READY,
+    val importError: String? = null
 )
 
 object SubscriptionSourceType {
@@ -31,4 +33,10 @@ object SubscriptionSourceType {
 object SubscriptionKind {
     const val BLOCK = "block"
     const val ALLOW = "allow"
+}
+
+object SubscriptionImportState {
+    const val READY = "ready"
+    const val IMPORTING = "importing"
+    const val FAILED = "failed"
 }

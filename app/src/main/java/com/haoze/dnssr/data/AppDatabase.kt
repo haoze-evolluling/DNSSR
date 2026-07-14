@@ -31,7 +31,7 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
         AllowRuleEntity::class,
         SubscriptionEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,7 +54,13 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dnssr_database"
                 )
-                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                    .addMigrations(
+                        MIGRATION_10_11,
+                        MIGRATION_11_12,
+                        MIGRATION_12_13,
+                        MIGRATION_13_14,
+                        MIGRATION_14_15
+                    )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
             }
@@ -139,6 +145,15 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_subscription_url ON subscription (url)"
                 )
+            }
+        }
+
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `subscription` ADD COLUMN `importState` TEXT NOT NULL DEFAULT 'ready'"
+                )
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `importError` TEXT")
             }
         }
     }

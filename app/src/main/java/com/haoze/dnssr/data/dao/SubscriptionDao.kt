@@ -36,6 +36,9 @@ interface SubscriptionDao {
     @Query("UPDATE subscription SET name = :name, url = :url, ruleCount = :ruleCount, lastUpdated = :lastUpdated WHERE id = :id")
     suspend fun setDetails(id: Long, name: String, url: String, ruleCount: Int, lastUpdated: Long)
 
+    @Query("UPDATE subscription SET importState = :state, importError = :error WHERE id = :id")
+    suspend fun setImportState(id: Long, state: String, error: String?)
+
     @Query("SELECT * FROM subscription WHERE url = :url AND kind = :kind")
     suspend fun byUrlAndKind(url: String, kind: String): SubscriptionEntity?
 
