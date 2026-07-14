@@ -29,7 +29,7 @@ import com.haoze.dnssr.vpn.cache.DnsCachePreset
 @Composable
 fun CacheSettingsScreen(
     onBack: () -> Unit,
-    title: String = "DNS 缓存设置",
+    title: String = "缓存设置",
     onRuntimeDnsSettingsChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current

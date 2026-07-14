@@ -254,10 +254,10 @@ fun AppNavHost(
         composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popBackStack() }) }
         composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popBackStack() }) }
         composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popBackStack() }) }
-        composable(titledRoute(Routes.CACHE_SETTINGS), arguments = listOf(screenTitleArgument("DNS 缓存设置"))) { entry ->
+        composable(titledRoute(Routes.CACHE_SETTINGS), arguments = listOf(screenTitleArgument("缓存设置"))) { entry ->
             CacheSettingsScreen(
                 onBack = { navController.popBackStack() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNS 缓存设置",
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "缓存设置",
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }

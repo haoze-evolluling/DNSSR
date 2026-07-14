@@ -41,7 +41,7 @@ fun SettingsScreen(
     val homeProviderVisibilityTitle = "服务显示"
     val bootstrapSettingsTitle = "Bootstrap 设置"
     val latencySettingsTitle = "查询测速"
-    val cacheSettingsTitle = "DNS 缓存设置"
+    val cacheSettingsTitle = "缓存设置"
     val raceModeSettingsTitle = "解析模式"
     val ruleManagementTitle = "域名规则"
     val logRetentionTitle = "日志保留"
