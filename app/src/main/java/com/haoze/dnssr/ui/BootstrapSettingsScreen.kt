@@ -46,7 +46,7 @@ import java.util.Locale
 @Composable
 fun BootstrapSettingsScreen(
     onBack: () -> Unit,
-    title: String = "Bootstrap DNS 解析设置",
+    title: String = "Bootstrap 设置",
     viewModel: BootstrapSettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current

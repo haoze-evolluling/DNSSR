@@ -213,10 +213,10 @@ fun AppNavHost(
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出"
             )
         }
-        composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("DNS 服务商管理"))) { entry ->
+        composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("服务商管理"))) { entry ->
             ProviderManagementScreen(
                 onBack = { navController.popBackStack() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNS 服务商管理"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "服务商管理"
             )
         }
         composable(titledRoute(Routes.HOME_PROVIDER_VISIBILITY), arguments = listOf(screenTitleArgument(""))) { entry ->
@@ -232,10 +232,10 @@ fun AppNavHost(
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
-        composable(titledRoute(Routes.BOOTSTRAP_SETTINGS), arguments = listOf(screenTitleArgument("Bootstrap DNS 解析设置"))) { entry ->
+        composable(titledRoute(Routes.BOOTSTRAP_SETTINGS), arguments = listOf(screenTitleArgument("Bootstrap 设置"))) { entry ->
             BootstrapSettingsScreen(
                 onBack = { navController.popBackStack() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap DNS 解析设置"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap 设置"
             )
         }
         composable(titledRoute(Routes.RACE_MODE_LATENCY), arguments = listOf(screenTitleArgument("DNS 查询测速"))) { entry ->

@@ -50,7 +50,7 @@ import com.haoze.dnssr.vpn.DnsProvider
 @Composable
 fun ProviderManagementScreen(
     onBack: () -> Unit,
-    title: String = "DNS 服务商管理",
+    title: String = "服务商管理",
     viewModel: ProviderManagementViewModel = viewModel()
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()

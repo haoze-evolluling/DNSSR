@@ -37,9 +37,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    val providerManagementTitle = "DNS 服务商管理"
+    val providerManagementTitle = "服务商管理"
     val homeProviderVisibilityTitle = "服务显示"
-    val bootstrapSettingsTitle = "Bootstrap DNS 解析设置"
+    val bootstrapSettingsTitle = "Bootstrap 设置"
     val latencySettingsTitle = "DNS 查询测速"
     val cacheSettingsTitle = "DNS 缓存设置"
     val raceModeSettingsTitle = "解析模式"
