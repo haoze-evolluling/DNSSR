@@ -43,6 +43,9 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     val importProgress: StateFlow<Pair<Int, Int>> = subscriptionManager.importProgress
     val importing: StateFlow<Boolean> = subscriptionManager.importing
 
+    private val _updatingSubscriptionId = MutableStateFlow<Long?>(null)
+    val updatingSubscriptionId: StateFlow<Long?> = _updatingSubscriptionId.asStateFlow()
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
@@ -155,21 +158,67 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
 
     fun updateSubscription(id: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            val result = subscriptionManager.updateSubscription(id)
-            if (result.isSuccess) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "subscription_updated"
-                )
-            }
-            withContext(Dispatchers.Main) {
+            _updatingSubscriptionId.value = id
+            try {
+                val result = subscriptionManager.updateSubscription(id)
                 if (result.isSuccess) {
-                    _message.value = "更新成功，共导入 ${result.getOrNull() ?: 0} 条规则"
-                } else {
-                    _message.value = "更新失败：${result.exceptionOrNull()?.message}"
+                    RuntimeDnsSettingsRefresher.refreshIfRunning(
+                        getApplication<Application>(),
+                        "subscription_updated"
+                    )
                 }
+                withContext(Dispatchers.Main) {
+                    if (result.isSuccess) {
+                        _message.value = "更新成功，共导入 ${result.getOrNull() ?: 0} 条规则"
+                    } else {
+                        _message.value = "更新失败：${result.exceptionOrNull()?.message}"
+                    }
+                }
+                loadSubscriptions()
+            } finally {
+                _updatingSubscriptionId.value = null
             }
-            loadSubscriptions()
+        }
+    }
+
+    fun updateAllSubscriptions() {
+        _operationMessage.value = "正在更新所有规则订阅..."
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var updated = 0
+                var failed = 0
+                var totalRules = 0
+                subscriptionManager.remoteSubscriptions().forEach { subscription ->
+                    _updatingSubscriptionId.value = subscription.id
+                    try {
+                        subscriptionManager.updateSubscription(subscription.id).fold(
+                            onSuccess = { ruleCount ->
+                                updated++
+                                totalRules += ruleCount
+                            },
+                            onFailure = { failed++ }
+                        )
+                    } finally {
+                        _updatingSubscriptionId.value = null
+                    }
+                }
+                if (updated > 0) {
+                    RuntimeDnsSettingsRefresher.refreshIfRunning(
+                        getApplication<Application>(),
+                        "subscriptions_updated"
+                    )
+                }
+                loadSubscriptionsIntoState()
+                withContext(Dispatchers.Main) {
+                    _message.value = when {
+                        failed == 0 -> "已更新 $updated 个订阅，共导入 $totalRules 条规则"
+                        updated == 0 -> "更新所有订阅失败"
+                        else -> "已更新 $updated 个订阅，$failed 个更新失败"
+                    }
+                }
+            } finally {
+                _operationMessage.value = null
+            }
         }
     }
 

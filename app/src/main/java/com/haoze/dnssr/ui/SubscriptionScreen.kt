@@ -19,16 +19,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -79,6 +77,7 @@ fun SubscriptionScreen(
     val selectedKind by viewModel.selectedKind.collectAsStateWithLifecycle()
     val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
+    val updatingSubscriptionId by viewModel.updatingSubscriptionId.collectAsStateWithLifecycle()
     val operationMessage by viewModel.operationMessage.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy = importing || operationMessage != null
@@ -112,6 +111,9 @@ fun SubscriptionScreen(
         title = "规则订阅",
         onBack = onBack,
         actions = {
+            IconButton(onClick = viewModel::updateAllSubscriptions, enabled = subscriptions.isNotEmpty() && !busy) {
+                Icon(Icons.Default.Refresh, contentDescription = "更新所有订阅")
+            }
             IconButton(onClick = { showAddChoiceDialog = true }, enabled = !busy) {
                 Icon(Icons.Default.Add, contentDescription = "添加规则订阅")
             }
@@ -131,36 +133,6 @@ fun SubscriptionScreen(
                     enabled = !busy,
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
                 )
-            }
-
-            item {
-                AnimatedVisibility(
-                    visible = importing || operationMessage != null,
-                    enter = expandVertically(),
-                    exit = shrinkVertically()
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        val (current, total) = importProgress
-                        Text(
-                            text = when {
-                                importing && total > 0 -> "正在导入${selectedKind.ruleKindLabel()}规则... $current / $total"
-                                importing -> "正在下载订阅规则..."
-                                else -> operationMessage.orEmpty()
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        if (importing && total > 0) {
-                            LinearProgressIndicator(
-                                progress = { current.toFloat() / total.toFloat() },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
             }
 
             // 操作结果消息
@@ -211,7 +183,9 @@ fun SubscriptionScreen(
                                             if (sub.sourceType == SubscriptionSourceType.REMOTE) showUrlDialog = sub
                                         },
                                         onShowActions = { showActionDialog = sub },
-                                        actionsEnabled = !busy
+                                        actionsEnabled = !busy,
+                                        isUpdating = importing && updatingSubscriptionId == sub.id,
+                                        importProgress = importProgress
                                     )
                                     if (index < subscriptions.lastIndex) {
                                         HorizontalDivider(
@@ -404,7 +378,9 @@ private fun SubscriptionItem(
     subscription: SubscriptionEntity,
     onShowUrl: () -> Unit,
     onShowActions: () -> Unit,
-    actionsEnabled: Boolean
+    actionsEnabled: Boolean,
+    isUpdating: Boolean,
+    importProgress: Pair<Int, Int>
 ) {
     Column(
         modifier = Modifier
@@ -478,6 +454,24 @@ private fun SubscriptionItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+        if (isUpdating) {
+            val (current, total) = importProgress
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (total > 0) "正在导入规则... $current / $total" else "正在下载并更新规则...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            if (total > 0) {
+                LinearProgressIndicator(
+                    progress = { current.toFloat() / total.toFloat() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
     }
