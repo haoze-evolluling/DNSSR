@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>DNSSR Logs</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fffbfe;
+      --surface: #fffbfe;
+      --surface-variant: #e7e0ec;
+      --panel: rgba(255, 255, 255, 0.82);
+      --panel-strong: rgba(255, 255, 255, 0.94);
+      --line: rgba(29, 27, 32, 0.12);
+      --text: #1d1b20;
+      --muted: #49454f;
+      --elevation: rgba(0, 0, 0, 0.14);
+      --primary: #6750a4;
+      --secondary: #625b71;
+      --tertiary: #7d5260;
+      --outline: #79747e;
+      --primary-rgb: 103, 80, 164;
+      --secondary-rgb: 98, 91, 113;
+      --tertiary-rgb: 125, 82, 96;
+      --error-rgb: 179, 38, 30;
+      --green: #34d399;
+      --red: #dc2626;
+      --amber: #b45309;
+      --cyan: #0891b2;
+      --violet: #a78bfa;
+      --blue: #2563eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141218;
+        --surface: #141218;
+        --surface-variant: #49454f;
+        --panel: rgba(255, 255, 255, 0.075);
+        --panel-strong: rgba(255, 255, 255, 0.12);
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #e6e0e9;
+        --muted: #cac4d0;
+        --elevation: rgba(0, 0, 0, 0.34);
+        --primary: #d0bcff;
+        --secondary: #ccc2dc;
+        --tertiary: #efb8c8;
+        --outline: #938f99;
+        --primary-rgb: 208, 188, 255;
+        --secondary-rgb: 204, 194, 220;
+        --tertiary-rgb: 239, 184, 200;
+        --error-rgb: 242, 184, 181;
+        --green: #34d399;
+        --red: #fb7185;
+        --amber: #f59e0b;
+        --cyan: #22d3ee;
+        --blue: #60a5fa;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background-color: var(--bg);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(var(--primary-rgb), 0.18), transparent 28rem),
+        radial-gradient(circle at 90% 8%, rgba(var(--tertiary-rgb), 0.16), transparent 24rem),
+        linear-gradient(145deg, var(--bg) 0%, var(--surface) 58%, var(--surface-variant) 140%);
+    }
+
+    .page {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 0 14px 28px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: calc(8px + env(safe-area-inset-top));
+      z-index: 10;
+      display: grid;
+      grid-template-columns: 40px minmax(112px, 1fr) 40px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 56px;
+      margin: calc(8px + env(safe-area-inset-top)) auto 14px;
+      padding: 7px 8px;
+      border: 1px solid rgba(var(--primary-rgb), 0.2);
+      border-radius: 999px;
+      background:
+        linear-gradient(135deg, rgba(var(--primary-rgb), 0.12), rgba(var(--secondary-rgb), 0.09)),
+        linear-gradient(135deg, var(--panel-strong), var(--panel));
+      box-shadow: 0 18px 48px var(--elevation);
+      backdrop-filter: blur(12px) saturate(145%);
+      -webkit-backdrop-filter: blur(12px) saturate(145%);
+    }
+
+    .nav-button {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 999px;
+      color: var(--text);
+      text-decoration: none;
+      background: rgba(var(--primary-rgb), 0.12);
+      font-size: 18px;
+      font-weight: 750;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 180ms cubic-bezier(0.2, 1.35, 0.45, 1), background-color 160ms ease;
+      will-change: transform;
+    }
+
+    .nav-button:active {
+      transform: scale(0.9);
+    }
+
+    .nav-button.back {
+      font-size: 0;
+    }
+
+    .nav-button.back::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg);
+      margin-left: 3px;
+    }
+
+    .topbar-title {
+      min-width: 0;
+      text-align: center;
+    }
+
+    .topbar-title h1 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .topbar-title p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--panel-strong), var(--panel));
+      box-shadow: 0 18px 50px var(--elevation);
+      overflow: hidden;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(25px, 7vw, 40px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .action {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--text);
+      text-decoration: none;
+      background: rgba(var(--primary-rgb), 0.1);
+      font-size: 14px;
+      font-weight: 650;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 180ms cubic-bezier(0.2, 1.35, 0.45, 1), background-color 160ms ease;
+      will-change: transform;
+    }
+
+    .action:active {
+      transform: scale(0.96);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 14px 38px var(--elevation);
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 14px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .value {
+      margin-top: 8px;
+      font-size: clamp(26px, 10vw, 40px);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .accent-green { color: var(--green); }
+    .accent-red { color: var(--red); }
+    .accent-amber { color: var(--amber); }
+    .accent-cyan { color: var(--cyan); }
+    .accent-violet { color: var(--violet); }
+    .accent-blue { color: var(--blue); }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    .section {
+      padding: 16px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .pill {
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .donut-wrap {
+      display: grid;
+      grid-template-columns: 128px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .donut {
+      width: 128px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--line) 0 100%);
+      box-shadow: inset 0 0 22px var(--elevation);
+    }
+
+    .donut::after {
+      content: attr(data-center);
+      width: 72%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .legend, .list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .legend-row, .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .legend-row span:first-child,
+    .row .main {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .row {
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .row:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag {
+      min-width: 54px;
+      padding: 5px 7px;
+      border-radius: 9px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(var(--secondary-rgb), 0.12);
+    }
+
+    .bar {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(var(--secondary-rgb), 0.14);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+    }
+
+    .empty {
+      padding: 12px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .error {
+      padding: 12px;
+      border: 1px solid rgba(var(--error-rgb), 0.35);
+      border-radius: 12px;
+      background: rgba(var(--error-rgb), 0.12);
+      color: var(--text);
+    }
+
+    @media (min-width: 760px) {
+      .page { padding: 0 24px 24px; }
+      .hero {
+        grid-template-columns: minmax(0, 1fr) 360px;
+        align-items: center;
+      }
+      .quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .charts { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <a class="nav-button back" href="dnssr://back" aria-label="返回"></a>
+      <div class="topbar-title">
+        <h1>日志仪表盘</h1>
+        <p id="updated">等待数据同步...</p>
+      </div>
+      <a class="nav-button" href="dnssr://refresh" aria-label="刷新">↻</a>
+    </header>
+
+    <section class="hero">
+      <div>
+        <h1>DNS 日志仪表盘</h1>
+        <p>请求、缓存、竞速与规则拦截的实时概览</p>
+      </div>
+      <nav class="quick-actions" aria-label="日志详情入口">
+        <a class="action" href="dnssr://dns_logs">请求记录</a>
+        <a class="action" href="dnssr://dns_cache">缓存记录</a>
+        <a class="action" href="dnssr://race_stats">竞速统计</a>
+        <a class="action" href="dnssr://bootstrap_stats">Bootstrap</a>
+        <a class="action" href="dnssr://subscription_interception_stats">规则拦截</a>
+      </nav>
+    </section>
+
+    <section class="grid">
+      <article class="card metric">
+        <div class="label">今日请求</div>
+        <div id="total" class="value accent-cyan">0</div>
+      </article>
+      <article class="card metric">
+        <div class="label">通过</div>
+        <div id="passed" class="value accent-green">0</div>
+      </article>
+      <article class="card metric">
+        <div class="label">过滤</div>
+        <div id="blocked" class="value accent-red">0</div>
+      </article>
+      <article class="card metric">
+        <div class="label">缓存命中</div>
+        <div id="cached" class="value accent-blue">0</div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>今日流量结构</h2>
+          <span class="pill">实时汇总</span>
+        </div>
+        <div id="error"></div>
+        <div class="charts">
+          <div class="donut-wrap">
+            <div id="resultDonut" class="donut" data-center="0"></div>
+            <div id="resultLegend" class="legend"></div>
+          </div>
+          <div>
+            <div class="legend-row">
+              <span>竞速成功率</span>
+              <b id="raceRate">0%</b>
+            </div>
+            <div class="bar"><i id="raceBar"></i></div>
+            <div class="legend-row" style="margin-top:14px">
+              <span>Bootstrap 成功率</span>
+              <b id="bootstrapRate">0%</b>
+            </div>
+            <div class="bar"><i id="bootstrapBar"></i></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>最近请求</h2>
+          <a class="pill" href="dnssr://dns_logs">查看全部</a>
+        </div>
+        <div id="recentLogs" class="list"></div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>缓存热点</h2>
+          <a class="pill" href="dnssr://dns_cache">详情</a>
+        </div>
+        <div id="cacheEntries" class="list"></div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>竞速胜出</h2>
+          <a class="pill" href="dnssr://race_stats">详情</a>
+        </div>
+        <div id="raceWinners" class="list"></div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>Bootstrap DNS</h2>
+          <a class="pill" href="dnssr://bootstrap_stats">详情</a>
+        </div>
+        <div id="bootstrapIps" class="list"></div>
+      </article>
+
+      <article class="card section wide">
+        <div class="section-title">
+          <h2>规则拦截</h2>
+          <a class="pill" href="dnssr://subscription_interception_stats">详情</a>
+        </div>
+        <div id="subscriptions" class="list"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const fmt = new Intl.NumberFormat("zh-CN");
+    const timeFmt = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+    function $(id) { return document.getElementById(id); }
+    function pct(value) { return `${Math.round((Number(value) || 0) * 1000) / 10}%`; }
+    function ms(value) { return `${Math.round(Number(value) || 0)} ms`; }
+    function text(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])); }
+    function time(value) { return value ? timeFmt.format(new Date(value)) : "无"; }
+    function duration(seconds) {
+      seconds = Number(seconds) || 0;
+      if (seconds >= 3600) return `${Math.floor(seconds / 3600)} 小时`;
+      if (seconds >= 60) return `${Math.floor(seconds / 60)} 分钟`;
+      return `${seconds} 秒`;
+    }
+
+    function setMetric(id, value) {
+      $(id).textContent = fmt.format(Number(value) || 0);
+    }
+
+    function renderRows(id, rows, emptyText, mapper) {
+      const target = $(id);
+      if (!rows || rows.length === 0) {
+        target.innerHTML = `<div class="empty">${emptyText}</div>`;
+        return;
+      }
+      target.innerHTML = rows.map(mapper).join("");
+    }
+
+    function setVar(name, value) {
+      if (value) document.documentElement.style.setProperty(name, value);
+    }
+
+    function isDarkColor(value) {
+      const match = String(value || "").match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      if (!match) return false;
+      const r = parseInt(match[1], 16) / 255;
+      const g = parseInt(match[2], 16) / 255;
+      const b = parseInt(match[3], 16) / 255;
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      return lum < 0.45;
+    }
+
+    function setTheme(theme) {
+      if (!theme) return;
+      const dark = isDarkColor(theme.background);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      setVar("--bg", theme.background);
+      setVar("--surface", theme.surface);
+      setVar("--surface-variant", theme.surfaceVariant);
+      setVar("--primary", theme.primary);
+      setVar("--secondary", theme.secondary);
+      setVar("--tertiary", theme.tertiary);
+      setVar("--outline", theme.outline);
+      setVar("--text", theme.onSurface || theme.onBackground);
+      setVar("--muted", theme.onSurfaceVariant);
+      setVar("--primary-rgb", theme.primaryRgb);
+      setVar("--secondary-rgb", theme.secondaryRgb);
+      setVar("--tertiary-rgb", theme.tertiaryRgb);
+      setVar("--error-rgb", theme.errorRgb);
+      setVar("--line", dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)");
+      setVar("--panel", dark ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.82)");
+      setVar("--panel-strong", dark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.94)");
+      setVar("--elevation", dark ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.14)");
+    }
+
+    function renderDonut(stats) {
+      const total = stats.total || 0;
+      const passed = total ? stats.passed / total * 100 : 0;
+      const blocked = total ? stats.blocked / total * 100 : 0;
+      const error = total ? stats.error / total * 100 : 0;
+      const donut = $("resultDonut");
+      donut.dataset.center = fmt.format(total);
+      if (total === 0) {
+        donut.style.background = "conic-gradient(var(--line) 0 100%)";
+      } else {
+        donut.style.background = `conic-gradient(var(--green) 0 ${passed}%, var(--red) ${passed}% ${passed + blocked}%, var(--amber) ${passed + blocked}% ${passed + blocked + error}%, var(--line) ${passed + blocked + error}% 100%)`;
+      }
+      $("resultLegend").innerHTML = [
+        ["通过", stats.passed, "accent-green"],
+        ["过滤", stats.blocked, "accent-red"],
+        ["失败", stats.error, "accent-amber"],
+        ["缓存", stats.cached, "accent-blue"]
+      ].map(([name, value, cls]) => `<div class="legend-row"><span>${name}</span><b class="${cls}">${fmt.format(value || 0)}</b></div>`).join("");
+    }
+
+    function render(data) {
+      if (!data) return;
+      const stats = data.dailyStats || {};
+      $("updated").textContent = `更新于 ${time(data.generatedAt)}`;
+      $("error").innerHTML = data.error ? `<div class="error">${text(data.error)}</div>` : "";
+      setMetric("total", stats.total);
+      setMetric("passed", stats.passed);
+      setMetric("blocked", stats.blocked);
+      setMetric("cached", stats.cached);
+      renderDonut(stats);
+
+      const race = data.race || {};
+      const raceRate = race.requests ? race.successes / race.requests : 0;
+      $("raceRate").textContent = `${pct(raceRate)} · ${fmt.format(race.requests || 0)} 次 · ${ms(race.avgElapsedMs)}`;
+      $("raceBar").style.width = `${Math.max(0, Math.min(100, raceRate * 100))}%`;
+
+      const bootstrap = data.bootstrap || {};
+      $("bootstrapRate").textContent = `${pct(bootstrap.successRate)} · ${fmt.format(bootstrap.attempts || 0)} 次 · ${ms(bootstrap.avgElapsedMs)}`;
+      $("bootstrapBar").style.width = `${Math.max(0, Math.min(100, (bootstrap.successRate || 0) * 100))}%`;
+
+      renderRows("recentLogs", data.recentLogs, "暂无 DNS 请求日志", item => {
+        const cls = item.result === "PASSED" ? "accent-green" : item.result === "BLOCKED" ? "accent-red" : "accent-amber";
+        const cache = item.cached ? " · 命中缓存" : "";
+        const msg = item.message ? ` · ${text(item.message)}` : "";
+        return `<div class="row"><div class="main">${text(item.queryName)}<div class="sub">${time(item.timestamp)} · ${text(item.queryType)}${cache}${msg}</div></div><span class="tag ${cls}">${text(item.resultLabel)}</span></div>`;
+      });
+
+      renderRows("cacheEntries", data.cacheEntries, "暂无有效缓存", item =>
+        `<div class="row"><div class="main">${text(item.queryName)}<div class="sub">${text(item.queryType)} · ${duration(item.remainingSeconds)} 后过期 · ${fmt.format(item.responseSize || 0)} B</div></div><span class="tag accent-blue">${fmt.format(item.hitCount || 0)} 次</span></div>`
+      );
+
+      renderRows("raceWinners", race.winners, "暂无竞速数据", item =>
+        `<div class="row"><div class="main">${text(item.name)}<div class="sub">平均胜出耗时 ${ms(item.avgElapsedMs)}</div></div><span class="tag accent-violet">${fmt.format(item.wins || 0)} 次</span></div>`
+      );
+
+      renderRows("bootstrapIps", bootstrap.ips, "暂无 Bootstrap 数据", item =>
+        `<div class="row"><div class="main">${text(item.name)}<div class="sub">${text(item.ip)} · 成功 ${pct(item.successRate)} · ${ms(item.avgElapsedMs)}</div></div><span class="tag accent-cyan">${fmt.format(item.attempts || 0)} 次</span></div>`
+      );
+
+      const subscriptions = data.subscriptions || {};
+      renderRows("subscriptions", subscriptions.items, "暂无规则拦截数据", item =>
+        `<div class="row"><div class="main">${text(item.name)}<div class="sub">${item.deleted ? "已删除" : item.enabled ? "已启用" : "已禁用"} · 占全部请求 ${pct(item.rate)}</div></div><span class="tag accent-red">${fmt.format(item.hits || 0)} 次</span></div>`
+      );
+    }
+
+    window.DNSSR = { render, setTheme };
+  </script>
+</body>
+</html>

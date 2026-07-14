@@ -6,6 +6,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import android.net.Uri
 import androidx.navigation.NavHostController
@@ -36,6 +37,7 @@ private fun screenTitleArgument(defaultTitle: String) = navArgument(SCREEN_TITLE
 object Routes {
     const val MAIN = "main"
     const val SETTINGS = "settings"
+    const val LOG_DASHBOARD = "log_dashboard"
     const val LOGS = "logs"
     const val DNS_LOGS = "dns_logs"
     const val DNS_CACHE = "dns_cache"
@@ -110,9 +112,18 @@ fun AppNavHost(
         }
     ) {
         composable(Routes.MAIN) {
+            val context = LocalContext.current
             mainScreen(
                 { navController.navigate(Routes.SETTINGS) },
-                { navController.navigate(Routes.LOGS) },
+                {
+                    navController.navigate(
+                        if (AppSettings.isLegacyLogPageEnabled(context)) {
+                            Routes.LOGS
+                        } else {
+                            Routes.LOG_DASHBOARD
+                        }
+                    )
+                },
                 { navController.navigate(Routes.PROVIDER_MANAGEMENT) },
                 { navController.navigateToTitledRoute(Routes.HOME_PROVIDER_VISIBILITY, "服务显示") },
                 { navController.navigate(Routes.RACE_MODE_PROVIDERS) }
@@ -136,6 +147,18 @@ fun AppNavHost(
                 },
                 onNavigateToExperimentalFeatures = { title -> navController.navigateToTitledRoute(Routes.EXPERIMENTAL_FEATURES, title) },
                 onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) }
+            )
+        }
+        composable(Routes.LOG_DASHBOARD) {
+            ModernLogDashboardScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToDnsLogs = { navController.navigate(Routes.DNS_LOGS) },
+                onNavigateToDnsCache = { navController.navigate(Routes.DNS_CACHE) },
+                onNavigateToRaceStats = { navController.navigate(Routes.RACE_STATS) },
+                onNavigateToBootstrapStats = { navController.navigate(Routes.BOOTSTRAP_STATS) },
+                onNavigateToSubscriptionInterceptionStats = {
+                    navController.navigate(Routes.SUBSCRIPTION_INTERCEPTION_STATS)
+                }
             )
         }
         composable(Routes.LOGS) {

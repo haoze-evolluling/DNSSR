@@ -31,6 +31,9 @@ fun ExperimentalFeaturesScreen(
     var legacyIconEnabled by remember {
         mutableStateOf(AppSettings.isLegacyIconEnabled(context))
     }
+    var legacyLogPageEnabled by remember {
+        mutableStateOf(AppSettings.isLegacyLogPageEnabled(context))
+    }
     val serviceLightEffectSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     var serviceLightEffectEnabled by remember {
         mutableStateOf(AppSettings.isServiceLightEffectEnabled(context))
@@ -40,6 +43,11 @@ fun ExperimentalFeaturesScreen(
         legacyIconEnabled = enabled
         AppSettings.setLegacyIconEnabled(context, enabled)
         LauncherIconManager.setLegacyIconEnabled(context, enabled)
+    }
+
+    fun saveLegacyLogPageEnabled(enabled: Boolean) {
+        legacyLogPageEnabled = enabled
+        AppSettings.setLegacyLogPageEnabled(context, enabled)
     }
 
     fun saveServiceLightEffectEnabled(enabled: Boolean) {
@@ -85,6 +93,16 @@ fun ExperimentalFeaturesScreen(
                 )
             }
             SettingsInfoText("桌面图标可能需要等待启动器刷新；如果未立即变化，可回到桌面稍等片刻。")
+
+            SettingsGroupTitle("日志")
+            SettingsGroup {
+                SettingsSwitchItem(
+                    title = "旧版日志页面",
+                    subtitle = "开启后首页日志按钮显示当前的日志分组页；关闭后显示新版日志仪表盘",
+                    checked = legacyLogPageEnabled,
+                    onCheckedChange = ::saveLegacyLogPageEnabled
+                )
+            }
         }
     }
 }

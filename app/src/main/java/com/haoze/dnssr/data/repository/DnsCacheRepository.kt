@@ -21,6 +21,10 @@ class DnsCacheRepository(private val dao: DnsCacheDao) {
         return dao.deleteExpired(now)
     }
 
+    suspend fun recentEntries(now: Long, limit: Int): List<DnsCacheEntity> {
+        return dao.getUnexpired(now, limit.coerceAtLeast(0))
+    }
+
     private fun appendSearch(sql: StringBuilder, args: MutableList<Any>, params: DnsCacheQueryParams) {
         val trimmed = params.query.trim()
         if (trimmed.isNotEmpty()) {

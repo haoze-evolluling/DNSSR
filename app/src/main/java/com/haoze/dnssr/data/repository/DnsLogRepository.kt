@@ -37,6 +37,15 @@ class DnsLogRepository(private val dao: DnsLogDao) {
         return dao.queryList(SimpleSQLiteQuery(sql.toString(), args.toTypedArray()))
     }
 
+    suspend fun recentLogs(limit: Int): List<DnsLogEntity> {
+        return dao.queryList(
+            SimpleSQLiteQuery(
+                "SELECT * FROM dns_log ORDER BY timestamp DESC LIMIT ?",
+                arrayOf(limit.coerceAtLeast(0))
+            )
+        )
+    }
+
     suspend fun dailyStats(since: Long): LogDailyStats {
         val rows = dao.dailyStats(since)
         var passed = 0

@@ -97,6 +97,7 @@ object AppSettings {
     const val KEY_HIDE_FROM_RECENTS_ENABLED = "hide_from_recents_enabled"
     const val KEY_PERSISTENT_NOTIFICATION_ENABLED = "persistent_notification_enabled"
     const val KEY_LEGACY_ICON_ENABLED = "legacy_icon_enabled"
+    const val KEY_LEGACY_LOG_PAGE_ENABLED = "legacy_log_page_enabled"
     const val KEY_SERVICE_LIGHT_EFFECT_ENABLED = "service_light_effect_enabled"
     private const val KEY_HOME_VISIBLE_PROTOCOLS = "home_visible_protocols"
     private const val KEY_HOME_HIDDEN_PROVIDER_IDS = "home_hidden_provider_ids"
@@ -130,6 +131,7 @@ object AppSettings {
     private const val DEFAULT_HIDE_FROM_RECENTS_ENABLED = false
     const val DEFAULT_PERSISTENT_NOTIFICATION_ENABLED = true
     private const val DEFAULT_LEGACY_ICON_ENABLED = false
+    private const val DEFAULT_LEGACY_LOG_PAGE_ENABLED = false
     private const val DEFAULT_SERVICE_LIGHT_EFFECT_ENABLED = true
     private val DEFAULT_BOOTSTRAP_PRESET_IDS = setOf(
         "preset_volcengine",
@@ -527,6 +529,18 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_LEGACY_ICON_ENABLED, enabled)
+            .apply()
+    }
+
+    fun isLegacyLogPageEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_LEGACY_LOG_PAGE_ENABLED, DEFAULT_LEGACY_LOG_PAGE_ENABLED)
+    }
+
+    fun setLegacyLogPageEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_LEGACY_LOG_PAGE_ENABLED, enabled)
             .apply()
     }
 
