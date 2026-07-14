@@ -317,7 +317,7 @@ private fun formatHealthMs(value: Double): String {
 @Composable
 fun RaceModeLatencySettingsScreen(
     onBack: () -> Unit,
-    title: String = "DNS 查询测速",
+    title: String = "查询测速",
     viewModel: RaceModeSettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current

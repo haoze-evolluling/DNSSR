@@ -40,7 +40,7 @@ fun SettingsScreen(
     val providerManagementTitle = "服务商管理"
     val homeProviderVisibilityTitle = "服务显示"
     val bootstrapSettingsTitle = "Bootstrap 设置"
-    val latencySettingsTitle = "DNS 查询测速"
+    val latencySettingsTitle = "查询测速"
     val cacheSettingsTitle = "DNS 缓存设置"
     val raceModeSettingsTitle = "解析模式"
     val ruleManagementTitle = "域名规则"

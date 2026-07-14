@@ -238,10 +238,10 @@ fun AppNavHost(
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap 设置"
             )
         }
-        composable(titledRoute(Routes.RACE_MODE_LATENCY), arguments = listOf(screenTitleArgument("DNS 查询测速"))) { entry ->
+        composable(titledRoute(Routes.RACE_MODE_LATENCY), arguments = listOf(screenTitleArgument("查询测速"))) { entry ->
             RaceModeLatencySettingsScreen(
                 onBack = { navController.popBackStack() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNS 查询测速"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "查询测速"
             )
         }
         composable(titledRoute(Routes.RACE_MODE_PROVIDERS), arguments = listOf(screenTitleArgument("解析模式"))) { entry ->
