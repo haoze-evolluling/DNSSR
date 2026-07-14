@@ -189,7 +189,7 @@ fun SubscriptionScreen(
 
             item {
                 SettingsInfoText(
-                    text = "订阅文件会按语法自动分类：@@ 规则导入白名单，其他受支持规则导入黑名单。",
+                    text = "依据 AdGuard DNS 语法自动分类黑白名单。支持 BOM、行尾注释、hosts 多域名和 IDN 域名。",
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
