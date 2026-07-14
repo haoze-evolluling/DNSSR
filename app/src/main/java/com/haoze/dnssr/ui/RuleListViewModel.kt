@@ -141,8 +141,8 @@ enum class ManagedRuleKind(
     val title: String,
     val countLabel: String
 ) {
-    BLOCK("已添加的屏蔽规则", "屏蔽规则"),
-    ALLOW("已添加的白名单规则", "白名单规则")
+    BLOCK("屏蔽规则", "屏蔽规则"),
+    ALLOW("放行规则", "白名单规则")
 }
 
 data class RuleListItem(

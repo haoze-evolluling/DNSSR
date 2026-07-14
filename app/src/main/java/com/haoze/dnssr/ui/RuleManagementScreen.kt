@@ -257,7 +257,7 @@ fun RuleManagementScreen(
                 SettingsGroup {
                     SettingsNavigationItem(
                         title = "黑名单规则",
-                        subtitle = "查看、启用、停用或删除拦截规则",
+                        subtitle = "查看、启用、停用或删除屏蔽规则",
                         value = "$ruleCount 条",
                         onClick = onNavigateToRuleList
                     )
