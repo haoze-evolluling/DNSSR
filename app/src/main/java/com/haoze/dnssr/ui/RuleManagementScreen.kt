@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -17,7 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +29,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsDivider
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
@@ -56,7 +53,6 @@ fun RuleManagementScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
     val ruleCount by viewModel.ruleCount.collectAsStateWithLifecycle()
     val allowRuleCount by viewModel.allowRuleCount.collectAsStateWithLifecycle()
 
@@ -64,8 +60,34 @@ fun RuleManagementScreen(
     var newAllowRule by remember { mutableStateOf("") }
     var addResult by remember { mutableStateOf<String?>(null) }
     var addAllowResult by remember { mutableStateOf<String?>(null) }
+    var showAddRuleDialog by remember { mutableStateOf(false) }
+    var showAddAllowRuleDialog by remember { mutableStateOf(false) }
+    var addRuleError by remember { mutableStateOf<String?>(null) }
+    var addAllowRuleError by remember { mutableStateOf<String?>(null) }
     var blockResponseMode by remember { mutableStateOf(AppSettings.getBlockResponseMode(context)) }
     var autoUpdateEnabled by remember { mutableStateOf(SubscriptionAutoUpdateSettings.isEnabled(context)) }
+
+    fun openAddRuleDialog() {
+        newRule = ""
+        addRuleError = null
+        showAddRuleDialog = true
+    }
+
+    fun closeAddRuleDialog() {
+        showAddRuleDialog = false
+        addRuleError = null
+    }
+
+    fun openAddAllowRuleDialog() {
+        newAllowRule = ""
+        addAllowRuleError = null
+        showAddAllowRuleDialog = true
+    }
+
+    fun closeAddAllowRuleDialog() {
+        showAddAllowRuleDialog = false
+        addAllowRuleError = null
+    }
 
     LaunchedEffect(Unit) {
         delay(300) // 等待页面进入动画完成后再加载数据
@@ -133,47 +155,20 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("手动添加域名")
+                SettingsGroupTitle("手动添加屏蔽域名")
             }
             item {
                 SettingsGroup {
-                    OutlinedTextField(
-                        value = newRule,
-                        onValueChange = { newRule = it },
-                        label = { Text("要屏蔽的域名，如 example.com") },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        shape = SettingsCornerShape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    SettingsNavigationItem(
+                        title = "添加屏蔽域名",
+                        subtitle = "输入要屏蔽的域名，如 example.com",
+                        onClick = ::openAddRuleDialog
                     )
-                    SettingsDivider()
-                    TextButton(
-                        enabled = newRule.isNotBlank(),
-                        onClick = {
-                            scope.launch {
-                                viewModel.addRule(newRule) { message ->
-                                    addResult = message
-                                }
-                                newRule = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Text("添加到屏蔽规则")
-                    }
-                    addResult?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, top = 4.dp, bottom = 8.dp, end = 16.dp)
-                        )
-                    }
+                }
+            }
+            addResult?.let { message ->
+                item {
+                    SettingsInfoText(message)
                 }
             }
 
@@ -182,43 +177,16 @@ fun RuleManagementScreen(
             }
             item {
                 SettingsGroup {
-                    OutlinedTextField(
-                        value = newAllowRule,
-                        onValueChange = { newAllowRule = it },
-                        label = { Text("要放行的域名，如 example.com") },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        shape = SettingsCornerShape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    SettingsNavigationItem(
+                        title = "添加白名单域名",
+                        subtitle = "输入要放行的域名，如 example.com",
+                        onClick = ::openAddAllowRuleDialog
                     )
-                    SettingsDivider()
-                    TextButton(
-                        enabled = newAllowRule.isNotBlank(),
-                        onClick = {
-                            scope.launch {
-                                viewModel.addAllowRule(newAllowRule) { message ->
-                                    addAllowResult = message
-                                }
-                                newAllowRule = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Text("添加到白名单规则")
-                    }
-                    addAllowResult?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, top = 4.dp, bottom = 8.dp, end = 16.dp)
-                        )
-                    }
+                }
+            }
+            addAllowResult?.let { message ->
+                item {
+                    SettingsInfoText(message)
                 }
             }
 
@@ -277,5 +245,109 @@ fun RuleManagementScreen(
                 }
             }
         }
+    }
+
+    if (showAddRuleDialog) {
+        AlertDialog(
+            onDismissRequest = ::closeAddRuleDialog,
+            title = { Text("添加屏蔽域名") },
+            text = {
+                OutlinedTextField(
+                    value = newRule,
+                    onValueChange = {
+                        newRule = it
+                        addRuleError = null
+                    },
+                    label = { Text("要屏蔽的域名，如 example.com") },
+                    supportingText = {
+                        Text(addRuleError ?: "请输入域名或支持的过滤规则")
+                    },
+                    isError = addRuleError != null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val rule = newRule.trim()
+                        if (rule.isBlank()) {
+                            addRuleError = "请输入要屏蔽的域名"
+                            return@TextButton
+                        }
+                        viewModel.addRule(rule) { message ->
+                            if (message == "已添加到屏蔽规则") {
+                                addResult = message
+                                newRule = ""
+                                closeAddRuleDialog()
+                            } else {
+                                addRuleError = message
+                            }
+                        }
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = ::closeAddRuleDialog) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showAddAllowRuleDialog) {
+        AlertDialog(
+            onDismissRequest = ::closeAddAllowRuleDialog,
+            title = { Text("添加白名单域名") },
+            text = {
+                OutlinedTextField(
+                    value = newAllowRule,
+                    onValueChange = {
+                        newAllowRule = it
+                        addAllowRuleError = null
+                    },
+                    label = { Text("要放行的域名，如 example.com") },
+                    supportingText = {
+                        Text(addAllowRuleError ?: "请输入域名或支持的白名单规则")
+                    },
+                    isError = addAllowRuleError != null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val rule = newAllowRule.trim()
+                        if (rule.isBlank()) {
+                            addAllowRuleError = "请输入要放行的域名"
+                            return@TextButton
+                        }
+                        viewModel.addAllowRule(rule) { message ->
+                            if (message == "已添加到白名单规则") {
+                                addAllowResult = message
+                                newAllowRule = ""
+                                closeAddAllowRuleDialog()
+                            } else {
+                                addAllowRuleError = message
+                            }
+                        }
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = ::closeAddAllowRuleDialog) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
