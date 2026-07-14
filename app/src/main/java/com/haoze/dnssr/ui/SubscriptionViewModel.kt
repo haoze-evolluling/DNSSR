@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.SubscriptionEntity
-import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.SubscriptionManager
@@ -37,9 +36,6 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     private val _subscriptions = MutableStateFlow<List<SubscriptionEntity>>(emptyList())
     val subscriptions: StateFlow<List<SubscriptionEntity>> = _subscriptions.asStateFlow()
 
-    private val _selectedKind = MutableStateFlow(SubscriptionKind.BLOCK)
-    val selectedKind: StateFlow<String> = _selectedKind.asStateFlow()
-
     val importProgress: StateFlow<Pair<Int, Int>> = subscriptionManager.importProgress
     val importing: StateFlow<Boolean> = subscriptionManager.importing
 
@@ -67,17 +63,9 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun setSelectedKind(kind: String) {
-        val normalized = if (kind == SubscriptionKind.ALLOW) SubscriptionKind.ALLOW else SubscriptionKind.BLOCK
-        if (_selectedKind.value == normalized) return
-        _selectedKind.value = normalized
-        loadSubscriptions()
-    }
-
     fun addSubscription(url: String, name: String? = null) {
         viewModelScope.launch(Dispatchers.IO) {
-            val kind = _selectedKind.value
-            val result = subscriptionManager.addSubscription(url, kind, name)
+            val result = subscriptionManager.addSubscription(url, name = name)
             if (result.isSuccess) {
                 RuntimeDnsSettingsRefresher.refreshIfRunning(
                     getApplication<Application>(),
@@ -86,8 +74,9 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
             }
             withContext(Dispatchers.Main) {
                 if (result.isSuccess) {
-                    val sub = result.getOrNull()
-                    _message.value = "导入成功，共添加 ${sub?.ruleCount ?: 0} 条${kind.ruleKindLabel()}规则"
+                    _message.value = subscriptionManager.latestImportSummary()
+                        ?.displayMessage("导入成功")
+                        ?: "导入成功"
                 } else {
                     _message.value = "导入失败：${result.exceptionOrNull()?.message}"
                 }
@@ -99,12 +88,11 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     fun addLocalSubscription(uri: Uri, name: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
-            val kind = _selectedKind.value
             val result = try {
                 val content = context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
                     reader?.readText()
                 } ?: throw IllegalArgumentException("无法读取所选文件")
-                subscriptionManager.addLocalSubscription(uri.toString(), name, content, kind)
+                subscriptionManager.addLocalSubscription(uri.toString(), name, content)
             } catch (e: Exception) {
                 Result.failure(e)
             }
@@ -113,7 +101,8 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
             }
             withContext(Dispatchers.Main) {
                 _message.value = if (result.isSuccess) {
-                    "导入成功，共添加 ${result.getOrNull()?.ruleCount ?: 0} 条${kind.ruleKindLabel()}规则"
+                    subscriptionManager.latestImportSummary()?.displayMessage("导入成功")
+                        ?: "导入成功"
                 } else {
                     "导入失败：${result.exceptionOrNull()?.message}"
                 }
@@ -169,7 +158,9 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
                 }
                 withContext(Dispatchers.Main) {
                     if (result.isSuccess) {
-                        _message.value = "更新成功，共导入 ${result.getOrNull() ?: 0} 条规则"
+                        _message.value = subscriptionManager.latestImportSummary()
+                            ?.displayMessage("更新成功")
+                            ?: "更新成功，共导入 ${result.getOrNull() ?: 0} 条规则"
                     } else {
                         _message.value = "更新失败：${result.exceptionOrNull()?.message}"
                     }
@@ -278,12 +269,8 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         _message.value = null
     }
 
-    private fun String.ruleKindLabel(): String {
-        return if (this == SubscriptionKind.ALLOW) "白名单" else "屏蔽"
-    }
-
     private suspend fun loadSubscriptionsIntoState() {
-        val list = subscriptionManager.subscriptionsByKind(_selectedKind.value)
+        val list = subscriptionManager.allSubscriptions()
         withContext(Dispatchers.Main) {
             _subscriptions.value = list
         }

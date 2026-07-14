@@ -9,7 +9,7 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
 
 @Dao
 interface SubscriptionDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(subscription: SubscriptionEntity): Long
 
     @Update
@@ -38,6 +38,9 @@ interface SubscriptionDao {
 
     @Query("SELECT * FROM subscription WHERE url = :url AND kind = :kind")
     suspend fun byUrlAndKind(url: String, kind: String): SubscriptionEntity?
+
+    @Query("SELECT * FROM subscription WHERE url = :url LIMIT 1")
+    suspend fun byUrl(url: String): SubscriptionEntity?
 
     @Query("DELETE FROM subscription WHERE id = :id")
     suspend fun deleteById(id: Long)

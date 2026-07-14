@@ -12,7 +12,7 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "allow_rule",
-    indices = [Index(value = ["pattern"], unique = true)]
+    indices = [Index(value = ["pattern", "source"], unique = true)]
 )
 data class AllowRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

@@ -10,7 +10,7 @@ import com.haoze.dnssr.data.entity.AllowRuleEntity
 @Dao
 interface AllowRuleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insert(entity: AllowRuleEntity)
+    suspend fun insert(entity: AllowRuleEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(entities: List<AllowRuleEntity>): List<Long>

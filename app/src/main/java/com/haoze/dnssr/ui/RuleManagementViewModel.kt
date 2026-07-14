@@ -88,32 +88,30 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun importRules(uri: Uri, allowRules: Boolean, onResult: (String) -> Unit) {
+    fun importRules(uri: Uri, onResult: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
             try {
                 val text = context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
                     reader?.readText()
                 } ?: throw IOException("无法读取所选文件")
-                val rules = if (allowRules) {
-                    com.haoze.dnssr.vpn.AdGuardRuleParser.parseAllowAll(text)
-                } else {
-                    com.haoze.dnssr.vpn.AdGuardRuleParser.parseAll(text)
-                }
-                val inserted = if (allowRules) {
-                    allowListManager.addRulesBatch(rules, LOCAL_IMPORT_SOURCE)
-                } else {
-                    blockListManager.addRulesBatch(rules, LOCAL_IMPORT_SOURCE)
-                }
-                if (inserted > 0) {
+                val rules = com.haoze.dnssr.vpn.AdGuardRuleParser.parseCategorized(text)
+                if (rules.isEmpty()) throw IllegalArgumentException("文件中没有可导入的有效 DNS 规则")
+                val insertedBlock = blockListManager.addRulesBatch(rules.blockRules, LOCAL_IMPORT_SOURCE)
+                val insertedAllow = allowListManager.addRulesBatch(rules.allowRules, LOCAL_IMPORT_SOURCE)
+                if (insertedBlock + insertedAllow > 0) {
                     RuntimeDnsSettingsRefresher.refreshIfRunning(
                         context,
-                        if (allowRules) "allow_rules_imported" else "block_rules_imported"
+                        "rules_imported"
                     )
                 }
                 withContext(Dispatchers.Main) {
-                    val kind = if (allowRules) "白名单" else "屏蔽"
-                    onResult("已导入 $inserted 条${kind}规则；${rules.size - inserted} 条重复或无效")
+                    val databaseDuplicates = rules.size - insertedBlock - insertedAllow
+                    onResult(
+                        "导入完成：黑名单 $insertedBlock 条，白名单 $insertedAllow 条，" +
+                            "重复 ${rules.duplicateCount + databaseDuplicates.coerceAtLeast(0)} 条，" +
+                            "无效/不支持 ${rules.invalidCount + rules.unsupportedCount} 条"
+                    )
                 }
                 loadRuleCount()
             } catch (e: Exception) {

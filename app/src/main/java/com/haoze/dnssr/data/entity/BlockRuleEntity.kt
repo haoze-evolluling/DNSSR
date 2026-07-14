@@ -12,7 +12,7 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "block_rule",
-    indices = [Index(value = ["pattern"], unique = true)]
+    indices = [Index(value = ["pattern", "source"], unique = true)]
 )
 data class BlockRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

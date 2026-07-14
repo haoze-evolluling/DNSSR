@@ -10,7 +10,7 @@ import com.haoze.dnssr.data.entity.BlockRuleEntity
 @Dao
 interface BlockRuleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insert(entity: BlockRuleEntity)
+    suspend fun insert(entity: BlockRuleEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(entities: List<BlockRuleEntity>): List<Long>

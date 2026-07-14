@@ -1,102 +1,168 @@
 package com.haoze.dnssr.vpn
 
-/**
- * AdGuard DNS 过滤规则解析器。
- *
- * 支持的格式：
- * - ||example.com^ 或 ||example.com → example.com
- * - 0.0.0.0 example.com / 127.0.0.1 example.com → example.com
- * - example.com（纯域名）→ example.com
- *
- * 跳过的格式（静默忽略）：
- * - @@||domain^ 白名单规则（屏蔽规则导入时）
- * - ! 或 # 开头的注释
- * - /regex/ 正则规则
- * - 含 $ 修饰符的规则
- * - 含 * 通配符的规则
- * - ## / #$# 等 cosmetic 规则
- * - 空行
- */
+import java.net.IDN
+import java.net.InetAddress
+
+/** Parses the DNS subset of AdGuard, hosts, and domains-only rule lists. */
 object AdGuardRuleParser {
 
     data class ParsedRule(val pattern: String, val rawLine: String)
 
-    private val HOSTS_PATTERN = Regex("^(0\\.0\\.0\\.0|127\\.0\\.0\\.1)\\s+(.+)$")
-
-    /**
-     * 解析单行规则文本，返回规范化后的域名，或 null 表示跳过。
-     */
-    fun parseLine(line: String): ParsedRule? {
-        return parseLine(line, allowRule = false)
+    data class CategorizedRules(
+        val blockRules: List<ParsedRule>,
+        val allowRules: List<ParsedRule>,
+        val duplicateCount: Int = 0,
+        val invalidCount: Int = 0,
+        val unsupportedCount: Int = 0,
+        val ignoredCount: Int = 0,
+        val totalLines: Int = 0
+    ) {
+        val size: Int get() = blockRules.size + allowRules.size
+        val skippedCount: Int get() = invalidCount + unsupportedCount
+        fun isEmpty(): Boolean = blockRules.isEmpty() && allowRules.isEmpty()
     }
 
-    /**
-     * 解析单行白名单规则。支持 @@||example.com^，也支持直接输入 example.com。
-     */
-    fun parseAllowLine(line: String): ParsedRule? {
-        return parseLine(line, allowRule = true)
+    private val SINKHOLE_ADDRESSES = setOf("0", "0.0.0.0", "127.0.0.1", "::", "::1")
+    private val DOMAIN_LABEL = Regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+
+    fun parseLine(line: String): ParsedRule? = parseSingle(line, allowRule = false)
+
+    /** Manual allow entry accepts either an exception rule or a plain domain. */
+    fun parseAllowLine(line: String): ParsedRule? = parseSingle(line, allowRule = true)
+
+    fun parseAll(text: String): List<ParsedRule> = parseCategorized(text).blockRules
+
+    fun parseAllowAll(text: String): List<ParsedRule> = text.lineSequence()
+        .mapNotNull(::parseAllowLine)
+        .distinctBy { it.pattern }
+        .toList()
+
+    fun parseCategorized(text: String): CategorizedRules {
+        val blockRules = LinkedHashMap<String, ParsedRule>()
+        val allowRules = LinkedHashMap<String, ParsedRule>()
+        var duplicates = 0
+        var invalid = 0
+        var unsupported = 0
+        var ignored = 0
+        var total = 0
+
+        text.lineSequence().forEach { originalLine ->
+            total++
+            val line = originalLine.trim().trimStart('\uFEFF')
+            if (line.isEmpty() || line.startsWith("!") || line.startsWith("#") ||
+                (line.startsWith("[") && line.endsWith("]"))
+            ) {
+                ignored++
+                return@forEach
+            }
+
+            val hosts = parseHostsLine(line)
+            if (hosts != null) {
+                if (hosts.isEmpty()) {
+                    unsupported++
+                } else {
+                    hosts.forEach { rule ->
+                        if (blockRules.putIfAbsent(rule.pattern, rule) != null) duplicates++
+                    }
+                }
+                return@forEach
+            }
+
+            val allow = line.startsWith("@@")
+            when (val result = parseAdblockOrDomain(line, allow)) {
+                is LineResult.Valid -> {
+                    val target = if (allow) allowRules else blockRules
+                    if (target.putIfAbsent(result.rule.pattern, result.rule) != null) duplicates++
+                }
+                LineResult.Invalid -> invalid++
+                LineResult.Unsupported -> unsupported++
+            }
+        }
+
+        return CategorizedRules(
+            blockRules = blockRules.values.toList(),
+            allowRules = allowRules.values.toList(),
+            duplicateCount = duplicates,
+            invalidCount = invalid,
+            unsupportedCount = unsupported,
+            ignoredCount = ignored,
+            totalLines = total
+        )
     }
 
-    private fun parseLine(line: String, allowRule: Boolean): ParsedRule? {
-        val trimmed = line.trim()
+    private fun parseSingle(line: String, allowRule: Boolean): ParsedRule? {
+        val trimmed = line.trim().trimStart('\uFEFF')
+        if (!allowRule && trimmed.startsWith("@@")) return null
+        if (!allowRule) parseHostsLine(trimmed)?.firstOrNull()?.let { return it }
+        val result = parseAdblockOrDomain(trimmed, trimmed.startsWith("@@"))
+        return (result as? LineResult.Valid)?.rule
+    }
 
-        // 跳过空行和注释
-        if (trimmed.isEmpty() || trimmed.startsWith("!") || trimmed.startsWith("#")) {
+    private fun parseHostsLine(line: String): List<ParsedRule>? {
+        val content = line.substringBefore('#').trim()
+        val fields = content.split(Regex("\\s+")).filter(String::isNotEmpty)
+        if (fields.size < 2 || !looksLikeIp(fields.first())) return null
+        if (fields.first().lowercase() !in SINKHOLE_ADDRESSES) return emptyList()
+        return fields.drop(1).mapNotNull { host ->
+            normalizeDomain(host)?.let { ParsedRule(it, line) }
+        }
+    }
+
+    private fun looksLikeIp(value: String): Boolean {
+        if (value == "0") return true
+        if (!value.contains(':') && !value.matches(Regex("^[0-9.]+$"))) return false
+        return try {
+            InetAddress.getByName(value)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun parseAdblockOrDomain(line: String, allow: Boolean): LineResult {
+        var value = line.substringBefore('#').trim()
+        if (value.isEmpty()) return LineResult.Invalid
+        if (allow) value = value.removePrefix("@@")
+        if (value.startsWith("/") || value.contains("*") || value.contains("##") || value.contains("#@#")) {
+            return LineResult.Unsupported
+        }
+
+        val modifierIndex = value.indexOf('$')
+        if (modifierIndex >= 0) {
+            val modifiers = value.substring(modifierIndex + 1)
+                .split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+            if (modifiers.any { it != "important" }) return LineResult.Unsupported
+            value = value.substring(0, modifierIndex)
+        }
+
+        value = when {
+            value.startsWith("||") -> value.removePrefix("||").trimEnd('^')
+            value.startsWith("|") || value.endsWith("|") -> return LineResult.Unsupported
+            else -> value.trimEnd('^')
+        }
+        val domain = normalizeDomain(value) ?: return LineResult.Invalid
+        return LineResult.Valid(ParsedRule(domain, line))
+    }
+
+    private fun normalizeDomain(value: String): String? {
+        val candidate = value.trim().trimEnd('.')
+        if (candidate.isEmpty() || candidate.contains('/') || candidate.contains(':') || candidate.contains(' ')) {
             return null
         }
-
-        val withoutAllowPrefix = if (trimmed.startsWith("@@")) {
-            trimmed.removePrefix("@@")
-        } else {
-            if (!allowRule) trimmed else trimmed
+        val ascii = try {
+            IDN.toASCII(candidate, IDN.USE_STD3_ASCII_RULES).lowercase()
+        } catch (_: IllegalArgumentException) {
+            return null
         }
-
-        // 屏蔽规则导入时跳过白名单规则。
-        if (!allowRule && trimmed.startsWith("@@")) return null
-
-        // 跳过正则规则
-        if (withoutAllowPrefix.startsWith("/")) return null
-
-        // 跳过含 $ 修饰符的规则
-        if (withoutAllowPrefix.contains("$")) return null
-
-        // 跳过含 * 通配符的规则
-        if (withoutAllowPrefix.contains("*")) return null
-
-        var domain = withoutAllowPrefix
-
-        // 剥离 || 前缀
-        if (domain.startsWith("||")) {
-            domain = domain.removePrefix("||")
-        }
-
-        // 剥离 ^ 后缀（可能紧跟其他内容如 ^$important，但前面已过滤含 $ 的行）
-        domain = domain.trimEnd('^')
-
-        // hosts 格式匹配: 0.0.0.0 domain 或 127.0.0.1 domain
-        val hostsMatch = HOSTS_PATTERN.matchEntire(domain)
-        if (hostsMatch != null) {
-            domain = hostsMatch.groupValues[2].trim()
-        }
-
-        // 规范化
-        domain = domain.lowercase().trim().trimEnd('.')
-        if (domain.isEmpty()) return null
-
-        // 跳过含 / 或 : 的异常模式（如含路径或端口号）
-        if (domain.contains("/") || domain.contains(":")) return null
-
-        return ParsedRule(pattern = domain, rawLine = trimmed)
+        if (ascii.length > 253 || !ascii.contains('.') || looksLikeIp(ascii)) return null
+        val labels = ascii.split('.')
+        if (labels.any { it.length !in 1..63 || !DOMAIN_LABEL.matches(it) }) return null
+        return ascii
     }
 
-    /**
-     * 解析完整的规则文本，返回所有有效规则列表。
-     */
-    fun parseAll(text: String): List<ParsedRule> {
-        return text.lineSequence().mapNotNull(::parseLine).toList()
-    }
-
-    fun parseAllowAll(text: String): List<ParsedRule> {
-        return text.lineSequence().mapNotNull(::parseAllowLine).toList()
+    private sealed interface LineResult {
+        data class Valid(val rule: ParsedRule) : LineResult
+        data object Invalid : LineResult
+        data object Unsupported : LineResult
     }
 }

@@ -31,7 +31,7 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
         AllowRuleEntity::class,
         SubscriptionEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,7 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dnssr_database"
                 )
-                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
             }
@@ -96,6 +96,48 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE `subscription` ADD COLUMN `sourceType` TEXT NOT NULL DEFAULT 'remote'"
+                )
+            }
+        }
+
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TEMP TABLE subscription_merge AS " +
+                        "SELECT s.id AS oldId, (SELECT MIN(k.id) FROM subscription k " +
+                        "WHERE LOWER(k.url) = LOWER(s.url)) AS keepId FROM subscription s"
+                )
+                db.execSQL(
+                    "UPDATE block_rule SET source = 'sub_' || " +
+                        "(SELECT keepId FROM subscription_merge WHERE oldId = " +
+                        "CAST(SUBSTR(block_rule.source, 5) AS INTEGER)) " +
+                        "WHERE source LIKE 'sub_%' AND EXISTS " +
+                        "(SELECT 1 FROM subscription_merge WHERE oldId = CAST(SUBSTR(block_rule.source, 5) AS INTEGER))"
+                )
+                db.execSQL(
+                    "UPDATE allow_rule SET source = 'sub_' || " +
+                        "(SELECT keepId FROM subscription_merge WHERE oldId = " +
+                        "CAST(SUBSTR(allow_rule.source, 5) AS INTEGER)) " +
+                        "WHERE source LIKE 'sub_%' AND EXISTS " +
+                        "(SELECT 1 FROM subscription_merge WHERE oldId = CAST(SUBSTR(allow_rule.source, 5) AS INTEGER))"
+                )
+                db.execSQL("DELETE FROM subscription WHERE id NOT IN (SELECT keepId FROM subscription_merge)")
+                db.execSQL("UPDATE subscription SET kind = 'block'")
+                db.execSQL("DROP TABLE subscription_merge")
+
+                db.execSQL("DROP INDEX IF EXISTS index_block_rule_pattern")
+                db.execSQL("DROP INDEX IF EXISTS index_allow_rule_pattern")
+                db.execSQL("DROP INDEX IF EXISTS index_subscription_url_kind")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_block_rule_pattern_source " +
+                        "ON block_rule (pattern, source)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_allow_rule_pattern_source " +
+                        "ON allow_rule (pattern, source)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_subscription_url ON subscription (url)"
                 )
             }
         }

@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "subscription",
-    indices = [Index(value = ["url", "kind"], unique = true)]
+    indices = [Index(value = ["url"], unique = true)]
 )
 data class SubscriptionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

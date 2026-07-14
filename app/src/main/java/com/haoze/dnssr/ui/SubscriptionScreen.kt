@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.data.entity.SubscriptionEntity
-import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.data.entity.SubscriptionSourceType
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsGroup
@@ -74,7 +72,6 @@ fun SubscriptionScreen(
 ) {
     val context = LocalContext.current
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
-    val selectedKind by viewModel.selectedKind.collectAsStateWithLifecycle()
     val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val updatingSubscriptionId by viewModel.updatingSubscriptionId.collectAsStateWithLifecycle()
@@ -125,16 +122,6 @@ fun SubscriptionScreen(
                 .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // 导入进度
-            item {
-                SubscriptionKindToggleRow(
-                    selectedKind = selectedKind,
-                    onSelect = viewModel::setSelectedKind,
-                    enabled = !busy,
-                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
-                )
-            }
-
             // 操作结果消息
             message?.let {
                 item {
@@ -151,7 +138,7 @@ fun SubscriptionScreen(
                     label = "SubscriptionList"
                 ) { empty ->
                     if (empty) {
-                        SettingsGroupTitle("${selectedKind.ruleKindLabel()}订阅")
+                        SettingsGroupTitle("规则订阅")
                         SettingsGroup {
                             Column(
                                 modifier = Modifier
@@ -160,13 +147,13 @@ fun SubscriptionScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = "暂无${selectedKind.ruleKindLabel()}订阅",
+                                    text = "暂无规则订阅",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "点击右上角 + 添加 AdGuard DNS ${selectedKind.ruleKindLabel()}规则地址",
+                                    text = "点击右上角 + 添加 AdGuard DNS 规则地址",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -174,7 +161,7 @@ fun SubscriptionScreen(
                         }
                     } else {
                         Column {
-                            SettingsGroupTitle("${selectedKind.ruleKindLabel()}订阅")
+                            SettingsGroupTitle("规则订阅")
                             SettingsGroup {
                                 subscriptions.forEachIndexed { index, sub ->
                                     SubscriptionItem(
@@ -202,11 +189,7 @@ fun SubscriptionScreen(
 
             item {
                 SettingsInfoText(
-                    text = if (selectedKind == SubscriptionKind.ALLOW) {
-                        "白名单订阅支持 @@||domain^ 和普通域名，会在屏蔽规则前优先匹配。"
-                    } else {
-                        "屏蔽订阅支持 AdGuard DNS 过滤规则，会自动解析 ||domain^、hosts 等常见格式。"
-                    },
+                    text = "订阅文件会按语法自动分类：@@ 规则导入白名单，其他受支持规则导入黑名单。",
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
@@ -229,7 +212,6 @@ fun SubscriptionScreen(
 
     if (showAddDialog) {
         AddSubscriptionDialog(
-            kind = selectedKind,
             onDismiss = { showAddDialog = false },
             onConfirm = { url, name ->
                 viewModel.addSubscription(url, name)
@@ -340,36 +322,6 @@ fun SubscriptionScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun SubscriptionKindToggleRow(
-    selectedKind: String,
-    onSelect: (String) -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        listOf(SubscriptionKind.BLOCK, SubscriptionKind.ALLOW).forEach { kind ->
-            FilterChip(
-                selected = selectedKind == kind,
-                onClick = { onSelect(kind) },
-                enabled = enabled,
-                label = {
-                    Text(
-                        text = kind.ruleKindLabel(),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
     }
 }
 
@@ -547,7 +499,6 @@ private fun SubscriptionActionDialog(
 
 @Composable
 private fun AddSubscriptionDialog(
-    kind: String,
     onDismiss: () -> Unit,
     onConfirm: (url: String, name: String) -> Unit
 ) {
@@ -560,7 +511,7 @@ private fun AddSubscriptionDialog(
         text = {
             Column {
                 Text(
-                    text = "输入 AdGuard DNS ${kind.ruleKindLabel()}规则订阅地址。",
+                    text = "输入 AdGuard DNS 规则订阅地址，导入时会自动区分黑名单和白名单规则。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -761,6 +712,3 @@ private fun android.content.Context.displayNameFor(uri: Uri): String {
     return "本地规则"
 }
 
-private fun String.ruleKindLabel(): String {
-    return if (this == SubscriptionKind.ALLOW) "白名单" else "屏蔽"
-}

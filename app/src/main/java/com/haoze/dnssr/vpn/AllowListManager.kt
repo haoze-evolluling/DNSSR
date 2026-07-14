@@ -24,7 +24,7 @@ class AllowListManager(private val dao: AllowRuleDao) {
 
     suspend fun addRule(pattern: String): Boolean {
         val parsed = AdGuardRuleParser.parseAllowLine(pattern) ?: return false
-        dao.insert(
+        val inserted = dao.insert(
             AllowRuleEntity(
                 pattern = parsed.pattern,
                 rawLine = parsed.rawLine,
@@ -34,6 +34,7 @@ class AllowListManager(private val dao: AllowRuleDao) {
                 groupName = null
             )
         )
+        if (inserted == -1L) return false
         cache.addPattern(parsed.pattern)
         return true
     }
@@ -83,7 +84,7 @@ class AllowListManager(private val dao: AllowRuleDao) {
         val rule = dao.all().find { it.id == id }
         if (rule != null) {
             dao.deleteById(id)
-            cache.removePattern(rule.pattern)
+            cache.reload(dao)
         }
     }
 
@@ -110,4 +111,7 @@ class AllowListManager(private val dao: AllowRuleDao) {
     }
 
     suspend fun countBySource(source: String): Int = dao.countBySource(source)
+
+    suspend fun parsedRulesBySource(source: String): List<AdGuardRuleParser.ParsedRule> =
+        dao.bySource(source).map { AdGuardRuleParser.ParsedRule(it.pattern, it.rawLine) }
 }

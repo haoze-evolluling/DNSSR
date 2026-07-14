@@ -44,7 +44,7 @@ class BlockListManager(private val dao: BlockRuleDao) {
      */
     suspend fun addRule(pattern: String): Boolean {
         val parsed = AdGuardRuleParser.parseLine(pattern) ?: return false
-        dao.insert(
+        val inserted = dao.insert(
             BlockRuleEntity(
                 pattern = parsed.pattern,
                 rawLine = parsed.rawLine,
@@ -54,6 +54,7 @@ class BlockListManager(private val dao: BlockRuleDao) {
                 groupName = null
             )
         )
+        if (inserted == -1L) return false
         cache.addPattern(parsed.pattern, "useradd")
         return true
     }
@@ -114,7 +115,7 @@ class BlockListManager(private val dao: BlockRuleDao) {
         val rule = rules.find { it.id == id }
         if (rule != null) {
             dao.deleteById(id)
-            cache.removePattern(rule.pattern)
+            cache.reload(dao)
         }
     }
 
@@ -145,4 +146,7 @@ class BlockListManager(private val dao: BlockRuleDao) {
     }
 
     suspend fun countBySource(source: String): Int = dao.countBySource(source)
+
+    suspend fun parsedRulesBySource(source: String): List<AdGuardRuleParser.ParsedRule> =
+        dao.bySource(source).map { AdGuardRuleParser.ParsedRule(it.pattern, it.rawLine) }
 }
