@@ -156,16 +156,16 @@ data class DnsProvider(
             ),
             DnsProvider(
                 id = "preset_alidns_doh3",
-                name = "阿里云",
+                name = "AdGuard DNS",
                 protocol = DnsProtocol.DOH3,
-                url = "https://dns.alidns.com/dns-query",
+                url = "https://dns.adguard-dns.com/dns-query",
                 isPreset = true
             ),
             DnsProvider(
                 id = "preset_dnspod_doh3",
-                name = "腾讯云 DNSPod",
+                name = "Quad9",
                 protocol = DnsProtocol.DOH3,
-                url = "https://doh.pub/dns-query",
+                url = "https://dns.quad9.net/dns-query",
                 isPreset = true
             ),
             DnsProvider(

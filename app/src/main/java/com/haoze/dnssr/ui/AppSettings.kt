@@ -14,6 +14,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+private val DEFAULT_HOME_VISIBLE_PROTOCOLS = DnsProtocol.MANAGED_PROTOCOLS.toSet() - DnsProtocol.DOH3
+
 enum class RaceModeStrategy(
     val storageValue: String,
     val displayName: String
@@ -45,7 +47,7 @@ enum class DnsResolutionMode(
 }
 
 data class HomeProviderVisibility(
-    val visibleProtocols: Set<DnsProtocol> = DnsProtocol.MANAGED_PROTOCOLS.toSet(),
+    val visibleProtocols: Set<DnsProtocol> = DEFAULT_HOME_VISIBLE_PROTOCOLS,
     val hiddenProviderIds: Set<String> = emptySet(),
     val visibleProviderIds: Set<String> = emptySet()
 ) {
@@ -58,7 +60,7 @@ data class HomeProviderVisibility(
     }
 
     fun isDefault(): Boolean {
-        return visibleProtocols == DnsProtocol.MANAGED_PROTOCOLS.toSet() &&
+        return visibleProtocols == DEFAULT_HOME_VISIBLE_PROTOCOLS &&
             hiddenProviderIds.isEmpty() && visibleProviderIds.isEmpty()
     }
 }
@@ -99,6 +101,7 @@ object AppSettings {
     private const val KEY_HOME_VISIBLE_PROTOCOLS = "home_visible_protocols"
     private const val KEY_HOME_HIDDEN_PROVIDER_IDS = "home_hidden_provider_ids"
     private const val KEY_HOME_VISIBLE_PROVIDER_IDS = "home_visible_provider_ids"
+    private const val KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS = "acknowledged_doh3_provider_ids"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -112,6 +115,12 @@ object AppSettings {
     private val DEFAULT_RACE_PROVIDER_IDS = setOf(
         "preset_alidns_dns",
         "preset_dnspod_dns",
+    )
+    private val BUILT_IN_DOH3_PROVIDER_IDS = setOf(
+        "preset_alidns_doh3",
+        "preset_dnspod_doh3",
+        "preset_cloudflare_doh3",
+        "preset_google_doh3"
     )
     private val DEFAULT_LATENCY_TEST_PROVIDER_IDS = emptySet<String>()
     private const val DEFAULT_RACE_TEST_DOMAIN = "mihoyo.com"
@@ -276,6 +285,28 @@ object AppSettings {
             .apply()
     }
 
+    fun shouldConfirmDoh3Provider(context: Context, provider: DnsProvider): Boolean {
+        return provider.id in BUILT_IN_DOH3_PROVIDER_IDS &&
+            provider.protocol == DnsProtocol.DOH3 &&
+            provider.id !in acknowledgedDoh3ProviderIds(context)
+    }
+
+    fun acknowledgeDoh3Provider(context: Context, providerId: String) {
+        if (providerId !in BUILT_IN_DOH3_PROVIDER_IDS) return
+        val ids = acknowledgedDoh3ProviderIds(context) + providerId
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS, ids)
+            .apply()
+    }
+
+    private fun acknowledgedDoh3ProviderIds(context: Context): Set<String> {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS, emptySet())
+            ?.toSet()
+            ?: emptySet()
+    }
+
     fun getRaceTestDomain(context: Context): String {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_RACE_TEST_DOMAIN, DEFAULT_RACE_TEST_DOMAIN)
@@ -407,7 +438,7 @@ object AppSettings {
             visibleProtocols = readStringSet(prefs.getString(KEY_HOME_VISIBLE_PROTOCOLS, null))
                 ?.mapNotNull { value -> DnsProtocol.entries.firstOrNull { it.name == value } }
                 ?.toSet()
-                ?: DnsProtocol.MANAGED_PROTOCOLS.toSet(),
+                ?: DEFAULT_HOME_VISIBLE_PROTOCOLS,
             hiddenProviderIds = readStringSet(prefs.getString(KEY_HOME_HIDDEN_PROVIDER_IDS, null)) ?: emptySet(),
             visibleProviderIds = readStringSet(prefs.getString(KEY_HOME_VISIBLE_PROVIDER_IDS, null)) ?: emptySet()
         )

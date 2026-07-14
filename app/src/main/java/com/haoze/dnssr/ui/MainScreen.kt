@@ -165,6 +165,7 @@ private fun MainContent(
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
     val raceModeEnabled by viewModel.raceModeEnabled.collectAsStateWithLifecycle()
@@ -227,6 +228,7 @@ private fun MainContent(
             .coerceAtLeast(0)
         val raceDisplayValue = raceProviderSummary(raceProviders.map { it.name })
         var expanded by remember { mutableStateOf(false) }
+        var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
 
         Column(
             modifier = Modifier
@@ -293,7 +295,13 @@ private fun MainContent(
                                             when (provider.id) {
                                                 MANAGE_PROVIDER_ID -> onNavigateToProviderManagement()
                                                 PROVIDER_VISIBILITY_ID -> onNavigateToHomeProviderVisibility()
-                                                else -> viewModel.selectProvider(provider.id)
+                                                else -> {
+                                                    if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
+                                                        pendingDoh3Provider = provider
+                                                    } else {
+                                                        viewModel.selectProvider(provider.id)
+                                                    }
+                                                }
                                             }
                                         }
                                     )
@@ -350,6 +358,23 @@ private fun MainContent(
             modifier = Modifier.padding(top = 24.dp)
         ) {
             Text(text = "模式切换 · ${resolutionMode.displayName}")
+        }
+
+        pendingDoh3Provider?.let { provider ->
+            Doh3FirstUseDialog(
+                provider = provider,
+                providers = providers,
+                onContinue = {
+                    AppSettings.acknowledgeDoh3Provider(context, provider.id)
+                    viewModel.selectProvider(provider.id)
+                    pendingDoh3Provider = null
+                },
+                onReplacementSelected = { replacement ->
+                    viewModel.selectProvider(replacement.id)
+                    pendingDoh3Provider = null
+                },
+                onDismiss = { pendingDoh3Provider = null }
+            )
         }
     }
 }

@@ -55,7 +55,7 @@ fun SettingsScreen(
         DnsProvider.loadSelected(context).name
     }
     val homeProviderVisibilitySummary = if (AppSettings.getHomeProviderVisibility(context).isDefault()) {
-        "全部服务"
+        "默认"
     } else {
         "已自定义"
     }

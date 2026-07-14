@@ -58,17 +58,6 @@ android {
     }
 }
 
-val cronetApiClasses by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    attributes {
-        attribute(
-            org.gradle.api.attributes.Attribute.of("artifactType", String::class.java),
-            "android-classes-jar"
-        )
-    }
-}
-
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
@@ -81,13 +70,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.okhttp)
-    implementation(libs.cronet.embedded) {
-        exclude(group = "org.chromium.net", module = "cronet-api")
-        exclude(group = "org.chromium.net", module = "cronet-common")
-    }
-    cronetApiClasses("org.chromium.net:cronet-api:108.5359.79")
-    cronetApiClasses("org.chromium.net:cronet-common:108.5359.79")
-    implementation(files(cronetApiClasses))
+    implementation(libs.cronet.embedded)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

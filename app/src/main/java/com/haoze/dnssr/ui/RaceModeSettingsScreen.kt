@@ -480,21 +480,32 @@ private fun LatencyResultItem(result: DnsLatencyTester.Result) {
             )
             DnsProtocolBadge(protocol = result.protocol)
         }
-        Text(
-            text = if (result.success) {
-                buildString {
+        if (result.success) {
+            Text(
+                text = buildString {
                     append("平均 ${result.elapsedMs} ms")
                     append(" · ${result.successCount}/${result.attempts} 次成功")
                     if (result.elapsedSamplesMs.size > 1) {
                         append(" · 样本 ")
                         append(result.elapsedSamplesMs.joinToString(" / ") { "$it ms" })
                     }
-                }
-            } else {
-                "全部失败（${result.attempts} 次）${result.message?.let { " · $it" } ?: ""}"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = color
-        )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = color
+            )
+        } else {
+            Text(
+                text = "全部失败（${result.attempts} 次）",
+                style = MaterialTheme.typography.bodySmall,
+                color = color
+            )
+            result.message?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = color
+                )
+            }
+        }
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,6 +54,7 @@ fun ProviderManagementScreen(
     title: String = "服务商管理",
     viewModel: ProviderManagementViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val selectedId by viewModel.selectedId.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -62,6 +64,16 @@ fun ProviderManagementScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var providerToDelete by remember { mutableStateOf<DnsProvider?>(null) }
     var selectedProtocol by remember { mutableStateOf(DnsProtocol.DNS) }
+    var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
+
+    fun handleProviderSelection(provider: DnsProvider) {
+        if (provider.id == selectedId) return
+        if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
+            pendingDoh3Provider = provider
+        } else {
+            viewModel.select(provider.id)
+        }
+    }
 
     LaunchedEffect(Unit) {
         delay(300) // 等待页面进入动画完成后再加载数据
@@ -121,7 +133,7 @@ fun ProviderManagementScreen(
                                 ProviderListItem(
                                     provider = provider,
                                     selected = provider.id == selectedId,
-                                    onSelect = { viewModel.select(provider.id) }
+                                    onSelect = { handleProviderSelection(provider) }
                                 )
                                 if (index < presetProviders.lastIndex) {
                                     SettingsDivider()
@@ -142,10 +154,10 @@ fun ProviderManagementScreen(
                         } else {
                             SettingsGroup {
                                 userProviders.forEachIndexed { index, provider ->
-                                    ProviderListItem(
-                                        provider = provider,
-                                        selected = provider.id == selectedId,
-                                        onSelect = { viewModel.select(provider.id) },
+                                ProviderListItem(
+                                    provider = provider,
+                                    selected = provider.id == selectedId,
+                                    onSelect = { handleProviderSelection(provider) },
                                         onEdit = { showEditDialog = provider },
                                         onDelete = { providerToDelete = provider }
                                     )
@@ -214,6 +226,23 @@ fun ProviderManagementScreen(
                     Text("取消")
                 }
             }
+        )
+    }
+
+    pendingDoh3Provider?.let { provider ->
+        Doh3FirstUseDialog(
+            provider = provider,
+            providers = providers,
+            onContinue = {
+                AppSettings.acknowledgeDoh3Provider(context, provider.id)
+                viewModel.select(provider.id)
+                pendingDoh3Provider = null
+            },
+            onReplacementSelected = { replacement ->
+                viewModel.select(replacement.id)
+                pendingDoh3Provider = null
+            },
+            onDismiss = { pendingDoh3Provider = null }
         )
     }
 }

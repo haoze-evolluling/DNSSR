@@ -190,6 +190,7 @@ fun ResolutionModeConfigScreen(
     viewModel: RaceModeSettingsViewModel = viewModel()
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val smartIds by viewModel.smartPredictionIds.collectAsStateWithLifecycle()
     val parallelIds by viewModel.parallelRaceIds.collectAsStateWithLifecycle()
     val backupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
@@ -205,6 +206,44 @@ fun ResolutionModeConfigScreen(
         DnsResolutionMode.PRIMARY_BACKUP -> backupIds.toSet()
         DnsResolutionMode.SINGLE -> setOf(singleId)
     }
+    var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
+
+    fun applyProviderSelection(provider: DnsProvider) {
+        if (mode == DnsResolutionMode.SINGLE) {
+            viewModel.selectSingleProvider(provider.id)
+        } else {
+            viewModel.toggleModeProvider(mode, provider.id)
+        }
+    }
+
+    fun handleProviderSelection(provider: DnsProvider) {
+        if (mode == DnsResolutionMode.SINGLE && provider.id == singleId) return
+        if (mode != DnsResolutionMode.SINGLE && provider.id in selected) {
+            applyProviderSelection(provider)
+        } else if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
+            pendingDoh3Provider = provider
+        } else {
+            applyProviderSelection(provider)
+        }
+    }
+
+    pendingDoh3Provider?.let { provider ->
+        Doh3FirstUseDialog(
+            provider = provider,
+            providers = providers,
+            onContinue = {
+                AppSettings.acknowledgeDoh3Provider(context, provider.id)
+                applyProviderSelection(provider)
+                pendingDoh3Provider = null
+            },
+            onReplacementSelected = { replacement ->
+                applyProviderSelection(replacement)
+                pendingDoh3Provider = null
+            },
+            onDismiss = { pendingDoh3Provider = null }
+        )
+    }
+
     SettingsScaffold(title = mode.displayName, onBack = onBack) { padding ->
         if (loading) return@SettingsScaffold SettingsLoadingContent(Modifier.padding(padding))
         LazyColumn(
@@ -225,9 +264,9 @@ fun ResolutionModeConfigScreen(
                 SettingsGroup {
                     providers.filter { it.protocol == protocol }.forEachIndexed { index, provider ->
                         if (mode == DnsResolutionMode.SINGLE) {
-                            SettingsRadioItem(provider.name, provider.id == singleId, { viewModel.selectSingleProvider(provider.id) }, subtitle = provider.endpointLabel())
+                            SettingsRadioItem(provider.name, provider.id == singleId, { handleProviderSelection(provider) }, subtitle = provider.endpointLabel())
                         } else {
-                            SettingsCheckboxItem(provider.name, provider.id in selected, { viewModel.toggleModeProvider(mode, provider.id) }, subtitle = provider.endpointLabel())
+                            SettingsCheckboxItem(provider.name, provider.id in selected, { handleProviderSelection(provider) }, subtitle = provider.endpointLabel())
                         }
                         if (index < providers.count { it.protocol == protocol } - 1) SettingsDivider()
                     }

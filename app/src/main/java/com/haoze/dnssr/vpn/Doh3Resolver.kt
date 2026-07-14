@@ -1,9 +1,11 @@
 package com.haoze.dnssr.vpn
 
 import android.content.Context
+import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
+import org.chromium.net.NetworkException
 import org.chromium.net.UploadDataProvider
 import org.chromium.net.UploadDataSink
 import org.chromium.net.UrlRequest
@@ -47,7 +49,10 @@ class Doh3Resolver(
                 resolveOnce(query)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            throw IOException("DoH3 request timed out after ${DNS_UPSTREAM_TIMEOUT_MS}ms", e)
+            throw IOException(
+                "DoH3 请求超时（${DNS_UPSTREAM_TIMEOUT_MS}ms）；QUIC 使用 UDP/443，请检查该 UDP 端口是否被拦截",
+                e
+            )
         }
     }
 
@@ -91,9 +96,20 @@ class Doh3Resolver(
                         }
                     }
                     !protocol.isHttp3Protocol() -> {
+                        val altSvc = info.headerValue("alt-svc") ?: "未提供"
+                        Log.w(
+                            TAG,
+                            "DoH3 QUIC was not negotiated for ${dohHttpUrl.host}: " +
+                                "protocol=${protocol.ifBlank { "unknown" }}, " +
+                                "alt-svc=$altSvc"
+                        )
                         runCatching {
                             continuation.resumeWithException(
-                                IOException("DoH3 upstream did not negotiate HTTP/3 (${protocol.ifBlank { "unknown" }})")
+                                IOException(
+                                    "DoH3 协商失败：实际协议 ${protocol.ifBlank { "unknown" }}；" +
+                                        "Alt-Svc：$altSvc。服务端未协商 HTTP/3，" +
+                                        "或 UDP/443 被网络拦截"
+                                )
                             )
                         }
                     }
@@ -108,12 +124,29 @@ class Doh3Resolver(
                 info: UrlResponseInfo?,
                 error: CronetException
             ) {
+                val details = when (error) {
+                    is NetworkException -> {
+                        "errorCode=${error.errorCode}, internalErrorCode=${error.cronetInternalErrorCode}, " +
+                            "immediatelyRetryable=${error.immediatelyRetryable()}"
+                    }
+                    else -> "message=${error.message.orEmpty()}"
+                }
+                Log.w(TAG, "DoH3 request failed for ${dohHttpUrl.host}: $details", error)
                 if (continuation.isActive) {
-                    runCatching { continuation.resumeWithException(error) }
+                    runCatching {
+                        continuation.resumeWithException(
+                            IOException("DoH3 网络请求失败：$details", error)
+                        )
+                    }
                 }
             }
 
             override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
+                Log.w(
+                    TAG,
+                    "DoH3 request canceled for ${dohHttpUrl.host}: " +
+                        "protocol=${info?.negotiatedProtocol.orEmpty().ifBlank { "unknown" }}"
+                )
                 if (continuation.isActive) {
                     runCatching { continuation.resumeWithException(IOException("DoH3 request canceled")) }
                 }
@@ -142,6 +175,12 @@ class Doh3Resolver(
         return normalized.startsWith("h3") || normalized.contains("quic")
     }
 
+    private fun UrlResponseInfo.headerValue(name: String): String? {
+        return allHeaders.entries.firstOrNull { (headerName, _) ->
+            headerName.equals(name, ignoreCase = true)
+        }?.value?.joinToString(", ")
+    }
+
     private class ByteArrayUploadDataProvider(
         private val bytes: ByteArray
     ) : UploadDataProvider() {
@@ -163,6 +202,7 @@ class Doh3Resolver(
     }
 
     companion object {
+        private const val TAG = "Doh3Resolver"
         private const val DNS_MEDIA_TYPE = "application/dns-message"
         private const val BUFFER_SIZE = 32 * 1024
     }
