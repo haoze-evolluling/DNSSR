@@ -66,6 +66,7 @@ import com.haoze.dnssr.ui.effect.ServiceLightEffect
 import com.haoze.dnssr.vpn.DnsProvider
 
 private const val MANAGE_PROVIDER_ID = "__manage__"
+private const val PROVIDER_VISIBILITY_ID = "__provider_visibility__"
 
 internal fun raceProviderSummary(providerNames: List<String>): String {
     if (providerNames.isEmpty()) return "未选择服务商"
@@ -81,6 +82,7 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToLogs: () -> Unit,
     onNavigateToProviderManagement: () -> Unit,
+    onNavigateToHomeProviderVisibility: () -> Unit,
     onNavigateToRaceModeSettings: () -> Unit,
     viewModel: MainViewModel = viewModel()
 ) {
@@ -141,6 +143,7 @@ fun MainScreen(
             onToggle = { onToggle(uiState.isRunning) },
             onPowerButtonCenterChanged = { powerButtonCenter = it },
             onNavigateToProviderManagement = onNavigateToProviderManagement,
+            onNavigateToHomeProviderVisibility = onNavigateToHomeProviderVisibility,
             onNavigateToRaceModeSettings = onNavigateToRaceModeSettings,
             viewModel = viewModel,
             modifier = Modifier.padding(innerPadding)
@@ -156,6 +159,7 @@ private fun MainContent(
     onToggle: () -> Unit,
     onPowerButtonCenterChanged: (Offset) -> Unit,
     onNavigateToProviderManagement: () -> Unit,
+    onNavigateToHomeProviderVisibility: () -> Unit,
     onNavigateToRaceModeSettings: () -> Unit,
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
@@ -217,6 +221,7 @@ private fun MainContent(
             selectedProvider?.takeIf { selected -> filteredProviders.none { it.id == selected.id } }?.let(::add)
             addAll(filteredProviders)
             add(DnsProvider(id = MANAGE_PROVIDER_ID, name = "管理服务...", isPreset = true))
+            add(DnsProvider(id = PROVIDER_VISIBILITY_ID, name = "服务显示...", isPreset = true))
         }
         val selectedIndex = displayProviders.indexOfFirst { it.id == selectedProvider?.id }
             .coerceAtLeast(0)
@@ -279,15 +284,16 @@ private fun MainContent(
                                         text = {
                                             ProviderDropdownText(
                                                 provider = provider,
-                                                showProtocolBadge = provider.id != MANAGE_PROVIDER_ID
+                                                showProtocolBadge = provider.id != MANAGE_PROVIDER_ID &&
+                                                    provider.id != PROVIDER_VISIBILITY_ID
                                             )
                                         },
                                         onClick = {
                                             expanded = false
-                                            if (provider.id == MANAGE_PROVIDER_ID) {
-                                                onNavigateToProviderManagement()
-                                            } else {
-                                                viewModel.selectProvider(provider.id)
+                                            when (provider.id) {
+                                                MANAGE_PROVIDER_ID -> onNavigateToProviderManagement()
+                                                PROVIDER_VISIBILITY_ID -> onNavigateToHomeProviderVisibility()
+                                                else -> viewModel.selectProvider(provider.id)
                                             }
                                         }
                                     )

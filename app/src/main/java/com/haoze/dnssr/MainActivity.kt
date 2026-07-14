@@ -60,12 +60,13 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     AppNavHost(
-                        mainScreen = { onSettings, onLogs, onProviderManagement, onRaceModeSettings ->
+                        mainScreen = { onSettings, onLogs, onProviderManagement, onHomeProviderVisibility, onRaceModeSettings ->
                             com.haoze.dnssr.ui.MainScreen(
                                 onToggle = { isRunning -> onToggleVpn(isRunning) },
                                 onNavigateToSettings = onSettings,
                                 onNavigateToLogs = onLogs,
                                 onNavigateToProviderManagement = onProviderManagement,
+                                onNavigateToHomeProviderVisibility = onHomeProviderVisibility,
                                 onNavigateToRaceModeSettings = onRaceModeSettings
                             )
                         },

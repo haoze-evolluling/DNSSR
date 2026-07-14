@@ -72,6 +72,7 @@ fun AppNavHost(
         onNavigateToSettings: () -> Unit,
         onNavigateToLogs: () -> Unit,
         onNavigateToProviderManagement: () -> Unit,
+        onNavigateToHomeProviderVisibility: () -> Unit,
         onNavigateToRaceModeSettings: () -> Unit
     ) -> Unit,
     onRuntimeDnsSettingsChanged: () -> Unit,
@@ -113,6 +114,7 @@ fun AppNavHost(
                 { navController.navigate(Routes.SETTINGS) },
                 { navController.navigate(Routes.LOGS) },
                 { navController.navigate(Routes.PROVIDER_MANAGEMENT) },
+                { navController.navigateToTitledRoute(Routes.HOME_PROVIDER_VISIBILITY, "服务显示") },
                 { navController.navigate(Routes.RACE_MODE_PROVIDERS) }
             )
         }
