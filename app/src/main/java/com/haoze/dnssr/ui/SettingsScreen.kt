@@ -2,6 +2,23 @@ package com.haoze.dnssr.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.Rule
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FlipToBack
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.ImportExport
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.haoze.dnssr.ui.components.SettingsDivider
@@ -61,24 +78,28 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = providerManagementTitle,
                     subtitle = "选择、添加或编辑 DoH/DoT 服务",
+                    leadingIcon = Icons.Filled.Dns,
                     onClick = { onNavigateToProviderManagement(providerManagementTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = homeProviderVisibilityTitle,
                     subtitle = "配置首页解析服务列表中显示的协议和服务商",
+                    leadingIcon = Icons.Filled.Visibility,
                     onClick = { onNavigateToHomeProviderVisibility(homeProviderVisibilityTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = bootstrapSettingsTitle,
                     subtitle = "配置全局 Bootstrap DNS 与智慧权重",
+                    leadingIcon = Icons.Filled.Public,
                     onClick = { onNavigateToBootstrapSettings(bootstrapSettingsTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = latencySettingsTitle,
                     subtitle = "选择服务商并测试指定域名的实际解析耗时",
+                    leadingIcon = Icons.Filled.Speed,
                     onClick = { onNavigateToRaceModeLatency(latencySettingsTitle) }
                 )
                 }
@@ -90,12 +111,14 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = cacheSettingsTitle,
                     subtitle = "缓存已解析的域名，减少重复查询",
+                    leadingIcon = Icons.Filled.Storage,
                     onClick = { onNavigateToCacheSettings(cacheSettingsTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = raceModeSettingsTitle,
                     subtitle = "选择一脉直达、择优而行、百舸争流或有备无患",
+                    leadingIcon = Icons.AutoMirrored.Filled.AltRoute,
                     onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                 )
                 }
@@ -107,6 +130,7 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = ruleManagementTitle,
                     subtitle = "添加屏蔽或白名单规则，导入规则订阅",
+                    leadingIcon = Icons.AutoMirrored.Filled.Rule,
                     onClick = { onNavigateToRuleManagement(ruleManagementTitle) }
                 )
                 }
@@ -118,18 +142,21 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = configTransferTitle,
                     subtitle = "备份或恢复自定义服务与规则订阅",
+                    leadingIcon = Icons.Filled.ImportExport,
                     onClick = { onNavigateToConfigTransfer(configTransferTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = logRetentionTitle,
                     subtitle = "设置请求日志自动清理时间",
+                    leadingIcon = Icons.Filled.History,
                     onClick = { onNavigateToLogRetentionSettings(logRetentionTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = dataCleanupTitle,
                     subtitle = "删除缓存、日志或域名规则",
+                    leadingIcon = Icons.Filled.DeleteSweep,
                     onClick = { onNavigateToDataCleanup(dataCleanupTitle) }
                 )
                 }
@@ -141,6 +168,7 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = foregroundBackgroundTitle,
                     subtitle = "后台隐藏、通知常驻",
+                    leadingIcon = Icons.Filled.FlipToBack,
                     onClick = { onNavigateToForegroundBackgroundSettings(foregroundBackgroundTitle) }
                 )
                 }
@@ -152,6 +180,7 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = experimentalFeaturesTitle,
                     subtitle = "查看还在开发中的功能",
+                    leadingIcon = Icons.Filled.Science,
                     onClick = { onNavigateToExperimentalFeatures(experimentalFeaturesTitle) }
                 )
                 }
@@ -163,24 +192,28 @@ fun SettingsScreen(
                 SettingsNavigationItem(
                     title = aboutTitle,
                     subtitle = "查看软件说明、作者信息和项目仓库",
+                    leadingIcon = Icons.Filled.Info,
                     onClick = { onNavigateToAbout(aboutTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = sponsorTitle,
                     subtitle = "请作者喝杯蜜雪，支持项目持续开发",
+                    leadingIcon = Icons.Filled.Favorite,
                     onClick = { onNavigateToSponsor(sponsorTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = sponsorListTitle,
                     subtitle = "感谢每一位支持 DNSSR 项目的朋友",
+                    leadingIcon = Icons.Filled.WorkspacePremium,
                     onClick = { onNavigateToSponsorList(sponsorListTitle) }
                 )
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = coBuilderListTitle,
                     subtitle = "感谢提出建议与帮助测试的共建者",
+                    leadingIcon = Icons.Filled.Groups,
                     onClick = { onNavigateToCoBuilderList(coBuilderListTitle) }
                 )
                 }

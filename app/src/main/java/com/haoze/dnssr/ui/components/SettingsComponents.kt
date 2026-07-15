@@ -284,6 +284,7 @@ fun SettingsNavigationItem(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    leadingIcon: ImageVector? = null,
     value: String? = null,
     valueMaxScreenFraction: Float? = null,
     onClick: () -> Unit
@@ -296,6 +297,7 @@ fun SettingsNavigationItem(
     SettingsItem(
         title = title,
         subtitle = subtitle,
+        leadingIcon = leadingIcon,
         modifier = modifier,
         onClick = onClick
     ) {
