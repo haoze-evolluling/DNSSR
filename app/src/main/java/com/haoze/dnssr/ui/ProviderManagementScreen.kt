@@ -74,8 +74,7 @@ fun ProviderManagementScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
     }
 

@@ -92,8 +92,7 @@ fun SubscriptionScreen(
         localImportUri = uri
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
     }
 

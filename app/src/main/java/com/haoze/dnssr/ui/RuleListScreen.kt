@@ -61,8 +61,7 @@ fun RuleListScreen(
     var pageInput by remember { mutableStateOf("") }
     var pageInputError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(ruleKind) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect(ruleKind) {
         viewModel.setRuleKind(ruleKind)
         viewModel.activate()
     }

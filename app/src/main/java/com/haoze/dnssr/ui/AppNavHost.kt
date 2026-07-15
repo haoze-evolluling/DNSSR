@@ -2,9 +2,11 @@ package com.haoze.dnssr.ui
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,20 +19,25 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.lifecycle.Lifecycle
 
 private const val SCREEN_TITLE_ARG = "screenTitle"
-private val navigationSlideSpec = tween<IntOffset>(
-    durationMillis = NAVIGATION_ANIMATION_DURATION_MS,
-    easing = FastOutSlowInEasing
-)
-private val navigationFadeSpec = tween<Float>(
-    durationMillis = NAVIGATION_ANIMATION_DURATION_MS / 2
-)
+private val emphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private val emphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 
 private fun titledRoute(route: String) = "$route?$SCREEN_TITLE_ARG={$SCREEN_TITLE_ARG}"
 
 private fun NavHostController.navigateToTitledRoute(route: String, title: String) {
-    navigate("$route?$SCREEN_TITLE_ARG=${Uri.encode(title)}")
+    navigateWhenResumed("$route?$SCREEN_TITLE_ARG=${Uri.encode(title)}")
+}
+
+private fun NavHostController.navigateWhenResumed(route: String) {
+    if (currentBackStackEntry?.lifecycle?.currentState != Lifecycle.State.RESUMED) return
+    navigate(route) { launchSingleTop = true }
+}
+
+private fun NavHostController.popWhenResumed() {
+    if (currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) popBackStack()
 }
 
 private fun screenTitleArgument(defaultTitle: String) = navArgument(SCREEN_TITLE_ARG) {
@@ -92,35 +99,41 @@ fun AppNavHost(
         modifier = modifier,
         enterTransition = {
             slideInHorizontally(
-                initialOffsetX = { it / 10 },
-                animationSpec = navigationSlideSpec
-            ) + fadeIn(animationSpec = navigationFadeSpec)
+                initialOffsetX = { it / 8 },
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
         },
         exitTransition = {
             slideOutHorizontally(
-                targetOffsetX = { -it / 20 },
-                animationSpec = navigationSlideSpec
-            ) + fadeOut(animationSpec = navigationFadeSpec)
+                targetOffsetX = { -it / 24 },
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + scaleOut(
+                targetScale = 0.98f,
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
         },
         popEnterTransition = {
             slideInHorizontally(
-                initialOffsetX = { -it / 20 },
-                animationSpec = navigationSlideSpec
-            ) + fadeIn(animationSpec = navigationFadeSpec)
+                initialOffsetX = { -it / 24 },
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + scaleIn(
+                initialScale = 0.98f,
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
         },
         popExitTransition = {
             slideOutHorizontally(
-                targetOffsetX = { it / 10 },
-                animationSpec = navigationSlideSpec
-            ) + fadeOut(animationSpec = navigationFadeSpec)
+                targetOffsetX = { it / 8 },
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
         }
     ) {
         composable(Routes.MAIN) {
             val context = LocalContext.current
             mainScreen(
-                { navController.navigate(Routes.SETTINGS) },
+                { navController.navigateWhenResumed(Routes.SETTINGS) },
                 {
-                    navController.navigate(
+                    navController.navigateWhenResumed(
                         if (AppSettings.isLegacyLogPageEnabled(context)) {
                             Routes.LOGS
                         } else {
@@ -128,14 +141,14 @@ fun AppNavHost(
                         }
                     )
                 },
-                { navController.navigate(Routes.PROVIDER_MANAGEMENT) },
+                { navController.navigateWhenResumed(Routes.PROVIDER_MANAGEMENT) },
                 { navController.navigateToTitledRoute(Routes.HOME_PROVIDER_VISIBILITY, "服务显示") },
-                { navController.navigate(Routes.RACE_MODE_PROVIDERS) }
+                { navController.navigateWhenResumed(Routes.RACE_MODE_PROVIDERS) }
             )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 onNavigateToRuleManagement = { title -> navController.navigateToTitledRoute(Routes.RULE_MANAGEMENT, title) },
                 onNavigateToDataCleanup = { title -> navController.navigateToTitledRoute(Routes.DATA_CLEANUP, title) },
                 onNavigateToConfigTransfer = { title -> navController.navigateToTitledRoute(Routes.CONFIG_TRANSFER, title) },
@@ -155,172 +168,172 @@ fun AppNavHost(
         }
         composable(Routes.LOG_DASHBOARD) {
             ModernLogDashboardScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToDnsLogs = { navController.navigate(Routes.DNS_LOGS) },
-                onNavigateToDnsCache = { navController.navigate(Routes.DNS_CACHE) },
-                onNavigateToRaceStats = { navController.navigate(Routes.RACE_STATS) },
-                onNavigateToBootstrapStats = { navController.navigate(Routes.BOOTSTRAP_STATS) },
+                onBack = { navController.popWhenResumed() },
+                onNavigateToDnsLogs = { navController.navigateWhenResumed(Routes.DNS_LOGS) },
+                onNavigateToDnsCache = { navController.navigateWhenResumed(Routes.DNS_CACHE) },
+                onNavigateToRaceStats = { navController.navigateWhenResumed(Routes.RACE_STATS) },
+                onNavigateToBootstrapStats = { navController.navigateWhenResumed(Routes.BOOTSTRAP_STATS) },
                 onNavigateToSubscriptionInterceptionStats = {
-                    navController.navigate(Routes.SUBSCRIPTION_INTERCEPTION_STATS)
+                    navController.navigateWhenResumed(Routes.SUBSCRIPTION_INTERCEPTION_STATS)
                 }
             )
         }
         composable(Routes.LOGS) {
             LogHomeScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToDnsLogs = { navController.navigate(Routes.DNS_LOGS) },
-                onNavigateToDnsCache = { navController.navigate(Routes.DNS_CACHE) },
-                onNavigateToRaceStats = { navController.navigate(Routes.RACE_STATS) },
-                onNavigateToBootstrapStats = { navController.navigate(Routes.BOOTSTRAP_STATS) },
+                onBack = { navController.popWhenResumed() },
+                onNavigateToDnsLogs = { navController.navigateWhenResumed(Routes.DNS_LOGS) },
+                onNavigateToDnsCache = { navController.navigateWhenResumed(Routes.DNS_CACHE) },
+                onNavigateToRaceStats = { navController.navigateWhenResumed(Routes.RACE_STATS) },
+                onNavigateToBootstrapStats = { navController.navigateWhenResumed(Routes.BOOTSTRAP_STATS) },
                 onNavigateToSubscriptionInterceptionStats = {
-                    navController.navigate(Routes.SUBSCRIPTION_INTERCEPTION_STATS)
+                    navController.navigateWhenResumed(Routes.SUBSCRIPTION_INTERCEPTION_STATS)
                 }
             )
         }
         composable(Routes.DNS_LOGS) {
             LogScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(Routes.DNS_CACHE) {
             DnsCacheScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(Routes.RACE_STATS) {
             RaceStatsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(Routes.BOOTSTRAP_STATS) {
             BootstrapStatsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(Routes.SUBSCRIPTION_INTERCEPTION_STATS) {
             SubscriptionInterceptionStatsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(Routes.PROVIDER_HEALTH) {
             ProviderHealthScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(titledRoute(Routes.RULE_MANAGEMENT), arguments = listOf(screenTitleArgument("域名规则"))) { entry ->
             RuleManagementScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "域名规则",
-                onNavigateToRuleList = { navController.navigate(Routes.RULE_LIST) },
-                onNavigateToAllowRuleList = { navController.navigate(Routes.ALLOW_RULE_LIST) },
-                onNavigateToSubscription = { navController.navigate(Routes.SUBSCRIPTION_MANAGEMENT) },
+                onNavigateToRuleList = { navController.navigateWhenResumed(Routes.RULE_LIST) },
+                onNavigateToAllowRuleList = { navController.navigateWhenResumed(Routes.ALLOW_RULE_LIST) },
+                onNavigateToSubscription = { navController.navigateWhenResumed(Routes.SUBSCRIPTION_MANAGEMENT) },
                 onNavigateToAutoUpdateInterval = {
-                    navController.navigate(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL)
+                    navController.navigateWhenResumed(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL)
                 },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(Routes.RULE_LIST) {
             RuleListScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(titledRoute(Routes.DATA_CLEANUP), arguments = listOf(screenTitleArgument("数据清理"))) { entry ->
             DataCleanupScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "数据清理",
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(titledRoute(Routes.CONFIG_TRANSFER), arguments = listOf(screenTitleArgument("导入与导出"))) { entry ->
             ConfigTransferScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出"
             )
         }
         composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("服务商管理"))) { entry ->
             ProviderManagementScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "服务商管理"
             )
         }
         composable(titledRoute(Routes.HOME_PROVIDER_VISIBILITY), arguments = listOf(screenTitleArgument(""))) { entry ->
             HomeProviderVisibilityScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG).orEmpty()
             )
         }
         composable(Routes.ALLOW_RULE_LIST) {
             RuleListScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 ruleKind = ManagedRuleKind.ALLOW,
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(titledRoute(Routes.BOOTSTRAP_SETTINGS), arguments = listOf(screenTitleArgument("Bootstrap 设置"))) { entry ->
             BootstrapSettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap 设置"
             )
         }
         composable(titledRoute(Routes.RACE_MODE_LATENCY), arguments = listOf(screenTitleArgument("查询测速"))) { entry ->
             RaceModeLatencySettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "查询测速"
             )
         }
         composable(titledRoute(Routes.RACE_MODE_PROVIDERS), arguments = listOf(screenTitleArgument("解析模式"))) { entry ->
             ResolutionModeHomeScreen(
-                onBack = { navController.popBackStack() },
-                onOpenMode = { mode -> navController.navigate(mode.route) }
+                onBack = { navController.popWhenResumed() },
+                onOpenMode = { mode -> navController.navigateWhenResumed(mode.route) }
             )
         }
-        composable(Routes.RESOLUTION_SINGLE) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popBackStack() }) }
-        composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popBackStack() }) }
-        composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popBackStack() }) }
-        composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popBackStack() }) }
+        composable(Routes.RESOLUTION_SINGLE) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popWhenResumed() }) }
+        composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popWhenResumed() }) }
+        composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popWhenResumed() }) }
+        composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popWhenResumed() }) }
         composable(titledRoute(Routes.CACHE_SETTINGS), arguments = listOf(screenTitleArgument("缓存设置"))) { entry ->
             CacheSettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "缓存设置",
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(titledRoute(Routes.LOG_RETENTION_SETTINGS), arguments = listOf(screenTitleArgument("日志保留"))) { entry ->
             LogRetentionSettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日志保留"
             )
         }
         composable(titledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS), arguments = listOf(screenTitleArgument("前后台行为"))) { entry ->
             ForegroundBackgroundSettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "前后台行为",
                 onHideFromRecentsChanged = onHideFromRecentsChanged
             )
         }
         composable(titledRoute(Routes.EXPERIMENTAL_FEATURES), arguments = listOf(screenTitleArgument("实验功能"))) { entry ->
             ExperimentalFeaturesScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
             )
         }
         composable(Routes.SUBSCRIPTION_MANAGEMENT) {
             SubscriptionScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
         composable(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL) {
             SubscriptionAutoUpdateIntervalScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popWhenResumed() }
             )
         }
         composable(titledRoute(Routes.ABOUT), arguments = listOf(screenTitleArgument("DNSSR 应用信息"))) { entry ->
             AboutScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNSSR 应用信息"
             )
         }

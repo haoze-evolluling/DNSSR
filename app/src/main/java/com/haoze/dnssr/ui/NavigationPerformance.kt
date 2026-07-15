@@ -1,9 +1,29 @@
 package com.haoze.dnssr.ui
 
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.flow.first
 
-internal const val NAVIGATION_ANIMATION_DURATION_MS = 250
+internal const val NAVIGATION_ENTER_DURATION_MS = 300
+internal const val NAVIGATION_EXIT_DURATION_MS = 250
 
-internal suspend fun awaitNavigationAnimation() {
-    delay(NAVIGATION_ANIMATION_DURATION_MS.toLong())
+@Composable
+internal fun NavigationSettledEffect(
+    key: Any? = Unit,
+    block: suspend () -> Unit
+) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var hasRun by rememberSaveable(key) { mutableStateOf(false) }
+    LaunchedEffect(lifecycle, key) {
+        if (hasRun) return@LaunchedEffect
+        lifecycle.currentStateFlow.first { it == Lifecycle.State.RESUMED }
+        hasRun = true
+        block()
+    }
 }

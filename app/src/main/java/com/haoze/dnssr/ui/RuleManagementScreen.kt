@@ -88,8 +88,7 @@ fun RuleManagementScreen(
         addAllowRuleError = null
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
     }
 

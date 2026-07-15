@@ -136,8 +136,7 @@ fun LogScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
         viewModel.refresh()
     }

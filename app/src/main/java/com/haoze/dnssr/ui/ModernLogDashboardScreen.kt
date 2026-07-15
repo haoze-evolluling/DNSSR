@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.util.Locale
 
@@ -47,9 +46,8 @@ fun ModernLogDashboardScreen(
     val hasLoadedDashboard = viewModel.hasLoadedDashboard
     var shouldLoadDashboard by remember { mutableStateOf(hasLoadedDashboard) }
 
-    LaunchedEffect(Unit) {
-        if (hasLoadedDashboard) return@LaunchedEffect
-        delay(DASHBOARD_LOAD_DELAY_MILLIS)
+    NavigationSettledEffect {
+        if (hasLoadedDashboard) return@NavigationSettledEffect
         shouldLoadDashboard = true
         viewModel.markDashboardLoaded()
         viewModel.refresh()
@@ -265,4 +263,3 @@ private fun handleDashboardUri(
 }
 
 private const val DASHBOARD_ASSET_URL = "file:///android_asset/log_dashboard.html"
-private const val DASHBOARD_LOAD_DELAY_MILLIS = 340L

@@ -93,8 +93,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
     }
 
@@ -336,8 +335,7 @@ fun RaceModeLatencySettingsScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        awaitNavigationAnimation()
+    NavigationSettledEffect {
         viewModel.activate()
     }
 
