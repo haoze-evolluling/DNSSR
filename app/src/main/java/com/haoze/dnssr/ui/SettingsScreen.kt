@@ -26,7 +26,8 @@ fun SettingsScreen(
     onNavigateToForegroundBackgroundSettings: (String) -> Unit,
     onNavigateToExperimentalFeatures: (String) -> Unit,
     onNavigateToAbout: (String) -> Unit,
-    onNavigateToSponsor: (String) -> Unit
+    onNavigateToSponsor: (String) -> Unit,
+    onNavigateToSponsorList: (String) -> Unit
 ) {
     val providerManagementTitle = "服务商管理"
     val homeProviderVisibilityTitle = "服务显示"
@@ -42,6 +43,7 @@ fun SettingsScreen(
     val experimentalFeaturesTitle = "实验功能"
     val aboutTitle = "应用信息"
     val sponsorTitle = "赞助"
+    val sponsorListTitle = "赞助者名单"
 
     SettingsScaffold(
         title = "应用设置",
@@ -164,8 +166,14 @@ fun SettingsScreen(
                 SettingsDivider()
                 SettingsNavigationItem(
                     title = sponsorTitle,
-                    subtitle = "请作者喝杯咖啡，支持项目持续开发",
+                    subtitle = "请作者喝杯蜜雪，支持项目持续开发",
                     onClick = { onNavigateToSponsor(sponsorTitle) }
+                )
+                SettingsDivider()
+                SettingsNavigationItem(
+                    title = sponsorListTitle,
+                    subtitle = "感谢每一位支持 DNSSR 项目的朋友",
+                    onClick = { onNavigateToSponsorList(sponsorListTitle) }
                 )
                 }
             }

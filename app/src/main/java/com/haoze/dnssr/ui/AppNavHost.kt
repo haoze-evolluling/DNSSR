@@ -78,6 +78,7 @@ object Routes {
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
     const val ABOUT = "about"
     const val SPONSOR = "sponsor"
+    const val SPONSOR_LIST = "sponsor_list"
 }
 
 @Composable
@@ -165,7 +166,8 @@ fun AppNavHost(
                 },
                 onNavigateToExperimentalFeatures = { title -> navController.navigateToTitledRoute(Routes.EXPERIMENTAL_FEATURES, title) },
                 onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) },
-                onNavigateToSponsor = { title -> navController.navigateToTitledRoute(Routes.SPONSOR, title) }
+                onNavigateToSponsor = { title -> navController.navigateToTitledRoute(Routes.SPONSOR, title) },
+                onNavigateToSponsorList = { title -> navController.navigateToTitledRoute(Routes.SPONSOR_LIST, title) }
             )
         }
         composable(Routes.LOG_DASHBOARD) {
@@ -343,6 +345,12 @@ fun AppNavHost(
             SponsorScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助"
+            )
+        }
+        composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->
+            SponsorListScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助者名单"
             )
         }
     }

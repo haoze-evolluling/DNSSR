@@ -38,13 +38,13 @@ fun SponsorScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "请作者喝杯咖啡 ☕",
+                    text = "请作者喝杯蜜雪 🧋",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "如果这个项目帮助到了你，欢迎请作者喝杯咖啡。",
+                    text = "如果这个项目帮助到了你，欢迎请作者喝杯蜜雪。",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
