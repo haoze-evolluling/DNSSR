@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.ui.AppNavHost
 import com.haoze.dnssr.ui.AppSettings
 import com.haoze.dnssr.ui.LauncherIconManager
@@ -25,6 +27,12 @@ import com.haoze.dnssr.ui.theme.DNSSRTheme
 import com.haoze.dnssr.vpn.DnsVpnService
 import com.haoze.dnssr.vpn.VpnMonitorService
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private const val DATABASE_WARMUP_DELAY_MS = 500L
 
 class MainActivity : ComponentActivity() {
 
@@ -75,6 +83,12 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+            }
+        }
+        lifecycleScope.launch {
+            delay(DATABASE_WARMUP_DELAY_MS)
+            withContext(Dispatchers.IO) {
+                AppDatabase.getInstance(applicationContext).openHelper.writableDatabase
             }
         }
         handleAutoStartIfNeeded(intent)

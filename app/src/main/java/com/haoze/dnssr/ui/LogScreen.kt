@@ -78,7 +78,6 @@ import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.LogResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -138,7 +137,7 @@ fun LogScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.activate()
         viewModel.refresh()
     }

@@ -1,14 +1,9 @@
 package com.haoze.dnssr.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
@@ -32,7 +27,6 @@ fun SettingsScreen(
     onNavigateToExperimentalFeatures: (String) -> Unit,
     onNavigateToAbout: (String) -> Unit
 ) {
-    val scrollState = rememberScrollState()
     val providerManagementTitle = "服务商管理"
     val homeProviderVisibilityTitle = "服务显示"
     val bootstrapSettingsTitle = "Bootstrap 设置"
@@ -51,15 +45,13 @@ fun SettingsScreen(
         title = "应用设置",
         onBack = onBack
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
         ) {
-            SettingsGroupTitle("解析设置")
-            SettingsGroup {
+            item { SettingsGroupTitle("解析设置") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = providerManagementTitle,
                     subtitle = "选择、添加或编辑 DoH/DoT 服务",
@@ -83,10 +75,12 @@ fun SettingsScreen(
                     subtitle = "选择服务商并测试指定域名的实际解析耗时",
                     onClick = { onNavigateToRaceModeLatency(latencySettingsTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("性能优化")
-            SettingsGroup {
+            item { SettingsGroupTitle("性能优化") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = cacheSettingsTitle,
                     subtitle = "缓存已解析的域名，减少重复查询",
@@ -98,19 +92,23 @@ fun SettingsScreen(
                     subtitle = "选择一脉直达、择优而行、百舸争流或有备无患",
                     onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("规则管理")
-            SettingsGroup {
+            item { SettingsGroupTitle("规则管理") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = ruleManagementTitle,
                     subtitle = "添加屏蔽或白名单规则，导入规则订阅",
                     onClick = { onNavigateToRuleManagement(ruleManagementTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("数据管理")
-            SettingsGroup {
+            item { SettingsGroupTitle("数据管理") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = configTransferTitle,
                     subtitle = "备份或恢复自定义服务与规则订阅",
@@ -128,33 +126,40 @@ fun SettingsScreen(
                     subtitle = "删除缓存、日志或域名规则",
                     onClick = { onNavigateToDataCleanup(dataCleanupTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("隐私保护")
-            SettingsGroup {
+            item { SettingsGroupTitle("隐私保护") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = foregroundBackgroundTitle,
                     subtitle = "后台隐藏、通知常驻",
                     onClick = { onNavigateToForegroundBackgroundSettings(foregroundBackgroundTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("实验功能")
-            SettingsGroup {
+            item { SettingsGroupTitle("实验功能") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = experimentalFeaturesTitle,
                     subtitle = "查看还在开发中的功能",
                     onClick = { onNavigateToExperimentalFeatures(experimentalFeaturesTitle) }
                 )
+                }
             }
 
-            SettingsGroupTitle("关于应用")
-            SettingsGroup {
+            item { SettingsGroupTitle("关于应用") }
+            item {
+                SettingsGroup {
                 SettingsNavigationItem(
                     title = aboutTitle,
                     subtitle = "查看软件说明、作者信息和项目仓库",
                     onClick = { onNavigateToAbout(aboutTitle) }
                 )
+                }
             }
         }
     }

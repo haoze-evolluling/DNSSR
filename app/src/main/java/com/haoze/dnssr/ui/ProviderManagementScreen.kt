@@ -44,7 +44,6 @@ import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsItem
 import com.haoze.dnssr.ui.components.SettingsLoadingContent
 import com.haoze.dnssr.ui.components.SettingsScaffold
-import kotlinx.coroutines.delay
 import com.haoze.dnssr.vpn.DnsProtocol
 import com.haoze.dnssr.vpn.DnsProvider
 
@@ -76,7 +75,7 @@ fun ProviderManagementScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.activate()
     }
 

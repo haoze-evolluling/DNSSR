@@ -44,6 +44,7 @@ fun HomeProviderVisibilityScreen(
     val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
+        awaitNavigationAnimation()
         viewModel.activate()
     }
 

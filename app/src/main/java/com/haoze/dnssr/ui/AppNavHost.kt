@@ -1,8 +1,10 @@
 package com.haoze.dnssr.ui
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,11 +18,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-private const val NAV_ANIM_DURATION = 300
 private const val SCREEN_TITLE_ARG = "screenTitle"
 private val navigationSlideSpec = tween<IntOffset>(
-    durationMillis = NAV_ANIM_DURATION,
-    easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+    durationMillis = NAVIGATION_ANIMATION_DURATION_MS,
+    easing = FastOutSlowInEasing
+)
+private val navigationFadeSpec = tween<Float>(
+    durationMillis = NAVIGATION_ANIMATION_DURATION_MS / 2
 )
 
 private fun titledRoute(route: String) = "$route?$SCREEN_TITLE_ARG={$SCREEN_TITLE_ARG}"
@@ -88,27 +92,27 @@ fun AppNavHost(
         modifier = modifier,
         enterTransition = {
             slideInHorizontally(
-                initialOffsetX = { it },
+                initialOffsetX = { it / 10 },
                 animationSpec = navigationSlideSpec
-            )
+            ) + fadeIn(animationSpec = navigationFadeSpec)
         },
         exitTransition = {
             slideOutHorizontally(
-                targetOffsetX = { -it / 3 },
+                targetOffsetX = { -it / 20 },
                 animationSpec = navigationSlideSpec
-            )
+            ) + fadeOut(animationSpec = navigationFadeSpec)
         },
         popEnterTransition = {
             slideInHorizontally(
-                initialOffsetX = { -it / 3 },
+                initialOffsetX = { -it / 20 },
                 animationSpec = navigationSlideSpec
-            )
+            ) + fadeIn(animationSpec = navigationFadeSpec)
         },
         popExitTransition = {
             slideOutHorizontally(
-                targetOffsetX = { it },
+                targetOffsetX = { it / 10 },
                 animationSpec = navigationSlideSpec
-            )
+            ) + fadeOut(animationSpec = navigationFadeSpec)
         }
     ) {
         composable(Routes.MAIN) {

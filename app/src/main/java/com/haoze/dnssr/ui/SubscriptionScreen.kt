@@ -61,7 +61,6 @@ import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsScaffold
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -94,7 +93,7 @@ fun SubscriptionScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.activate()
     }
 

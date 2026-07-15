@@ -53,7 +53,6 @@ import com.haoze.dnssr.ui.components.SettingsLoadingContent
 import com.haoze.dnssr.ui.components.SettingsRadioItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.DnsProtocolBadge
-import kotlinx.coroutines.delay
 import com.haoze.dnssr.vpn.DnsLatencyTester
 import com.haoze.dnssr.vpn.DnsProtocol
 import com.haoze.dnssr.vpn.DnsProvider
@@ -95,7 +94,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.activate()
     }
 
@@ -338,7 +337,7 @@ fun RaceModeLatencySettingsScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.activate()
     }
 

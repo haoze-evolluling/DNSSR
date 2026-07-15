@@ -41,7 +41,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsScaffold
@@ -63,7 +62,7 @@ fun RuleListScreen(
     var pageInputError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(ruleKind) {
-        delay(300) // 等待页面进入动画完成后再加载数据
+        awaitNavigationAnimation()
         viewModel.setRuleKind(ruleKind)
         viewModel.activate()
     }
