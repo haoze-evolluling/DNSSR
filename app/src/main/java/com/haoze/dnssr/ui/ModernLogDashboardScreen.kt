@@ -17,16 +17,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.haoze.dnssr.ui.components.MagSafeLoadingIndicator
 import org.json.JSONObject
 import java.util.Locale
+
+private object DashboardWebViewCache {
+    var webView: WebView? = null
+    var pageReady: Boolean = false
+}
 
 @Composable
 fun ModernLogDashboardScreen(
@@ -40,15 +43,13 @@ fun ModernLogDashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dashboardTheme = rememberDashboardThemeColors()
-    val cachedWebView = viewModel.dashboardWebView
+    val cachedWebView = DashboardWebViewCache.webView
     var webView by remember { mutableStateOf(cachedWebView) }
-    var pageReady by remember { mutableStateOf(cachedWebView != null) }
+    var pageReady by remember { mutableStateOf(DashboardWebViewCache.pageReady) }
     val hasLoadedDashboard = viewModel.hasLoadedDashboard
-    var shouldLoadDashboard by remember { mutableStateOf(hasLoadedDashboard) }
 
     NavigationSettledEffect {
         if (hasLoadedDashboard) return@NavigationSettledEffect
-        shouldLoadDashboard = true
         viewModel.markDashboardLoaded()
         viewModel.refresh()
     }
@@ -72,32 +73,26 @@ fun ModernLogDashboardScreen(
             .fillMaxSize()
             .background(dashboardTheme.background)
     ) {
-        if (shouldLoadDashboard) {
-            DashboardWebView(
-                cachedWebView = cachedWebView,
-                themeColors = dashboardTheme,
-                onPageReady = { pageReady = true },
-                onWebViewCreated = {
-                    webView = it
-                    viewModel.dashboardWebView = it
-                },
-                onBack = onBack,
-                onRefresh = viewModel::refresh,
-                onNavigateToDnsLogs = onNavigateToDnsLogs,
-                onNavigateToDnsCache = onNavigateToDnsCache,
-                onNavigateToRaceStats = onNavigateToRaceStats,
-                onNavigateToBootstrapStats = onNavigateToBootstrapStats,
-                onNavigateToSubscriptionInterceptionStats = onNavigateToSubscriptionInterceptionStats,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        if ((!shouldLoadDashboard || !pageReady) && !hasLoadedDashboard) {
-            MagSafeLoadingIndicator(
-                trackColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        DashboardWebView(
+            cachedWebView = cachedWebView,
+            themeColors = dashboardTheme,
+            onPageReady = {
+                DashboardWebViewCache.pageReady = true
+                pageReady = true
+            },
+            onWebViewCreated = {
+                webView = it
+                DashboardWebViewCache.webView = it
+            },
+            onBack = onBack,
+            onRefresh = viewModel::refresh,
+            onNavigateToDnsLogs = onNavigateToDnsLogs,
+            onNavigateToDnsCache = onNavigateToDnsCache,
+            onNavigateToRaceStats = onNavigateToRaceStats,
+            onNavigateToBootstrapStats = onNavigateToBootstrapStats,
+            onNavigateToSubscriptionInterceptionStats = onNavigateToSubscriptionInterceptionStats,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
@@ -117,46 +112,55 @@ private fun DashboardWebView(
     onNavigateToSubscriptionInterceptionStats: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest
+        ): Boolean {
+            return handleDashboardUri(
+                request.url,
+                onBack,
+                onRefresh,
+                onNavigateToDnsLogs,
+                onNavigateToDnsCache,
+                onNavigateToRaceStats,
+                onNavigateToBootstrapStats,
+                onNavigateToSubscriptionInterceptionStats
+            )
+        }
+
+        override fun onPageFinished(view: WebView, url: String?) {
+            onPageReady()
+        }
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            (cachedWebView ?: WebView(context.applicationContext).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = true
-                settings.allowContentAccess = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    settings.forceDark = WebSettings.FORCE_DARK_OFF
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    settings.isAlgorithmicDarkeningAllowed = false
-                }
-                setBackgroundColor(themeColors.background.toArgb())
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView,
-                        request: WebResourceRequest
-                    ): Boolean {
-                        return handleDashboardUri(
-                            request.url,
-                            onBack,
-                            onRefresh,
-                            onNavigateToDnsLogs,
-                            onNavigateToDnsCache,
-                            onNavigateToRaceStats,
-                            onNavigateToBootstrapStats,
-                            onNavigateToSubscriptionInterceptionStats
-                        )
+            val view = cachedWebView ?: WebView(context.applicationContext).apply {
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = false
+                    allowFileAccess = true
+                    allowContentAccess = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        forceDark = WebSettings.FORCE_DARK_OFF
                     }
-
-                    override fun onPageFinished(view: WebView, url: String?) {
-                        onPageReady()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        isAlgorithmicDarkeningAllowed = false
                     }
                 }
-                loadUrl(DASHBOARD_ASSET_URL)
-            }).also(onWebViewCreated)
+            }
+            view.webViewClient = webViewClient
+            view.setBackgroundColor(themeColors.background.toArgb())
+            if (cachedWebView == null) {
+                view.loadUrl(DASHBOARD_ASSET_URL)
+            }
+            onWebViewCreated(view)
+            view
         },
         update = { view ->
+            view.webViewClient = webViewClient
             view.setBackgroundColor(themeColors.background.toArgb())
             onWebViewCreated(view)
         }

@@ -1,7 +1,6 @@
 package com.haoze.dnssr.ui
 
 import android.app.Application
-import android.webkit.WebView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.haoze.dnssr.data.AppDatabase
@@ -42,7 +41,6 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
     val uiState: StateFlow<ModernLogDashboardUiState> = _uiState.asStateFlow()
     var hasLoadedDashboard = false
         private set
-    var dashboardWebView: WebView? = null
 
     fun markDashboardLoaded() {
         hasLoadedDashboard = true
@@ -63,12 +61,6 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                 }
             )
         }
-    }
-
-    override fun onCleared() {
-        dashboardWebView?.destroy()
-        dashboardWebView = null
-        super.onCleared()
     }
 
     private suspend fun buildDashboardJson(): String {
