@@ -69,6 +69,11 @@ fun SponsorScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                Text(
+                    text = "付款时请备注您的网名或希望展示的名称，方便将您的名字加入赞助者名单。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             SettingsGroupTitle("你的每一笔支持都会用于")
