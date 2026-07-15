@@ -10,7 +10,6 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.haoze.dnssr.ui.components.MagSafeLoadingIndicator
 import org.json.JSONObject
 import java.util.Locale
 
@@ -93,7 +93,10 @@ fun ModernLogDashboardScreen(
         }
 
         if ((!shouldLoadDashboard || !pageReady) && !hasLoadedDashboard) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            MagSafeLoadingIndicator(
+                trackColor = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
 }

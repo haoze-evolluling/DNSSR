@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -21,14 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,11 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -54,6 +43,7 @@ import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
+import com.haoze.dnssr.ui.components.MagSafeLoadingIndicator
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsTextItem
 import java.text.SimpleDateFormat
@@ -227,7 +217,7 @@ private fun ImportingOverlay(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    MagSafeImportIndicator(trackColor = contentColor)
+                    MagSafeLoadingIndicator(trackColor = contentColor)
                     Spacer(Modifier.height(28.dp))
                     Text(
                         text = "正在导入",
@@ -266,78 +256,5 @@ private fun ImportingOverlay(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MagSafeImportIndicator(trackColor: Color) {
-    val transition = rememberInfiniteTransition(label = "importRing")
-    val rotation by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ringRotation"
-    )
-    val pulse by transition.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ringPulse"
-    )
-    val haloAlpha by transition.animateFloat(
-        initialValue = 0.18f,
-        targetValue = 0.42f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "haloAlpha"
-    )
-
-    Canvas(
-        modifier = Modifier
-            .size(176.dp)
-            .graphicsLayer {
-                scaleX = pulse
-                scaleY = pulse
-            }
-    ) {
-        val ringWidth = 12.dp.toPx()
-        val radius = (size.minDimension - ringWidth) / 2f
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xFF67FFD3).copy(alpha = haloAlpha),
-                    Color(0xFF2DE7C0).copy(alpha = haloAlpha * 0.35f),
-                    Color.Transparent
-                )
-            ),
-            radius = size.minDimension / 2f
-        )
-        drawCircle(
-            color = trackColor.copy(alpha = 0.12f),
-            radius = radius,
-            style = Stroke(width = ringWidth)
-        )
-        drawArc(
-            brush = Brush.sweepGradient(
-                colors = listOf(
-                    Color(0xFF6CFFD5),
-                    Color(0xFF31E8C3),
-                    Color(0xFF1AA7FF),
-                    Color(0xFF6CFFD5)
-                )
-            ),
-            startAngle = rotation,
-            sweepAngle = 285f,
-            useCenter = false,
-            style = Stroke(width = ringWidth, cap = StrokeCap.Round)
-        )
     }
 }
