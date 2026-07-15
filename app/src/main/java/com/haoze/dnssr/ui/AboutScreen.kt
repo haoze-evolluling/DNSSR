@@ -55,14 +55,14 @@ fun AboutScreen(
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             SettingsInfoText(
-                text = "DNSSR 是一款在 Android 本机运行的 DNS 安全解析工具，用于接管系统 DNS 查询并转发到可信的加密 DNS 服务。",
+                text = "DNSSR 是一款运行在 Android 设备本机的 DNS 解析管理工具。它接管系统 DNS 查询，并按配置转发至 DNS、DoH、DoH3 或 DoT 上游服务。",
                 modifier = Modifier.padding(top = 8.dp)
             )
 
             SettingsGroupTitle("软件定位")
             SettingsGroup {
                 AboutText(
-                    "DNSSR 通过 Android VpnService 建立本地 DNS 通道，重点处理 DNS 请求，不代理普通网页、应用数据或文件传输流量。"
+                    "DNSSR 通过 Android VpnService 建立仅处理 DNS 的本地通道，不代理普通网页、应用数据或文件传输流量。启用服务时，Android 会要求授予 VPN 权限。"
                 )
             }
 
@@ -70,12 +70,13 @@ fun AboutScreen(
             SettingsGroup {
                 AboutBulletList(
                     items = listOf(
-                        "支持 DoH 与 DoT DNS 服务商，并可添加自定义服务。",
-                        "支持 DNS 缓存，减少重复查询并查看缓存命中情况。",
-                        "支持域名屏蔽规则和订阅导入，用于拦截指定域名。",
-                        "支持竞速模式，在多个服务商之间按策略选择解析结果。",
-                        "支持 Bootstrap IP，降低解析 DoH/DoT 服务商域名时的循环依赖风险。",
-                        "提供 DNS 日志、缓存、竞速统计和 Bootstrap 统计，便于排查解析状态。"
+                        "支持 DNS、DoH、DoH3 与 DoT 服务商，并可添加和管理自定义服务。",
+                        "支持单服务商、健康权重择优、并行竞速和主备容灾四种解析模式。",
+                        "支持可配置 DNS 缓存，减少重复查询，并提供缓存记录和命中情况。",
+                        "支持屏蔽规则、白名单规则和 AdGuard DNS 规则订阅，可设置订阅自动更新。",
+                        "支持 Bootstrap IP，降低解析 DoH、DoH3 或 DoT 服务商域名时对系统 DNS 的依赖。",
+                        "提供 DNS 请求日志、竞速统计、服务商健康状态和 Bootstrap 统计，便于排查解析状态。",
+                        "支持自定义服务与规则订阅的配置导入、导出，以及系统快捷设置磁贴。"
                     )
                 )
             }
@@ -83,14 +84,14 @@ fun AboutScreen(
             SettingsGroupTitle("使用效果")
             SettingsGroup {
                 AboutText(
-                    "启用后，应用会把设备上的 DNS 查询转交给已配置的加密 DNS 服务处理。实际解析速度、稳定性和可用性取决于网络环境、所选服务商以及本机规则配置。"
+                    "启用后，应用会将设备 DNS 查询交给已配置的上游服务处理。实际解析速度、稳定性和可用性取决于网络环境、所选服务商和本机规则配置；DoH3 使用 QUIC，需要网络允许 UDP/443。"
                 )
             }
 
             SettingsGroupTitle("隐私与本地运行")
             SettingsGroup {
                 AboutText(
-                    "DNS 缓存、请求日志、规则和服务商配置保存在设备本机。使用 DoH/DoT 解析时，所选 DNS 服务商仍会收到必要的域名解析请求。"
+                    "DNS 缓存、请求日志、规则和服务商配置保存在设备本机。上游 DNS 服务商仍会收到必要的域名解析请求；仅 DoH、DoH3 和 DoT 会对设备到上游之间的 DNS 传输进行加密，普通 DNS 不提供该保护。"
                 )
             }
 
