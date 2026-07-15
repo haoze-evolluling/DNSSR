@@ -178,7 +178,10 @@ fun ProviderManagementScreen(
             initialProtocol = selectedProtocol,
             initialUrl = "",
             initialHost = "",
-            initialPort = DnsProvider.DEFAULT_DNS_PORT.toString(),
+            initialPort = when (selectedProtocol) {
+                DnsProtocol.DOT -> DnsProvider.DEFAULT_DOT_PORT.toString()
+                else -> DnsProvider.DEFAULT_DNS_PORT.toString()
+            },
             onDismiss = { showAddDialog = false },
             onConfirm = { name, protocol, url, host, port ->
                 viewModel.addProvider(name, protocol, url, host, port)
