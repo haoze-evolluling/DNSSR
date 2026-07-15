@@ -1,6 +1,7 @@
 package com.haoze.dnssr.ui
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.webkit.WebResourceRequest
@@ -10,14 +11,17 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
@@ -29,6 +33,20 @@ import java.util.Locale
 private object DashboardWebViewCache {
     var webView: WebView? = null
     var pageReady: Boolean = false
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+internal fun preloadLogDashboard(context: Context) {
+    if (DashboardWebViewCache.webView != null) return
+    DashboardWebViewCache.webView = WebView(context.applicationContext).apply {
+        configureLocalPageSettings()
+        webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                DashboardWebViewCache.pageReady = true
+            }
+        }
+        loadUrl(DASHBOARD_ASSET_URL)
+    }
 }
 
 @Composable
@@ -46,25 +64,30 @@ fun ModernLogDashboardScreen(
     val cachedWebView = DashboardWebViewCache.webView
     var webView by remember { mutableStateOf(cachedWebView) }
     var pageReady by remember { mutableStateOf(DashboardWebViewCache.pageReady) }
-    val hasLoadedDashboard = viewModel.hasLoadedDashboard
-
-    NavigationSettledEffect {
-        if (hasLoadedDashboard) return@NavigationSettledEffect
-        viewModel.markDashboardLoaded()
+    var webViewAttached by rememberSaveable { mutableStateOf(false) }
+    val hasDashboardData = uiState.dashboardJson != EMPTY_DASHBOARD_JSON
+    LaunchedEffect(viewModel) {
         viewModel.refresh()
+    }
+    NavigationSettledEffect {
+        webViewAttached = true
     }
 
     LaunchedEffect(pageReady, uiState.dashboardJson, dashboardTheme) {
         val view = webView
         if (pageReady && view != null) {
-            view.evaluateJavascript(
-                "window.DNSSR && window.DNSSR.setTheme(${dashboardTheme.toJson()});",
-                null
-            )
-            view.evaluateJavascript(
-                "window.DNSSR && window.DNSSR.render(${uiState.dashboardJson});",
-                null
-            )
+            view.post {
+                view.evaluateJavascript(
+                    "window.DNSSR && window.DNSSR.setTheme(${dashboardTheme.toJson()});",
+                    null
+                )
+                if (hasDashboardData) {
+                    view.evaluateJavascript(
+                        "window.DNSSR && window.DNSSR.render(${uiState.dashboardJson});",
+                        null
+                    )
+                }
+            }
         }
     }
 
@@ -73,7 +96,7 @@ fun ModernLogDashboardScreen(
             .fillMaxSize()
             .background(dashboardTheme.background)
     ) {
-        DashboardWebView(
+        if (webViewAttached) DashboardWebView(
             cachedWebView = cachedWebView,
             themeColors = dashboardTheme,
             onPageReady = {
@@ -93,6 +116,16 @@ fun ModernLogDashboardScreen(
             onNavigateToSubscriptionInterceptionStats = onNavigateToSubscriptionInterceptionStats,
             modifier = Modifier.fillMaxSize()
         )
+        if (!webViewAttached || !pageReady || (uiState.loading && !hasDashboardData)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(dashboardTheme.background),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
     }
 }
 
@@ -138,18 +171,7 @@ private fun DashboardWebView(
         modifier = modifier,
         factory = { context ->
             val view = cachedWebView ?: WebView(context.applicationContext).apply {
-                settings.apply {
-                    javaScriptEnabled = true
-                    domStorageEnabled = false
-                    allowFileAccess = true
-                    allowContentAccess = false
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        forceDark = WebSettings.FORCE_DARK_OFF
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        isAlgorithmicDarkeningAllowed = false
-                    }
-                }
+                configureLocalPageSettings()
             }
             view.webViewClient = webViewClient
             view.setBackgroundColor(themeColors.background.toArgb())
@@ -165,6 +187,22 @@ private fun DashboardWebView(
             onWebViewCreated(view)
         }
     )
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.configureLocalPageSettings() {
+    settings.apply {
+        javaScriptEnabled = true
+        domStorageEnabled = false
+        allowFileAccess = true
+        allowContentAccess = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            forceDark = WebSettings.FORCE_DARK_OFF
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            isAlgorithmicDarkeningAllowed = false
+        }
+    }
 }
 
 @Composable
@@ -270,3 +308,4 @@ private fun handleDashboardUri(
 }
 
 private const val DASHBOARD_ASSET_URL = "file:///android_asset/log_dashboard.html"
+private const val EMPTY_DASHBOARD_JSON = "{}"

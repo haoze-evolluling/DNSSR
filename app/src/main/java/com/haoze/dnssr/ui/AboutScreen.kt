@@ -1,6 +1,7 @@
 package com.haoze.dnssr.ui
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -12,14 +13,17 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +37,20 @@ private const val ABOUT_ASSET_URL = "file:///android_asset/app_info.html"
 private object AboutWebViewCache {
     var webView: WebView? = null
     var pageReady: Boolean = false
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+internal fun preloadAboutPage(context: Context) {
+    if (AboutWebViewCache.webView != null) return
+    AboutWebViewCache.webView = WebView(context.applicationContext).apply {
+        configureAboutPageSettings()
+        webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                AboutWebViewCache.pageReady = true
+            }
+        }
+        loadUrl(ABOUT_ASSET_URL)
+    }
 }
 
 @Composable
@@ -56,6 +74,7 @@ fun AboutScreen(
     }
     var webView by remember { mutableStateOf(AboutWebViewCache.webView) }
     var pageReady by remember { mutableStateOf(AboutWebViewCache.pageReady) }
+    var webViewAttached by rememberSaveable { mutableStateOf(false) }
     val webViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(
             view: WebView,
@@ -87,29 +106,21 @@ fun AboutScreen(
             )
         }
     }
+    NavigationSettledEffect {
+        webViewAttached = true
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(themeColors.background)
     ) {
-        AndroidView(
+        if (webViewAttached) AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { viewContext ->
                 val cachedWebView = AboutWebViewCache.webView
                 val view = cachedWebView ?: WebView(viewContext.applicationContext).apply {
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = false
-                        allowFileAccess = true
-                        allowContentAccess = false
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            forceDark = WebSettings.FORCE_DARK_OFF
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            isAlgorithmicDarkeningAllowed = false
-                        }
-                    }
+                    configureAboutPageSettings()
                 }
                 view.webViewClient = webViewClient
                 view.setBackgroundColor(themeColors.background.toArgb())
@@ -126,7 +137,32 @@ fun AboutScreen(
                 view.setBackgroundColor(themeColors.background.toArgb())
             }
         )
+        if (!webViewAttached || !pageReady) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(themeColors.background),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+    }
+}
 
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.configureAboutPageSettings() {
+    settings.apply {
+        javaScriptEnabled = true
+        domStorageEnabled = false
+        allowFileAccess = true
+        allowContentAccess = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            forceDark = WebSettings.FORCE_DARK_OFF
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            isAlgorithmicDarkeningAllowed = false
+        }
     }
 }
 

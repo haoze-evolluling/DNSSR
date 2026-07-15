@@ -39,12 +39,6 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
 
     private val _uiState = MutableStateFlow(ModernLogDashboardUiState())
     val uiState: StateFlow<ModernLogDashboardUiState> = _uiState.asStateFlow()
-    var hasLoadedDashboard = false
-        private set
-
-    fun markDashboardLoaded() {
-        hasLoadedDashboard = true
-    }
 
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {

@@ -22,7 +22,6 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.Lifecycle
 
 private const val SCREEN_TITLE_ARG = "screenTitle"
-private const val WEB_PAGE_FADE_DURATION_MS = 120
 private val emphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 private val emphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 
@@ -83,10 +82,6 @@ object Routes {
     const val CO_BUILDER_LIST = "co_builder_list"
 }
 
-private fun isWebPageRoute(route: String?): Boolean {
-    return route == Routes.LOG_DASHBOARD || route?.startsWith("${Routes.ABOUT}?") == true
-}
-
 @Composable
 fun AppNavHost(
     mainScreen: @Composable (
@@ -106,50 +101,34 @@ fun AppNavHost(
         startDestination = Routes.MAIN,
         modifier = modifier,
         enterTransition = {
-            if (isWebPageRoute(initialState.destination.route) || isWebPageRoute(targetState.destination.route)) {
-                fadeIn(animationSpec = tween(WEB_PAGE_FADE_DURATION_MS))
-            } else {
-                slideInHorizontally(
-                    initialOffsetX = { it / 8 },
-                    animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
-                ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
-            }
+            slideInHorizontally(
+                initialOffsetX = { it / 8 },
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
         },
         exitTransition = {
-            if (isWebPageRoute(initialState.destination.route) || isWebPageRoute(targetState.destination.route)) {
-                fadeOut(animationSpec = tween(WEB_PAGE_FADE_DURATION_MS))
-            } else {
-                slideOutHorizontally(
-                    targetOffsetX = { -it / 24 },
-                    animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
-                ) + scaleOut(
-                    targetScale = 0.98f,
-                    animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
-                ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
-            }
+            slideOutHorizontally(
+                targetOffsetX = { -it / 24 },
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + scaleOut(
+                targetScale = 0.98f,
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
         },
         popEnterTransition = {
-            if (isWebPageRoute(initialState.destination.route) || isWebPageRoute(targetState.destination.route)) {
-                fadeIn(animationSpec = tween(WEB_PAGE_FADE_DURATION_MS))
-            } else {
-                slideInHorizontally(
-                    initialOffsetX = { -it / 24 },
-                    animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
-                ) + scaleIn(
-                    initialScale = 0.98f,
-                    animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
-                ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
-            }
+            slideInHorizontally(
+                initialOffsetX = { -it / 24 },
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + scaleIn(
+                initialScale = 0.98f,
+                animationSpec = tween(NAVIGATION_ENTER_DURATION_MS, easing = emphasizedDecelerate)
+            ) + fadeIn(animationSpec = tween(NAVIGATION_ENTER_DURATION_MS))
         },
         popExitTransition = {
-            if (isWebPageRoute(initialState.destination.route) || isWebPageRoute(targetState.destination.route)) {
-                fadeOut(animationSpec = tween(WEB_PAGE_FADE_DURATION_MS))
-            } else {
-                slideOutHorizontally(
-                    targetOffsetX = { it / 8 },
-                    animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
-                ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
-            }
+            slideOutHorizontally(
+                targetOffsetX = { it / 8 },
+                animationSpec = tween(NAVIGATION_EXIT_DURATION_MS, easing = emphasizedAccelerate)
+            ) + fadeOut(animationSpec = tween(NAVIGATION_EXIT_DURATION_MS))
         }
     ) {
         composable(Routes.MAIN) {
