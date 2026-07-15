@@ -25,7 +25,8 @@ fun SettingsScreen(
     onNavigateToLogRetentionSettings: (String) -> Unit,
     onNavigateToForegroundBackgroundSettings: (String) -> Unit,
     onNavigateToExperimentalFeatures: (String) -> Unit,
-    onNavigateToAbout: (String) -> Unit
+    onNavigateToAbout: (String) -> Unit,
+    onNavigateToSponsor: (String) -> Unit
 ) {
     val providerManagementTitle = "服务商管理"
     val homeProviderVisibilityTitle = "服务显示"
@@ -39,7 +40,8 @@ fun SettingsScreen(
     val configTransferTitle = "导入与导出"
     val foregroundBackgroundTitle = "前后台行为"
     val experimentalFeaturesTitle = "实验功能"
-    val aboutTitle = "DNSSR 应用信息"
+    val aboutTitle = "应用信息"
+    val sponsorTitle = "赞助"
 
     SettingsScaffold(
         title = "应用设置",
@@ -158,6 +160,12 @@ fun SettingsScreen(
                     title = aboutTitle,
                     subtitle = "查看软件说明、作者信息和项目仓库",
                     onClick = { onNavigateToAbout(aboutTitle) }
+                )
+                SettingsDivider()
+                SettingsNavigationItem(
+                    title = sponsorTitle,
+                    subtitle = "请作者喝杯咖啡，支持项目持续开发",
+                    onClick = { onNavigateToSponsor(sponsorTitle) }
                 )
                 }
             }

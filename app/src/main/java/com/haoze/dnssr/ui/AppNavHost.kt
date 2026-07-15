@@ -77,6 +77,7 @@ object Routes {
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
     const val ABOUT = "about"
+    const val SPONSOR = "sponsor"
 }
 
 @Composable
@@ -163,7 +164,8 @@ fun AppNavHost(
                     navController.navigateToTitledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS, title)
                 },
                 onNavigateToExperimentalFeatures = { title -> navController.navigateToTitledRoute(Routes.EXPERIMENTAL_FEATURES, title) },
-                onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) }
+                onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) },
+                onNavigateToSponsor = { title -> navController.navigateToTitledRoute(Routes.SPONSOR, title) }
             )
         }
         composable(Routes.LOG_DASHBOARD) {
@@ -331,10 +333,16 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() }
             )
         }
-        composable(titledRoute(Routes.ABOUT), arguments = listOf(screenTitleArgument("DNSSR 应用信息"))) { entry ->
+        composable(titledRoute(Routes.ABOUT), arguments = listOf(screenTitleArgument("应用信息"))) { entry ->
             AboutScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "DNSSR 应用信息"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "应用信息"
+            )
+        }
+        composable(titledRoute(Routes.SPONSOR), arguments = listOf(screenTitleArgument("赞助"))) { entry ->
+            SponsorScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助"
             )
         }
     }

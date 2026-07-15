@@ -38,7 +38,7 @@ private const val PROJECT_REPOSITORY_URL = "https://github.com/haoze-evolluling/
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
-    title: String = "DNSSR 应用信息"
+    title: String = "应用信息"
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
