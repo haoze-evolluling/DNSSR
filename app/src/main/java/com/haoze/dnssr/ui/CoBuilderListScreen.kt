@@ -19,18 +19,33 @@ private val CO_BUILDERS = listOf(
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
+        name = "酷安@乐野",
+        avatarRes = R.drawable.leye_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "理塘丁真",
+        avatarRes = R.drawable.litangdingzhen_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
         name = "酷安@睿上源",
         avatarRes = R.drawable.ruishangyuan_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@widiOA",
-        avatarRes = R.drawable.widioa_avatar,
+        name = "酷安@天涯浮客",
+        avatarRes = R.drawable.tianyafuke_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
         name = "酷安@妄炁",
         avatarRes = R.drawable.wangqi_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "酷安@widiOA",
+        avatarRes = R.drawable.widioa_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     )
 )
@@ -48,7 +63,7 @@ fun CoBuilderListScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             SettingsInfoText(
-                text = "感谢每一位为 DNSSR 提出建议、帮助测试的共建者！",
+                text = "感谢每一位为 DNSSR 提出建议、帮助测试的共建者！名单按用户名称的字母顺序排列，中文名称按拼音排序。",
                 modifier = Modifier.padding(top = 8.dp)
             )
             RecognitionList(
