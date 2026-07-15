@@ -71,7 +71,6 @@ fun AboutScreen(
                 AboutBulletList(
                     items = listOf(
                         "支持 DNS、DoH、DoH3 与 DoT 服务商，并可添加和管理自定义服务。",
-                        "支持单服务商、健康权重择优、并行竞速和主备容灾四种解析模式。",
                         "支持可配置 DNS 缓存，减少重复查询，并提供缓存记录和命中情况。",
                         "支持屏蔽规则、白名单规则和 AdGuard DNS 规则订阅，可设置订阅自动更新。",
                         "支持 Bootstrap IP，降低解析 DoH、DoH3 或 DoT 服务商域名时对系统 DNS 的依赖。",
