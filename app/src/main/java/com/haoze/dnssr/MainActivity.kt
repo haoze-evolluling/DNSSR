@@ -32,6 +32,7 @@ import com.haoze.dnssr.ui.MainViewModel
 import com.haoze.dnssr.ui.preloadAboutPage
 import com.haoze.dnssr.ui.preloadLogDashboard
 import com.haoze.dnssr.ui.theme.DNSSRTheme
+import com.haoze.dnssr.ui.theme.ThemeColorStyle
 import com.haoze.dnssr.vpn.DnsVpnService
 import com.haoze.dnssr.vpn.VpnMonitorService
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
@@ -77,12 +78,13 @@ class MainActivity : ComponentActivity() {
         SubscriptionAutoUpdateScheduler.sync(this)
         setContent {
             var themeMode by remember { mutableStateOf(AppSettings.getAppThemeMode(this)) }
+            var colorStyle by remember { mutableStateOf(AppSettings.getThemeColorStyle(this)) }
             val darkTheme = when (themeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
                 AppThemeMode.LIGHT -> false
                 AppThemeMode.DARK -> true
             }
-            DNSSRTheme(darkTheme = darkTheme) {
+            DNSSRTheme(darkTheme = darkTheme, colorStyle = colorStyle) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -101,6 +103,7 @@ class MainActivity : ComponentActivity() {
                         onRuntimeDnsSettingsChanged = { refreshRuntimeConfigIfRunning() },
                         onHideFromRecentsChanged = { applyRecentsPrivacy(it) },
                         onThemeModeChanged = { themeMode = it },
+                        onThemeColorStyleChanged = { colorStyle = it },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

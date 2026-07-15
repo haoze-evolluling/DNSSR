@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.Lifecycle
+import com.haoze.dnssr.ui.theme.ThemeColorStyle
 
 private const val SCREEN_TITLE_ARG = "screenTitle"
 private val emphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -75,6 +76,7 @@ object Routes {
     const val FOREGROUND_BACKGROUND_SETTINGS = "foreground_background_settings"
     const val APPEARANCE_SETTINGS = "appearance_settings"
     const val DAY_NIGHT_MODE = "day_night_mode"
+    const val THEME_COLOR_SETTINGS = "theme_color_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
@@ -96,6 +98,7 @@ fun AppNavHost(
     onRuntimeDnsSettingsChanged: () -> Unit,
     onHideFromRecentsChanged: (Boolean) -> Unit = {},
     onThemeModeChanged: (AppThemeMode) -> Unit = {},
+    onThemeColorStyleChanged: (ThemeColorStyle) -> Unit = {},
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
@@ -361,6 +364,9 @@ fun AppNavHost(
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "外观设置",
                 onNavigateToDayNightMode = { title ->
                     navController.navigateToTitledRoute(Routes.DAY_NIGHT_MODE, title)
+                },
+                onNavigateToThemeColorSettings = { title ->
+                    navController.navigateToTitledRoute(Routes.THEME_COLOR_SETTINGS, title)
                 }
             )
         }
@@ -369,6 +375,13 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日夜模式",
                 onThemeModeChanged = onThemeModeChanged
+            )
+        }
+        composable(titledRoute(Routes.THEME_COLOR_SETTINGS), arguments = listOf(screenTitleArgument("主题色配置"))) { entry ->
+            ThemeColorSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "主题色配置",
+                onThemeColorStyleChanged = onThemeColorStyleChanged
             )
         }
         composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->

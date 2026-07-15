@@ -10,6 +10,7 @@ import com.haoze.dnssr.vpn.DnsProvider
 import com.haoze.dnssr.vpn.cache.DnsCacheMode
 import com.haoze.dnssr.vpn.cache.DnsCachePolicy
 import com.haoze.dnssr.vpn.cache.DnsCachePreset
+import com.haoze.dnssr.ui.theme.ThemeColorStyle
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -118,6 +119,7 @@ object AppSettings {
     private const val KEY_HOME_VISIBLE_PROVIDER_IDS = "home_visible_provider_ids"
     private const val KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS = "acknowledged_doh3_provider_ids"
     private const val KEY_APP_THEME_MODE = "app_theme_mode"
+    private const val KEY_THEME_COLOR_STYLE = "theme_color_style"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -164,6 +166,19 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_APP_THEME_MODE, mode.storageValue)
+            .apply()
+    }
+
+    fun getThemeColorStyle(context: Context): ThemeColorStyle {
+        val value = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_THEME_COLOR_STYLE, null)
+        return ThemeColorStyle.fromStorageValue(value)
+    }
+
+    fun setThemeColorStyle(context: Context, style: ThemeColorStyle) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_THEME_COLOR_STYLE, style.storageValue)
             .apply()
     }
 
