@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val DATABASE_WARMUP_DELAY_MS = 500L
+private const val PREFERRED_REFRESH_RATE_HZ = 120f
 
 class MainActivity : ComponentActivity() {
 
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.attributes = window.attributes.apply {
+            preferredRefreshRate = PREFERRED_REFRESH_RATE_HZ
+        }
         enableEdgeToEdge()
         applyRecentsPrivacySetting()
         LauncherIconManager.applyPreferredIcon(this)
