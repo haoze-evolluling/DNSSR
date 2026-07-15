@@ -37,6 +37,11 @@ private val SPONSORS = listOf(
         name = "酷安@乐野",
         avatarRes = R.drawable.leye_avatar,
         acknowledgement = "感谢对 DNSSR 项目的支持"
+    ),
+    RecognitionMember(
+        name = "AceTaffy1883",
+        avatarRes = R.drawable.acetaffy1883_avatar,
+        acknowledgement = "感谢对 DNSSR 项目的支持"
     )
 )
 

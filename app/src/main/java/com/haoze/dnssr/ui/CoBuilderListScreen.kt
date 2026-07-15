@@ -14,6 +14,11 @@ import com.haoze.dnssr.ui.components.SettingsScaffold
 
 private val CO_BUILDERS = listOf(
     RecognitionMember(
+        name = "AceTaffy1883",
+        avatarRes = R.drawable.acetaffy1883_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
         name = "alone",
         avatarRes = R.drawable.alone_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
