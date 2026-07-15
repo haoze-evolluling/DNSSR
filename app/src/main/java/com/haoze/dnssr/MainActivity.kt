@@ -15,12 +15,18 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.ui.AppNavHost
 import com.haoze.dnssr.ui.AppSettings
+import com.haoze.dnssr.ui.AppThemeMode
 import com.haoze.dnssr.ui.LauncherIconManager
 import com.haoze.dnssr.ui.MainViewModel
 import com.haoze.dnssr.ui.preloadAboutPage
@@ -70,7 +76,13 @@ class MainActivity : ComponentActivity() {
         LauncherIconManager.applyPreferredIcon(this)
         SubscriptionAutoUpdateScheduler.sync(this)
         setContent {
-            DNSSRTheme {
+            var themeMode by remember { mutableStateOf(AppSettings.getAppThemeMode(this)) }
+            val darkTheme = when (themeMode) {
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+            DNSSRTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -88,6 +100,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onRuntimeDnsSettingsChanged = { refreshRuntimeConfigIfRunning() },
                         onHideFromRecentsChanged = { applyRecentsPrivacy(it) },
+                        onThemeModeChanged = { themeMode = it },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

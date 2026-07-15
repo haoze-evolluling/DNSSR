@@ -46,6 +46,20 @@ enum class DnsResolutionMode(
     }
 }
 
+enum class AppThemeMode(
+    val storageValue: String,
+    val displayName: String
+) {
+    SYSTEM("system", "跟随系统"),
+    LIGHT("light", "浅色模式"),
+    DARK("dark", "深色模式");
+
+    companion object {
+        fun fromStorageValue(value: String?): AppThemeMode =
+            entries.firstOrNull { it.storageValue == value } ?: SYSTEM
+    }
+}
+
 data class HomeProviderVisibility(
     val visibleProtocols: Set<DnsProtocol> = DEFAULT_HOME_VISIBLE_PROTOCOLS,
     val hiddenProviderIds: Set<String> = emptySet(),
@@ -103,6 +117,7 @@ object AppSettings {
     private const val KEY_HOME_HIDDEN_PROVIDER_IDS = "home_hidden_provider_ids"
     private const val KEY_HOME_VISIBLE_PROVIDER_IDS = "home_visible_provider_ids"
     private const val KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS = "acknowledged_doh3_provider_ids"
+    private const val KEY_APP_THEME_MODE = "app_theme_mode"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -138,6 +153,19 @@ object AppSettings {
         "preset_dnspod",
         "preset_alidns"
     )
+
+    fun getAppThemeMode(context: Context): AppThemeMode {
+        val value = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_APP_THEME_MODE, null)
+        return AppThemeMode.fromStorageValue(value)
+    }
+
+    fun setAppThemeMode(context: Context, mode: AppThemeMode) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_APP_THEME_MODE, mode.storageValue)
+            .apply()
+    }
 
     fun isCacheEnabled(context: Context): Boolean {
         return getDnsCachePolicy(context).enabled

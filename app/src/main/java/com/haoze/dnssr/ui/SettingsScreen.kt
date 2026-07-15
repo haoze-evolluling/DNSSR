@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FlipToBack
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Public
@@ -41,6 +42,7 @@ fun SettingsScreen(
     onNavigateToBootstrapSettings: (String) -> Unit,
     onNavigateToLogRetentionSettings: (String) -> Unit,
     onNavigateToForegroundBackgroundSettings: (String) -> Unit,
+    onNavigateToAppearanceSettings: (String) -> Unit,
     onNavigateToExperimentalFeatures: (String) -> Unit,
     onNavigateToAbout: (String) -> Unit,
     onNavigateToSponsor: (String) -> Unit,
@@ -58,6 +60,7 @@ fun SettingsScreen(
     val dataCleanupTitle = "数据清理"
     val configTransferTitle = "导入与导出"
     val foregroundBackgroundTitle = "前后台行为"
+    val appearanceSettingsTitle = "外观设置"
     val experimentalFeaturesTitle = "实验功能"
     val aboutTitle = "应用信息"
     val sponsorTitle = "赞助"
@@ -171,6 +174,18 @@ fun SettingsScreen(
                     leadingIcon = Icons.Filled.FlipToBack,
                     onClick = { onNavigateToForegroundBackgroundSettings(foregroundBackgroundTitle) }
                 )
+                }
+            }
+
+            item { SettingsGroupTitle("外观") }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = appearanceSettingsTitle,
+                        subtitle = "设置应用的显示外观",
+                        leadingIcon = Icons.Filled.Palette,
+                        onClick = { onNavigateToAppearanceSettings(appearanceSettingsTitle) }
+                    )
                 }
             }
 

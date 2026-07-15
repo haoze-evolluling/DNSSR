@@ -73,6 +73,8 @@ object Routes {
     const val CACHE_SETTINGS = "cache_settings"
     const val LOG_RETENTION_SETTINGS = "log_retention_settings"
     const val FOREGROUND_BACKGROUND_SETTINGS = "foreground_background_settings"
+    const val APPEARANCE_SETTINGS = "appearance_settings"
+    const val DAY_NIGHT_MODE = "day_night_mode"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
@@ -93,6 +95,7 @@ fun AppNavHost(
     ) -> Unit,
     onRuntimeDnsSettingsChanged: () -> Unit,
     onHideFromRecentsChanged: (Boolean) -> Unit = {},
+    onThemeModeChanged: (AppThemeMode) -> Unit = {},
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
@@ -164,6 +167,9 @@ fun AppNavHost(
                 onNavigateToLogRetentionSettings = { title -> navController.navigateToTitledRoute(Routes.LOG_RETENTION_SETTINGS, title) },
                 onNavigateToForegroundBackgroundSettings = { title ->
                     navController.navigateToTitledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS, title)
+                },
+                onNavigateToAppearanceSettings = { title ->
+                    navController.navigateToTitledRoute(Routes.APPEARANCE_SETTINGS, title)
                 },
                 onNavigateToExperimentalFeatures = { title -> navController.navigateToTitledRoute(Routes.EXPERIMENTAL_FEATURES, title) },
                 onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) },
@@ -347,6 +353,22 @@ fun AppNavHost(
             SponsorScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助"
+            )
+        }
+        composable(titledRoute(Routes.APPEARANCE_SETTINGS), arguments = listOf(screenTitleArgument("外观设置"))) { entry ->
+            AppearanceSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "外观设置",
+                onNavigateToDayNightMode = { title ->
+                    navController.navigateToTitledRoute(Routes.DAY_NIGHT_MODE, title)
+                }
+            )
+        }
+        composable(titledRoute(Routes.DAY_NIGHT_MODE), arguments = listOf(screenTitleArgument("日夜模式"))) { entry ->
+            DayNightModeScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日夜模式",
+                onThemeModeChanged = onThemeModeChanged
             )
         }
         composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->
