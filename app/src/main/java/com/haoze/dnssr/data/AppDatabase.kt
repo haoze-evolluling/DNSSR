@@ -13,6 +13,7 @@ import com.haoze.dnssr.data.dao.DnsCacheDao
 import com.haoze.dnssr.data.dao.DnsLogDao
 import com.haoze.dnssr.data.dao.RaceLogDao
 import com.haoze.dnssr.data.dao.SubscriptionDao
+import com.haoze.dnssr.data.dao.SubscriptionAutoUpdateDao
 import com.haoze.dnssr.data.entity.AllowRuleEntity
 import com.haoze.dnssr.data.entity.AllowRuleSourceEntity
 import com.haoze.dnssr.data.entity.BlockRuleEntity
@@ -22,6 +23,7 @@ import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.data.entity.DnsLogEntity
 import com.haoze.dnssr.data.entity.RaceLogEntity
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
 
 @Database(
     entities = [
@@ -33,9 +35,10 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
         BlockRuleSourceEntity::class,
         AllowRuleEntity::class,
         AllowRuleSourceEntity::class,
-        SubscriptionEntity::class
+        SubscriptionEntity::class,
+        SubscriptionAutoUpdateItemEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun blockRuleDao(): BlockRuleDao
     abstract fun allowRuleDao(): AllowRuleDao
     abstract fun subscriptionDao(): SubscriptionDao
+    abstract fun subscriptionAutoUpdateDao(): SubscriptionAutoUpdateDao
 
     companion object {
         @Volatile
@@ -64,7 +68,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
-                        MIGRATION_15_16
+                        MIGRATION_15_16,
+                        MIGRATION_16_17
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -207,6 +212,32 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX `index_${sourceTable}_source` ON `$sourceTable` (`source`)")
                 db.execSQL("DROP TABLE `$sourceData`")
+            }
+        }
+
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `httpEtag` TEXT")
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `httpLastModified` TEXT")
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `ruleSetHash` TEXT")
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `lastAttemptAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `subscription` ADD COLUMN `consecutiveFailureCount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `subscription_auto_update_item` (" +
+                        "`batchId` TEXT NOT NULL, `subscriptionId` INTEGER NOT NULL, " +
+                        "`status` TEXT NOT NULL, `changed` INTEGER NOT NULL, `ruleCount` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`batchId`, `subscriptionId`), " +
+                        "FOREIGN KEY(`subscriptionId`) REFERENCES `subscription`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_subscription_auto_update_item_subscriptionId` " +
+                        "ON `subscription_auto_update_item` (`subscriptionId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_subscription_auto_update_item_batchId_status` " +
+                        "ON `subscription_auto_update_item` (`batchId`, `status`)"
+                )
             }
         }
     }

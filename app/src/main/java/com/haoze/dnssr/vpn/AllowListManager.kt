@@ -71,12 +71,13 @@ class AllowListManager(private val dao: AllowRuleDao) {
     suspend fun replaceRulesBySource(
         rules: List<AdGuardRuleParser.ParsedRule>,
         source: String,
-        enabled: Boolean
+        enabled: Boolean,
+        onProgress: ((Int) -> Unit)? = null
     ) {
         val now = System.currentTimeMillis()
         dao.replaceBySource(source, rules.map { rule ->
             AllowRuleEntity(pattern = rule.pattern, rawLine = rule.rawLine, addedAt = now)
-        }, enabled)
+        }, enabled, onProgress = onProgress)
         cache.reload(dao)
     }
 

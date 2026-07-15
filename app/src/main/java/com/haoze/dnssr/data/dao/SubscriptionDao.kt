@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SubscriptionDao {
@@ -18,8 +19,14 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscription ORDER BY addedAt DESC")
     suspend fun all(): List<SubscriptionEntity>
 
+    @Query("SELECT * FROM subscription ORDER BY addedAt DESC")
+    fun observeAll(): Flow<List<SubscriptionEntity>>
+
     @Query("SELECT * FROM subscription WHERE sourceType = 'remote' ORDER BY addedAt DESC")
     suspend fun allRemote(): List<SubscriptionEntity>
+
+    @Query("SELECT * FROM subscription WHERE sourceType = 'remote' AND enabled = 1 ORDER BY addedAt DESC")
+    suspend fun allEnabledRemote(): List<SubscriptionEntity>
 
     @Query("SELECT * FROM subscription WHERE kind = :kind ORDER BY addedAt DESC")
     suspend fun allByKind(kind: String): List<SubscriptionEntity>
@@ -38,6 +45,25 @@ interface SubscriptionDao {
 
     @Query("UPDATE subscription SET importState = :state, importError = :error WHERE id = :id")
     suspend fun setImportState(id: Long, state: String, error: String?)
+
+    @Query(
+        "UPDATE subscription SET importState = :state, importError = NULL, " +
+            "lastAttemptAt = :attemptedAt, consecutiveFailureCount = 0, " +
+            "httpEtag = :etag, httpLastModified = :lastModified WHERE id = :id"
+    )
+    suspend fun markNotModified(
+        id: Long,
+        state: String,
+        attemptedAt: Long,
+        etag: String?,
+        lastModified: String?
+    )
+
+    @Query(
+        "UPDATE subscription SET importState = :state, importError = :error, " +
+            "lastAttemptAt = :attemptedAt, consecutiveFailureCount = consecutiveFailureCount + 1 WHERE id = :id"
+    )
+    suspend fun markUpdateFailed(id: Long, state: String, error: String, attemptedAt: Long)
 
     @Query("SELECT * FROM subscription WHERE url = :url AND kind = :kind")
     suspend fun byUrlAndKind(url: String, kind: String): SubscriptionEntity?

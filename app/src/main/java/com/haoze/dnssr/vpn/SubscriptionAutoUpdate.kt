@@ -15,14 +15,20 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.MainActivity
 import com.haoze.dnssr.R
+import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
+import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemStatus
 import com.haoze.dnssr.ui.RuntimeDnsSettingsRefresher
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 object SubscriptionAutoUpdateSettings {
@@ -54,11 +60,13 @@ object SubscriptionAutoUpdateSettings {
 
 object SubscriptionAutoUpdateScheduler {
     private const val WORK_NAME = "subscription_auto_update"
+    private const val RETRY_WORK_NAME = "subscription_auto_update_retry"
 
     fun sync(context: Context) {
         val manager = WorkManager.getInstance(context)
         if (!SubscriptionAutoUpdateSettings.isEnabled(context)) {
             manager.cancelUniqueWork(WORK_NAME)
+            manager.cancelUniqueWork(RETRY_WORK_NAME)
             return
         }
         val hours = SubscriptionAutoUpdateSettings.intervalHours(context)
@@ -67,6 +75,20 @@ object SubscriptionAutoUpdateScheduler {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         manager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+    }
+
+    fun scheduleRetry(context: Context, batchId: String) {
+        val request = OneTimeWorkRequestBuilder<SubscriptionAutoUpdateRetryWorker>()
+            .setInputData(workDataOf(SubscriptionAutoUpdateRetryWorker.KEY_BATCH_ID to batchId))
+            .setInitialDelay(30, TimeUnit.SECONDS)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            RETRY_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 }
 
@@ -81,37 +103,150 @@ class SubscriptionAutoUpdateWorker(
             BlockListManager(database.blockRuleDao()),
             AllowListManager(database.allowRuleDao())
         )
-        var succeeded = false
-        var succeededCount = 0
-        var importedRuleCount = 0
-        var failed = false
-        manager.remoteSubscriptions().forEach { subscription ->
-            manager.updateSubscription(subscription.id).fold(
-                onSuccess = { ruleCount ->
-                    succeeded = true
-                    succeededCount++
-                    importedRuleCount += ruleCount
-                },
-                onFailure = { failed = true }
-            )
+        val batchDao = database.subscriptionAutoUpdateDao()
+        val batchId = UUID.randomUUID().toString()
+        var changed = false
+        var aborted = false
+        val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
+            batchDao.clear()
+            for (subscription in manager.enabledRemoteSubscriptions()) {
+                if (shouldStop()) {
+                    aborted = true
+                    break
+                }
+                val outcome = manager.updateSubscription(subscription.id)
+                changed = recordOutcome(batchDao, batchId, subscription.id, outcome) || changed
+            }
+            if (shouldStop()) aborted = true
         }
-        if (succeeded) {
+        if (!ran || aborted) {
+            batchDao.deleteBatch(batchId)
+            return Result.success()
+        }
+        if (changed) {
             RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
-            SubscriptionAutoUpdateNotifier.showSuccess(
-                applicationContext,
-                succeededCount,
-                importedRuleCount
-            )
         }
-        return if (failed && runAttemptCount < 3) Result.retry() else Result.success()
+        return if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
+            SubscriptionAutoUpdateScheduler.scheduleRetry(applicationContext, batchId)
+            Result.success()
+        } else {
+            finishBatch(applicationContext, batchDao, batchId)
+            Result.success()
+        }
     }
+}
+
+class SubscriptionAutoUpdateRetryWorker(
+    context: Context,
+    params: WorkerParameters
+) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val batchId = inputData.getString(KEY_BATCH_ID) ?: return Result.success()
+        val database = AppDatabase.getInstance(applicationContext)
+        val batchDao = database.subscriptionAutoUpdateDao()
+        val manager = SubscriptionManager(
+            database.subscriptionDao(),
+            BlockListManager(database.blockRuleDao()),
+            AllowListManager(database.allowRuleDao())
+        )
+        var changed = false
+        var aborted = false
+        val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
+            for (item in batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY)) {
+                if (shouldStop()) {
+                    aborted = true
+                    break
+                }
+                val subscription = database.subscriptionDao().byId(item.subscriptionId)
+                if (subscription == null || !subscription.enabled) {
+                    batchDao.deleteItem(batchId, item.subscriptionId)
+                    continue
+                }
+                val outcome = manager.updateSubscription(item.subscriptionId)
+                val finalOutcome = if (
+                    outcome is SubscriptionUpdateOutcome.Failed &&
+                    outcome.retryable &&
+                    runAttemptCount >= MAX_RETRY_ATTEMPTS - 1
+                ) {
+                    outcome.copy(retryable = false)
+                } else {
+                    outcome
+                }
+                changed = recordOutcome(batchDao, batchId, item.subscriptionId, finalOutcome) || changed
+            }
+            if (shouldStop()) aborted = true
+        }
+        if (!ran || aborted) {
+            batchDao.deleteBatch(batchId)
+            return Result.success()
+        }
+        if (changed) {
+            RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
+        }
+        return if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
+            Result.retry()
+        } else {
+            finishBatch(applicationContext, batchDao, batchId)
+            Result.success()
+        }
+    }
+
+    companion object {
+        const val KEY_BATCH_ID = "batch_id"
+        private const val MAX_RETRY_ATTEMPTS = 3
+    }
+}
+
+private suspend fun recordOutcome(
+    dao: com.haoze.dnssr.data.dao.SubscriptionAutoUpdateDao,
+    batchId: String,
+    subscriptionId: Long,
+    outcome: SubscriptionUpdateOutcome
+): Boolean {
+    val item = when (outcome) {
+        is SubscriptionUpdateOutcome.Updated -> SubscriptionAutoUpdateItemEntity(
+            batchId,
+            subscriptionId,
+            SubscriptionAutoUpdateItemStatus.SUCCESS,
+            changed = true,
+            ruleCount = outcome.ruleCount
+        )
+        is SubscriptionUpdateOutcome.NotModified -> SubscriptionAutoUpdateItemEntity(
+            batchId,
+            subscriptionId,
+            SubscriptionAutoUpdateItemStatus.SUCCESS,
+            changed = false,
+            ruleCount = outcome.ruleCount
+        )
+        is SubscriptionUpdateOutcome.Failed -> SubscriptionAutoUpdateItemEntity(
+            batchId,
+            subscriptionId,
+            if (outcome.retryable) {
+                SubscriptionAutoUpdateItemStatus.PENDING_RETRY
+            } else {
+                SubscriptionAutoUpdateItemStatus.FAILED
+            }
+        )
+    }
+    dao.upsert(item)
+    return outcome is SubscriptionUpdateOutcome.Updated
+}
+
+private suspend fun finishBatch(
+    context: Context,
+    dao: com.haoze.dnssr.data.dao.SubscriptionAutoUpdateDao,
+    batchId: String
+) {
+    val items = dao.byBatch(batchId)
+    if (items.isNotEmpty()) SubscriptionAutoUpdateNotifier.showSummary(context, items)
+    dao.deleteBatch(batchId)
 }
 
 private object SubscriptionAutoUpdateNotifier {
     private const val CHANNEL_ID = "subscription_auto_update"
     private const val NOTIFICATION_ID = 4102
 
-    fun showSuccess(context: Context, subscriptionCount: Int, ruleCount: Int) {
+    fun showSummary(context: Context, items: List<SubscriptionAutoUpdateItemEntity>) {
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -136,10 +271,23 @@ private object SubscriptionAutoUpdateNotifier {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val successCount = items.count { it.status == SubscriptionAutoUpdateItemStatus.SUCCESS }
+        val failedCount = items.count { it.status == SubscriptionAutoUpdateItemStatus.FAILED }
+        val updatedCount = items.count { it.status == SubscriptionAutoUpdateItemStatus.SUCCESS && it.changed }
+        val unchangedCount = successCount - updatedCount
+        val importedRuleCount = items.filter { it.changed }.sumOf { it.ruleCount }
+        val title = when {
+            successCount == 0 -> "规则订阅自动更新失败"
+            failedCount > 0 -> "规则订阅自动更新完成"
+            else -> "规则订阅已自动更新"
+        }
+        val summary = "成功 $successCount 个，失败 $failedCount 个；更新 $updatedCount 个，无需更新 $unchangedCount 个"
+        val detail = "$summary，共导入 $importedRuleCount 条规则"
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_dnssr)
-            .setContentTitle("规则订阅已自动更新")
-            .setContentText("已更新 $subscriptionCount 个订阅，共导入 $ruleCount 条规则")
+            .setContentTitle(title)
+            .setContentText(summary)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

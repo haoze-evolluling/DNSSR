@@ -9,6 +9,8 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.SubscriptionManager
+import com.haoze.dnssr.vpn.SubscriptionUpdateCoordinator
+import com.haoze.dnssr.vpn.SubscriptionUpdateOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,23 +52,16 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     private val _operationMessage = MutableStateFlow<String?>(null)
     val operationMessage: StateFlow<String?> = _operationMessage.asStateFlow()
 
-    private var activated = false
-
     init {
         viewModelScope.launch {
-            subscriptionManager.importingSubscriptionId.collectLatest { subscriptionId ->
-                if (subscriptionId != null) {
-                    loadSubscriptionsIntoState()
-                }
+            AppDatabase.getInstance(application).subscriptionDao().observeAll().collectLatest { list ->
+                _subscriptions.value = list
             }
         }
     }
 
     fun activate() {
-        if (!activated) {
-            activated = true
-            loadSubscriptions()
-        }
+        loadSubscriptions()
     }
 
     fun loadSubscriptions() {
@@ -158,20 +153,22 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch(Dispatchers.IO) {
             _updatingSubscriptionId.value = id
             try {
-                val result = subscriptionManager.updateSubscription(id)
-                if (result.isSuccess) {
+                val outcome = SubscriptionUpdateCoordinator.runManual {
+                    subscriptionManager.updateSubscription(id)
+                }
+                if (outcome is SubscriptionUpdateOutcome.Updated) {
                     RuntimeDnsSettingsRefresher.refreshIfRunning(
                         getApplication<Application>(),
                         "subscription_updated"
                     )
                 }
                 withContext(Dispatchers.Main) {
-                    if (result.isSuccess) {
-                        _message.value = subscriptionManager.latestImportSummary()
+                    _message.value = when (outcome) {
+                        is SubscriptionUpdateOutcome.Updated -> subscriptionManager.latestImportSummary()
                             ?.displayMessage("更新成功")
-                            ?: "更新成功，共导入 ${result.getOrNull() ?: 0} 条规则"
-                    } else {
-                        _message.value = "更新失败：${result.exceptionOrNull()?.message}"
+                            ?: "更新成功，共导入 ${outcome.ruleCount} 条规则"
+                        is SubscriptionUpdateOutcome.NotModified -> "订阅已是最新"
+                        is SubscriptionUpdateOutcome.Failed -> "更新失败：${outcome.error}"
                     }
                 }
                 loadSubscriptions()
@@ -186,20 +183,24 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 var updated = 0
+                var unchanged = 0
                 var failed = 0
                 var totalRules = 0
-                subscriptionManager.remoteSubscriptions().forEach { subscription ->
-                    _updatingSubscriptionId.value = subscription.id
-                    try {
-                        subscriptionManager.updateSubscription(subscription.id).fold(
-                            onSuccess = { ruleCount ->
-                                updated++
-                                totalRules += ruleCount
-                            },
-                            onFailure = { failed++ }
-                        )
-                    } finally {
-                        _updatingSubscriptionId.value = null
+                SubscriptionUpdateCoordinator.runManual {
+                    subscriptionManager.remoteSubscriptions().forEach { subscription ->
+                        _updatingSubscriptionId.value = subscription.id
+                        try {
+                            when (val outcome = subscriptionManager.updateSubscription(subscription.id)) {
+                                is SubscriptionUpdateOutcome.Updated -> {
+                                    updated++
+                                    totalRules += outcome.ruleCount
+                                }
+                                is SubscriptionUpdateOutcome.NotModified -> unchanged++
+                                is SubscriptionUpdateOutcome.Failed -> failed++
+                            }
+                        } finally {
+                            _updatingSubscriptionId.value = null
+                        }
                     }
                 }
                 if (updated > 0) {
@@ -211,9 +212,9 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
                 loadSubscriptionsIntoState()
                 withContext(Dispatchers.Main) {
                     _message.value = when {
-                        failed == 0 -> "已更新 $updated 个订阅，共导入 $totalRules 条规则"
-                        updated == 0 -> "更新所有订阅失败"
-                        else -> "已更新 $updated 个订阅，$failed 个更新失败"
+                        failed == 0 -> "检查完成：更新 $updated 个，已是最新 $unchanged 个，共导入 $totalRules 条规则"
+                        updated + unchanged == 0 -> "更新所有订阅失败"
+                        else -> "检查完成：更新 $updated 个，已是最新 $unchanged 个，失败 $failed 个"
                     }
                 }
             } finally {

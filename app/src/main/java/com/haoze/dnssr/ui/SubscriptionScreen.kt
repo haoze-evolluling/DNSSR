@@ -409,6 +409,18 @@ private fun SubscriptionItem(
                 )
             }
         }
+        if (subscription.sourceType == SubscriptionSourceType.REMOTE && subscription.lastAttemptAt > 0) {
+            val attemptDate = remember(subscription.lastAttemptAt) {
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                    .format(Date(subscription.lastAttemptAt))
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "上次尝试于 $attemptDate",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         if (isUpdating) {
             val (current, total) = importProgress
             Spacer(modifier = Modifier.height(8.dp))
@@ -430,7 +442,12 @@ private fun SubscriptionItem(
         if (subscription.importState == SubscriptionImportState.FAILED) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "导入失败：${subscription.importError ?: "未知错误"}",
+                text = if (subscription.sourceType == SubscriptionSourceType.REMOTE) {
+                    "更新失败（连续 ${subscription.consecutiveFailureCount} 次）：" +
+                        (subscription.importError ?: "未知错误")
+                } else {
+                    "导入失败：${subscription.importError ?: "未知错误"}"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )

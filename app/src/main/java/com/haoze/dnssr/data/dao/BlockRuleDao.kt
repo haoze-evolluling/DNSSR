@@ -36,10 +36,21 @@ interface BlockRuleDao {
     ): Int = entities.count { insertForSource(it, source, sourceEnabled) }
 
     @Transaction
-    suspend fun replaceBySource(source: String, entities: List<BlockRuleEntity>, sourceEnabled: Boolean) {
+    suspend fun replaceBySource(
+        source: String,
+        entities: List<BlockRuleEntity>,
+        sourceEnabled: Boolean,
+        chunkSize: Int = 500,
+        onProgress: ((Int) -> Unit)? = null
+    ) {
         deleteSource(source)
         deleteOrphans()
-        insertAllForSource(entities, source, sourceEnabled)
+        var imported = 0
+        entities.chunked(chunkSize).forEach { chunk ->
+            insertAllForSource(chunk, source, sourceEnabled)
+            imported += chunk.size
+            onProgress?.invoke(imported)
+        }
     }
 
     @Query("SELECT * FROM block_rule ORDER BY addedAt DESC")

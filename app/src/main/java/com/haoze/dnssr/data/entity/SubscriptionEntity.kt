@@ -22,7 +22,12 @@ data class SubscriptionEntity(
     val lastUpdated: Long = 0,
     val addedAt: Long = System.currentTimeMillis(),
     val importState: String = SubscriptionImportState.READY,
-    val importError: String? = null
+    val importError: String? = null,
+    val httpEtag: String? = null,
+    val httpLastModified: String? = null,
+    val ruleSetHash: String? = null,
+    val lastAttemptAt: Long = 0,
+    val consecutiveFailureCount: Int = 0
 )
 
 object SubscriptionSourceType {
