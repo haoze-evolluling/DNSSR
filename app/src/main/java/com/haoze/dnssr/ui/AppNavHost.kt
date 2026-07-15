@@ -80,6 +80,7 @@ object Routes {
     const val ABOUT = "about"
     const val SPONSOR = "sponsor"
     const val SPONSOR_LIST = "sponsor_list"
+    const val CO_BUILDER_LIST = "co_builder_list"
 }
 
 private fun isWebPageRoute(route: String?): Boolean {
@@ -188,7 +189,8 @@ fun AppNavHost(
                 onNavigateToExperimentalFeatures = { title -> navController.navigateToTitledRoute(Routes.EXPERIMENTAL_FEATURES, title) },
                 onNavigateToAbout = { title -> navController.navigateToTitledRoute(Routes.ABOUT, title) },
                 onNavigateToSponsor = { title -> navController.navigateToTitledRoute(Routes.SPONSOR, title) },
-                onNavigateToSponsorList = { title -> navController.navigateToTitledRoute(Routes.SPONSOR_LIST, title) }
+                onNavigateToSponsorList = { title -> navController.navigateToTitledRoute(Routes.SPONSOR_LIST, title) },
+                onNavigateToCoBuilderList = { title -> navController.navigateToTitledRoute(Routes.CO_BUILDER_LIST, title) }
             )
         }
         composable(Routes.LOG_DASHBOARD) {
@@ -372,6 +374,12 @@ fun AppNavHost(
             SponsorListScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助者名单"
+            )
+        }
+        composable(titledRoute(Routes.CO_BUILDER_LIST), arguments = listOf(screenTitleArgument("共建者名单"))) { entry ->
+            CoBuilderListScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "共建者名单"
             )
         }
     }

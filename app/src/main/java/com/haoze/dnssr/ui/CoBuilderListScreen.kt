@@ -12,23 +12,33 @@ import com.haoze.dnssr.R
 import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsScaffold
 
-private val SPONSORS = listOf(
+private val CO_BUILDERS = listOf(
     RecognitionMember(
         name = "alone",
         avatarRes = R.drawable.alone_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
         name = "酷安@睿上源",
         avatarRes = R.drawable.ruishangyuan_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "酷安@widiOA",
+        avatarRes = R.drawable.widioa_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "酷安@妄炁",
+        avatarRes = R.drawable.wangqi_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     )
 )
 
 @Composable
-fun SponsorListScreen(
+fun CoBuilderListScreen(
     onBack: () -> Unit,
-    title: String = "赞助者名单"
+    title: String = "共建者名单"
 ) {
     SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
         Column(
@@ -38,12 +48,12 @@ fun SponsorListScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             SettingsInfoText(
-                text = "感谢每一位支持 DNSSR 项目的朋友！名单仅按赞助时间顺序排列，与赞助金额无关；每一份支持都同样珍贵。",
+                text = "感谢每一位为 DNSSR 提出建议、帮助测试的共建者！",
                 modifier = Modifier.padding(top = 8.dp)
             )
             RecognitionList(
-                members = SPONSORS,
-                emptyText = "暂时还没有赞助者，期待在这里写下你的名字。"
+                members = CO_BUILDERS,
+                emptyText = "暂时还没有共建者，期待在这里写下你的名字。"
             )
         }
     }
