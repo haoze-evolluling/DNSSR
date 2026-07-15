@@ -38,6 +38,7 @@ fun ExperimentalFeaturesScreen(
     var serviceLightEffectEnabled by remember {
         mutableStateOf(AppSettings.isServiceLightEffectEnabled(context))
     }
+    val customBackgroundEnabled = AppSettings.isCustomBackgroundEnabled(context)
 
     fun saveLegacyIconEnabled(enabled: Boolean) {
         legacyIconEnabled = enabled
@@ -76,13 +77,15 @@ fun ExperimentalFeaturesScreen(
             SettingsGroup {
                 SettingsSwitchItem(
                     title = "服务动态光影",
-                    subtitle = if (serviceLightEffectSupported) {
+                    subtitle = if (customBackgroundEnabled) {
+                        "软件背景已启用，服务动态光影不可同时使用"
+                    } else if (serviceLightEffectSupported) {
                         "启动和关闭服务时，光影从电源按钮向整个页面展开或收回\n光影效果代码来源于开源项目:\nhttps://github.com/badnng/Hyper-pick-up-code/"
                     } else {
                         "需要 Android 13 或更高版本"
                     },
                     checked = serviceLightEffectEnabled,
-                    enabled = serviceLightEffectSupported,
+                    enabled = serviceLightEffectSupported && !customBackgroundEnabled,
                     onCheckedChange = ::saveServiceLightEffectEnabled
                 )
                 SettingsSwitchItem(

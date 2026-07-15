@@ -172,11 +172,25 @@ private fun MainContent(
     val resolutionMode by viewModel.resolutionMode.collectAsStateWithLifecycle()
     val raceProviderIds by viewModel.raceProviderIds.collectAsStateWithLifecycle()
     val homeProviderVisibility by viewModel.homeProviderVisibility.collectAsStateWithLifecycle()
+    var powerButtonOpacity by remember { mutableStateOf(AppSettings.getHomePowerButtonOpacity(context)) }
+    var providerSelectorOpacity by remember { mutableStateOf(AppSettings.getHomeProviderSelectorOpacity(context)) }
+    var modeButtonOpacity by remember { mutableStateOf(AppSettings.getHomeModeButtonOpacity(context)) }
+    var poemOpacity by remember { mutableStateOf(AppSettings.getHomePoemOpacity(context)) }
+    var dnsDetailOpacity by remember { mutableStateOf(AppSettings.getHomeDnsDetailOpacity(context)) }
+    var runningSentence by remember { mutableStateOf(AppSettings.getHomeSentenceRunning(context)) }
+    var stoppedSentence by remember { mutableStateOf(AppSettings.getHomeSentenceStopped(context)) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.loadProviders()
+                powerButtonOpacity = AppSettings.getHomePowerButtonOpacity(context)
+                providerSelectorOpacity = AppSettings.getHomeProviderSelectorOpacity(context)
+                modeButtonOpacity = AppSettings.getHomeModeButtonOpacity(context)
+                poemOpacity = AppSettings.getHomePoemOpacity(context)
+                dnsDetailOpacity = AppSettings.getHomeDnsDetailOpacity(context)
+                runningSentence = AppSettings.getHomeSentenceRunning(context)
+                stoppedSentence = AppSettings.getHomeSentenceStopped(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -195,27 +209,31 @@ private fun MainContent(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        PowerToggleButton(
-            isRunning = uiState.isRunning,
-            isBusy = uiState.isBusy,
-            enabled = !uiState.isBusy && selectedProvider != null &&
-                (resolutionMode == DnsResolutionMode.SINGLE || raceProviderIds.size >= 2),
-            onCenterChanged = onPowerButtonCenterChanged,
-            onToggle = onToggle
-        )
+        Box(modifier = Modifier.alpha(powerButtonOpacity)) {
+            PowerToggleButton(
+                isRunning = uiState.isRunning,
+                isBusy = uiState.isBusy,
+                enabled = !uiState.isBusy && selectedProvider != null &&
+                    (resolutionMode == DnsResolutionMode.SINGLE || raceProviderIds.size >= 2),
+                onCenterChanged = onPowerButtonCenterChanged,
+                onToggle = onToggle
+            )
+        }
 
-        Text(
-            text = if (uiState.isRunning) {
-                "云途一线通鹏翼，万里长风任远驰"
-            } else {
-                "尘途断路羁鹏翼，空待长风不得驰"
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp, bottom = 24.dp)
-        )
+        val homeSentence = if (uiState.isRunning) runningSentence else stoppedSentence
+        if (homeSentence.isNotEmpty()) {
+            Text(
+                text = homeSentence,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, bottom = 24.dp)
+                    .alpha(poemOpacity)
+            )
+        } else {
+            Spacer(modifier = Modifier.padding(vertical = 12.dp))
+        }
 
         val filteredProviders = providers.filter(homeProviderVisibility::isVisible)
         val displayProviders = buildList {
@@ -239,6 +257,7 @@ private fun MainContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
+                    .alpha(providerSelectorOpacity)
             ) {
                 Crossfade(
                     targetState = resolutionMode != DnsResolutionMode.SINGLE,
@@ -313,7 +332,7 @@ private fun MainContent(
             }
 
             if (resolutionMode != DnsResolutionMode.SINGLE) {
-                ProviderEndpointList(providers = raceProviders)
+                ProviderEndpointList(providers = raceProviders, modifier = Modifier.alpha(dnsDetailOpacity))
             } else {
                 selectedProvider?.let { provider ->
                     Text(
@@ -324,6 +343,7 @@ private fun MainContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp)
+                            .alpha(dnsDetailOpacity)
                     )
                 }
             }
@@ -355,7 +375,9 @@ private fun MainContent(
             ),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             enabled = !uiState.isBusy,
-            modifier = Modifier.padding(top = 24.dp)
+            modifier = Modifier
+                .padding(top = 24.dp)
+                .alpha(modeButtonOpacity)
         ) {
             Text(text = "模式切换 · ${resolutionMode.displayName}")
         }
@@ -485,9 +507,9 @@ private fun PowerToggleButton(
 }
 
 @Composable
-private fun ProviderEndpointList(providers: List<DnsProvider>) {
+private fun ProviderEndpointList(providers: List<DnsProvider>, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

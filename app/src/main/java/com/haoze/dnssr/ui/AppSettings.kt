@@ -120,6 +120,16 @@ object AppSettings {
     private const val KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS = "acknowledged_doh3_provider_ids"
     private const val KEY_APP_THEME_MODE = "app_theme_mode"
     private const val KEY_THEME_COLOR_STYLE = "theme_color_style"
+    private const val KEY_HOME_COMPONENT_OPACITY = "home_component_opacity"
+    private const val KEY_HOME_POWER_BUTTON_OPACITY = "home_power_button_opacity"
+    private const val KEY_HOME_PROVIDER_SELECTOR_OPACITY = "home_provider_selector_opacity"
+    private const val KEY_HOME_MODE_BUTTON_OPACITY = "home_mode_button_opacity"
+    private const val KEY_HOME_POEM_OPACITY = "home_poem_opacity"
+    private const val KEY_HOME_DNS_DETAIL_OPACITY = "home_dns_detail_opacity"
+    private const val KEY_HOME_SENTENCE_RUNNING = "home_sentence_running"
+    private const val KEY_HOME_SENTENCE_STOPPED = "home_sentence_stopped"
+    private const val KEY_CUSTOM_BACKGROUND_ENABLED = "custom_background_enabled"
+    private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -150,6 +160,7 @@ object AppSettings {
     private const val DEFAULT_LEGACY_ICON_ENABLED = false
     private const val DEFAULT_LEGACY_LOG_PAGE_ENABLED = false
     private const val DEFAULT_SERVICE_LIGHT_EFFECT_ENABLED = true
+    const val DEFAULT_HOME_COMPONENT_OPACITY = 1f
     private val DEFAULT_BOOTSTRAP_PRESET_IDS = setOf(
         "preset_volcengine",
         "preset_dnspod",
@@ -179,6 +190,72 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_THEME_COLOR_STYLE, style.storageValue)
+            .apply()
+    }
+
+    fun getHomeComponentOpacity(context: Context): Float {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(KEY_HOME_COMPONENT_OPACITY, DEFAULT_HOME_COMPONENT_OPACITY)
+            .coerceIn(0.1f, 1f)
+    }
+
+    fun setHomeComponentOpacity(context: Context, opacity: Float) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(KEY_HOME_COMPONENT_OPACITY, opacity.coerceIn(0.1f, 1f))
+            .apply()
+    }
+
+    private fun getHomeOpacity(context: Context, key: String): Float {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getFloat(key, prefs.getFloat(KEY_HOME_COMPONENT_OPACITY, DEFAULT_HOME_COMPONENT_OPACITY))
+            .coerceIn(0.1f, 1f)
+    }
+
+    private fun setHomeOpacity(context: Context, key: String, opacity: Float) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(key, opacity.coerceIn(0.1f, 1f))
+            .apply()
+    }
+
+    fun getHomePowerButtonOpacity(context: Context) = getHomeOpacity(context, KEY_HOME_POWER_BUTTON_OPACITY)
+    fun setHomePowerButtonOpacity(context: Context, opacity: Float) =
+        setHomeOpacity(context, KEY_HOME_POWER_BUTTON_OPACITY, opacity)
+
+    fun getHomeProviderSelectorOpacity(context: Context) = getHomeOpacity(context, KEY_HOME_PROVIDER_SELECTOR_OPACITY)
+    fun setHomeProviderSelectorOpacity(context: Context, opacity: Float) =
+        setHomeOpacity(context, KEY_HOME_PROVIDER_SELECTOR_OPACITY, opacity)
+
+    fun getHomeModeButtonOpacity(context: Context) = getHomeOpacity(context, KEY_HOME_MODE_BUTTON_OPACITY)
+    fun setHomeModeButtonOpacity(context: Context, opacity: Float) =
+        setHomeOpacity(context, KEY_HOME_MODE_BUTTON_OPACITY, opacity)
+
+    fun getHomePoemOpacity(context: Context) = getHomeOpacity(context, KEY_HOME_POEM_OPACITY)
+    fun setHomePoemOpacity(context: Context, opacity: Float) =
+        setHomeOpacity(context, KEY_HOME_POEM_OPACITY, opacity)
+
+    fun getHomeDnsDetailOpacity(context: Context) = getHomeOpacity(context, KEY_HOME_DNS_DETAIL_OPACITY)
+    fun setHomeDnsDetailOpacity(context: Context, opacity: Float) =
+        setHomeOpacity(context, KEY_HOME_DNS_DETAIL_OPACITY, opacity)
+
+    fun getHomeSentenceRunning(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HOME_SENTENCE_RUNNING, "云途一线通鹏翼，万里长风任远驰")
+            .orEmpty()
+    }
+
+    fun getHomeSentenceStopped(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HOME_SENTENCE_STOPPED, "尘途断路羁鹏翼，空待长风不得驰")
+            .orEmpty()
+    }
+
+    fun setHomeSentences(context: Context, running: String, stopped: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_HOME_SENTENCE_RUNNING, running)
+            .putString(KEY_HOME_SENTENCE_STOPPED, stopped)
             .apply()
     }
 
@@ -596,11 +673,34 @@ object AppSettings {
     }
 
     fun setServiceLightEffectEnabled(context: Context, enabled: Boolean) {
-        val supportedEnabled = enabled &&
+        val supportedEnabled = enabled && !isCustomBackgroundEnabled(context) &&
             android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_SERVICE_LIGHT_EFFECT_ENABLED, supportedEnabled)
+            .apply()
+    }
+
+    fun isCustomBackgroundEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_CUSTOM_BACKGROUND_ENABLED, false) &&
+            !prefs.getString(KEY_CUSTOM_BACKGROUND_URI, null).isNullOrEmpty()
+    }
+
+    fun getCustomBackgroundUri(context: Context): String? {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CUSTOM_BACKGROUND_URI, null)
+    }
+
+    fun setCustomBackground(context: Context, enabled: Boolean, uri: String?) {
+        val actualEnabled = enabled && !uri.isNullOrEmpty()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_CUSTOM_BACKGROUND_ENABLED, actualEnabled)
+            .putString(KEY_CUSTOM_BACKGROUND_URI, uri)
+            .apply {
+                if (actualEnabled) putBoolean(KEY_SERVICE_LIGHT_EFFECT_ENABLED, false)
+            }
             .apply()
     }
 

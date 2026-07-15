@@ -7,20 +7,29 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.haoze.dnssr.data.AppDatabase
@@ -79,17 +88,49 @@ class MainActivity : ComponentActivity() {
         setContent {
             var themeMode by remember { mutableStateOf(AppSettings.getAppThemeMode(this)) }
             var colorStyle by remember { mutableStateOf(AppSettings.getThemeColorStyle(this)) }
+            var backgroundEnabled by remember { mutableStateOf(AppSettings.isCustomBackgroundEnabled(this)) }
+            var backgroundUri by remember { mutableStateOf(AppSettings.getCustomBackgroundUri(this)) }
+            var backgroundBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+            LaunchedEffect(backgroundEnabled, backgroundUri) {
+                backgroundBitmap = if (backgroundEnabled && backgroundUri != null) {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            contentResolver.openInputStream(Uri.parse(backgroundUri)).use { stream ->
+                                BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                            }
+                        }.getOrNull()
+                    }
+                } else null
+            }
             val darkTheme = when (themeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
                 AppThemeMode.LIGHT -> false
                 AppThemeMode.DARK -> true
             }
-            DNSSRTheme(darkTheme = darkTheme, colorStyle = colorStyle) {
+            DNSSRTheme(
+                darkTheme = darkTheme,
+                colorStyle = colorStyle,
+                transparentBackground = backgroundBitmap != null
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = if (backgroundBitmap != null) Color.Transparent else MaterialTheme.colorScheme.background
                 ) {
-                    AppNavHost(
+                    Box(Modifier.fillMaxSize()) {
+                        backgroundBitmap?.let { bitmap ->
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = if (darkTheme) 0.34f else 0.16f))
+                            )
+                        }
+                        AppNavHost(
                         mainScreen = { onSettings, onLogs, onProviderManagement, onHomeProviderVisibility, onRaceModeSettings ->
                             com.haoze.dnssr.ui.MainScreen(
                                 onToggle = { isRunning -> onToggleVpn(isRunning) },
@@ -104,8 +145,13 @@ class MainActivity : ComponentActivity() {
                         onHideFromRecentsChanged = { applyRecentsPrivacy(it) },
                         onThemeModeChanged = { themeMode = it },
                         onThemeColorStyleChanged = { colorStyle = it },
+                        onCustomBackgroundChanged = {
+                            backgroundEnabled = AppSettings.isCustomBackgroundEnabled(this@MainActivity)
+                            backgroundUri = AppSettings.getCustomBackgroundUri(this@MainActivity)
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
+                    }
                 }
             }
         }

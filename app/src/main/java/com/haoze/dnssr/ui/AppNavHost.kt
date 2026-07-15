@@ -77,6 +77,9 @@ object Routes {
     const val APPEARANCE_SETTINGS = "appearance_settings"
     const val DAY_NIGHT_MODE = "day_night_mode"
     const val THEME_COLOR_SETTINGS = "theme_color_settings"
+    const val HOME_COMPONENT_OPACITY = "home_component_opacity"
+    const val HOME_SENTENCE_SETTINGS = "home_sentence_settings"
+    const val CUSTOM_BACKGROUND_SETTINGS = "custom_background_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
@@ -99,6 +102,7 @@ fun AppNavHost(
     onHideFromRecentsChanged: (Boolean) -> Unit = {},
     onThemeModeChanged: (AppThemeMode) -> Unit = {},
     onThemeColorStyleChanged: (ThemeColorStyle) -> Unit = {},
+    onCustomBackgroundChanged: () -> Unit = {},
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier
 ) {
@@ -367,6 +371,15 @@ fun AppNavHost(
                 },
                 onNavigateToThemeColorSettings = { title ->
                     navController.navigateToTitledRoute(Routes.THEME_COLOR_SETTINGS, title)
+                },
+                onNavigateToHomeComponentOpacity = { title ->
+                    navController.navigateToTitledRoute(Routes.HOME_COMPONENT_OPACITY, title)
+                },
+                onNavigateToHomeSentence = { title ->
+                    navController.navigateToTitledRoute(Routes.HOME_SENTENCE_SETTINGS, title)
+                },
+                onNavigateToCustomBackground = { title ->
+                    navController.navigateToTitledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS, title)
                 }
             )
         }
@@ -382,6 +395,25 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "主题色配置",
                 onThemeColorStyleChanged = onThemeColorStyleChanged
+            )
+        }
+        composable(titledRoute(Routes.HOME_COMPONENT_OPACITY), arguments = listOf(screenTitleArgument("首页透明度"))) { entry ->
+            HomeComponentOpacityScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "首页透明度"
+            )
+        }
+        composable(titledRoute(Routes.HOME_SENTENCE_SETTINGS), arguments = listOf(screenTitleArgument("首页句子"))) { entry ->
+            HomeSentenceSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "首页句子"
+            )
+        }
+        composable(titledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS), arguments = listOf(screenTitleArgument("软件背景"))) { entry ->
+            CustomBackgroundSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "软件背景",
+                onBackgroundChanged = onCustomBackgroundChanged
             )
         }
         composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->

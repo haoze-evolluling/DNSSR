@@ -67,6 +67,7 @@ private val LightColorScheme = lightColorScheme(
 fun DNSSRTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     colorStyle: ThemeColorStyle = ThemeColorStyle.SYSTEM,
+    transparentBackground: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -96,7 +97,7 @@ fun DNSSRTheme(
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (transparentBackground) colorScheme.copy(background = Color.Transparent) else colorScheme,
         typography = Typography,
         content = content
     )
