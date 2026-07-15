@@ -44,18 +44,19 @@ class BlockListManager(private val dao: BlockRuleDao) {
      */
     suspend fun addRule(pattern: String): Boolean {
         val parsed = AdGuardRuleParser.parseLine(pattern) ?: return false
-        val inserted = dao.insert(
+        val inserted = dao.insertForSource(
             BlockRuleEntity(
                 pattern = parsed.pattern,
                 rawLine = parsed.rawLine,
                 addedAt = System.currentTimeMillis(),
                 enabled = true,
-                source = "useradd",
                 groupName = null
-            )
+            ),
+            source = "useradd",
+            sourceEnabled = true
         )
-        if (inserted == -1L) return false
-        cache.addPattern(parsed.pattern, "useradd")
+        if (!inserted) return false
+        cache.reload(dao)
         return true
     }
 
@@ -82,12 +83,11 @@ class BlockListManager(private val dao: BlockRuleDao) {
                     pattern = rule.pattern,
                     rawLine = rule.rawLine,
                     addedAt = now,
-                    enabled = enabled,
-                    source = source,
+                    enabled = true,
                     groupName = null
                 )
             }
-            inserted += dao.insertAll(entities).count { it != -1L }
+            inserted += dao.insertAllForSource(entities, source, enabled)
             imported += chunk.size
             onProgress?.invoke(imported)
         }
@@ -103,8 +103,8 @@ class BlockListManager(private val dao: BlockRuleDao) {
     ) {
         val now = System.currentTimeMillis()
         dao.replaceBySource(source, rules.map { rule ->
-            BlockRuleEntity(pattern = rule.pattern, rawLine = rule.rawLine, addedAt = now, enabled = enabled, source = source)
-        })
+            BlockRuleEntity(pattern = rule.pattern, rawLine = rule.rawLine, addedAt = now)
+        }, enabled)
         cache.reload(dao)
     }
 

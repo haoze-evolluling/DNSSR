@@ -14,7 +14,9 @@ import com.haoze.dnssr.data.dao.DnsLogDao
 import com.haoze.dnssr.data.dao.RaceLogDao
 import com.haoze.dnssr.data.dao.SubscriptionDao
 import com.haoze.dnssr.data.entity.AllowRuleEntity
+import com.haoze.dnssr.data.entity.AllowRuleSourceEntity
 import com.haoze.dnssr.data.entity.BlockRuleEntity
+import com.haoze.dnssr.data.entity.BlockRuleSourceEntity
 import com.haoze.dnssr.data.entity.BootstrapLogEntity
 import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.data.entity.DnsLogEntity
@@ -28,10 +30,12 @@ import com.haoze.dnssr.data.entity.SubscriptionEntity
         RaceLogEntity::class,
         BootstrapLogEntity::class,
         BlockRuleEntity::class,
+        BlockRuleSourceEntity::class,
         AllowRuleEntity::class,
+        AllowRuleSourceEntity::class,
         SubscriptionEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,7 +63,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12,
                         MIGRATION_12_13,
                         MIGRATION_13_14,
-                        MIGRATION_14_15
+                        MIGRATION_14_15,
+                        MIGRATION_15_16
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -154,6 +159,54 @@ abstract class AppDatabase : RoomDatabase() {
                     "ALTER TABLE `subscription` ADD COLUMN `importState` TEXT NOT NULL DEFAULT 'ready'"
                 )
                 db.execSQL("ALTER TABLE `subscription` ADD COLUMN `importError` TEXT")
+            }
+        }
+
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                migrateRuleTable(db, "block_rule")
+                migrateRuleTable(db, "allow_rule")
+            }
+
+            private fun migrateRuleTable(db: SupportSQLiteDatabase, table: String) {
+                val newTable = "${table}_new"
+                val sourceData = "${table}_source_data"
+                val sourceTable = "${table}_source"
+
+                db.execSQL(
+                    "CREATE TABLE `$newTable` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`pattern` TEXT NOT NULL, `rawLine` TEXT NOT NULL, " +
+                        "`addedAt` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, `groupName` TEXT)"
+                )
+                db.execSQL(
+                    "INSERT INTO `$newTable` (`id`, `pattern`, `rawLine`, `addedAt`, `enabled`, `groupName`) " +
+                        "SELECT r.id, r.pattern, r.rawLine, r.addedAt, " +
+                        "(SELECT MAX(e.enabled) FROM `$table` e WHERE e.pattern = r.pattern), r.groupName " +
+                        "FROM `$table` r WHERE r.id = " +
+                        "(SELECT MIN(k.id) FROM `$table` k WHERE k.pattern = r.pattern)"
+                )
+                db.execSQL(
+                    "CREATE TEMP TABLE `$sourceData` AS " +
+                        "SELECT n.id AS ruleId, o.source AS source, MAX(o.enabled) AS enabled " +
+                        "FROM `$table` o JOIN `$newTable` n ON n.pattern = o.pattern " +
+                        "GROUP BY n.id, o.source"
+                )
+                db.execSQL("DROP TABLE `$table`")
+                db.execSQL("ALTER TABLE `$newTable` RENAME TO `$table`")
+                db.execSQL("CREATE UNIQUE INDEX `index_${table}_pattern` ON `$table` (`pattern`)")
+                db.execSQL(
+                    "CREATE TABLE `$sourceTable` (" +
+                        "`ruleId` INTEGER NOT NULL, `source` TEXT NOT NULL, `enabled` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`ruleId`, `source`), " +
+                        "FOREIGN KEY(`ruleId`) REFERENCES `$table`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL(
+                    "INSERT INTO `$sourceTable` (`ruleId`, `source`, `enabled`) " +
+                        "SELECT ruleId, source, enabled FROM `$sourceData`"
+                )
+                db.execSQL("CREATE INDEX `index_${sourceTable}_source` ON `$sourceTable` (`source`)")
+                db.execSQL("DROP TABLE `$sourceData`")
             }
         }
     }

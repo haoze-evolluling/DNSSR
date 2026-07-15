@@ -24,18 +24,19 @@ class AllowListManager(private val dao: AllowRuleDao) {
 
     suspend fun addRule(pattern: String): Boolean {
         val parsed = AdGuardRuleParser.parseAllowLine(pattern) ?: return false
-        val inserted = dao.insert(
+        val inserted = dao.insertForSource(
             AllowRuleEntity(
                 pattern = parsed.pattern,
                 rawLine = parsed.rawLine,
                 addedAt = System.currentTimeMillis(),
                 enabled = true,
-                source = "useradd",
                 groupName = null
-            )
+            ),
+            source = "useradd",
+            sourceEnabled = true
         )
-        if (inserted == -1L) return false
-        cache.addPattern(parsed.pattern)
+        if (!inserted) return false
+        cache.reload(dao)
         return true
     }
 
@@ -55,12 +56,11 @@ class AllowListManager(private val dao: AllowRuleDao) {
                     pattern = rule.pattern,
                     rawLine = rule.rawLine,
                     addedAt = now,
-                    enabled = enabled,
-                    source = source,
+                    enabled = true,
                     groupName = null
                 )
             }
-            inserted += dao.insertAll(entities).count { it != -1L }
+            inserted += dao.insertAllForSource(entities, source, enabled)
             imported += chunk.size
             onProgress?.invoke(imported)
         }
@@ -75,8 +75,8 @@ class AllowListManager(private val dao: AllowRuleDao) {
     ) {
         val now = System.currentTimeMillis()
         dao.replaceBySource(source, rules.map { rule ->
-            AllowRuleEntity(pattern = rule.pattern, rawLine = rule.rawLine, addedAt = now, enabled = enabled, source = source)
-        })
+            AllowRuleEntity(pattern = rule.pattern, rawLine = rule.rawLine, addedAt = now)
+        }, enabled)
         cache.reload(dao)
     }
 

@@ -1,5 +1,6 @@
 package com.haoze.dnssr.ui
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,7 +72,7 @@ fun DataCleanupScreen(
             SettingsGroupTitle("运行数据")
             SettingsGroup {
                 SettingsTextItem(
-                    title = "删除 DNS 请求日志",
+                    title = "删除 DNS 日志",
                     subtitle = "清除日志页中的历史请求记录",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.LOG }
@@ -88,14 +89,14 @@ fun DataCleanupScreen(
             SettingsGroupTitle("权重数据")
             SettingsGroup {
                 SettingsTextItem(
-                    title = "恢复竞速模式默认权重",
+                    title = "恢复 DNS 默认权重",
                     subtitle = "清除竞速模式的健康样本，让择优而行重新按默认权重分配流量",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.PROVIDER_WEIGHT }
                 )
                 SettingsDivider()
                 SettingsTextItem(
-                    title = "恢复 Bootstrap IP 默认权重",
+                    title = "恢复 Bootstrap 权重",
                     subtitle = "清除 Bootstrap DNS 解析健康样本，重新按默认权重选择",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.BOOTSTRAP_WEIGHT }
@@ -142,8 +143,7 @@ fun DataCleanupScreen(
                             BootstrapHealthStore.reset(context, bootstrapIpIds)
                         }
                         CleanupAction.RULE -> {
-                            BlockListManager(db.blockRuleDao()).clearAll()
-                            AllowListManager(db.allowRuleDao()).clearAll()
+                            clearAllDomainRules(context)
                         }
                     }
                     withContext(Dispatchers.Main) {
@@ -160,6 +160,12 @@ fun DataCleanupScreen(
     }
 }
 
+suspend fun clearAllDomainRules(context: Context) {
+    val database = AppDatabase.getInstance(context)
+    BlockListManager(database.blockRuleDao()).clearAll()
+    AllowListManager(database.allowRuleDao()).clearAll()
+}
+
 private enum class CleanupAction(
     val title: String,
     val message: String
@@ -172,7 +178,7 @@ private enum class CleanupAction(
 }
 
 @Composable
-private fun ConfirmDialog(
+fun ConfirmDialog(
     title: String,
     text: String,
     onConfirm: () -> Unit,

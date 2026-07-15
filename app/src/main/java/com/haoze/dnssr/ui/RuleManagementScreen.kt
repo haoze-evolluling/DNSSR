@@ -1,5 +1,6 @@
 package com.haoze.dnssr.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,6 +40,9 @@ import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import com.haoze.dnssr.vpn.BlockResponseMode
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun RuleManagementScreen(
@@ -51,6 +56,7 @@ fun RuleManagementScreen(
     viewModel: RuleManagementViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val ruleCount by viewModel.ruleCount.collectAsStateWithLifecycle()
     val allowRuleCount by viewModel.allowRuleCount.collectAsStateWithLifecycle()
@@ -61,6 +67,7 @@ fun RuleManagementScreen(
     var addAllowResult by remember { mutableStateOf<String?>(null) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
     var showAddAllowRuleDialog by remember { mutableStateOf(false) }
+    var showClearAllRulesDialog by remember { mutableStateOf(false) }
     var addRuleError by remember { mutableStateOf<String?>(null) }
     var addAllowRuleError by remember { mutableStateOf<String?>(null) }
     var blockResponseMode by remember { mutableStateOf(AppSettings.getBlockResponseMode(context)) }
@@ -242,7 +249,39 @@ fun RuleManagementScreen(
                     )
                 }
             }
+
+            item {
+                SettingsGroupTitle("规则修复")
+            }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "清理全部规则",
+                        subtitle = "如出现规则冲突、重复或导入异常，建议先删除全部规则，再重新导入",
+                        onClick = { showClearAllRulesDialog = true }
+                    )
+                }
+            }
         }
+    }
+
+    if (showClearAllRulesDialog) {
+        ConfirmDialog(
+            title = "删除全部规则",
+            text = "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。",
+            onConfirm = {
+                showClearAllRulesDialog = false
+                scope.launch(Dispatchers.IO) {
+                    clearAllDomainRules(context)
+                    withContext(Dispatchers.Main) {
+                        viewModel.loadRuleCount()
+                        onRuntimeDnsSettingsChanged()
+                        Toast.makeText(context, "已删除全部规则", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDismiss = { showClearAllRulesDialog = false }
+        )
     }
 
     if (showAddRuleDialog) {
