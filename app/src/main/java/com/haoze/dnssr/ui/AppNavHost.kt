@@ -60,6 +60,7 @@ object Routes {
     const val RULE_MANAGEMENT = "rule_management"
     const val RULE_LIST = "rule_list"
     const val ALLOW_RULE_LIST = "allow_rule_list"
+    const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
     const val PROVIDER_MANAGEMENT = "provider_management"
@@ -252,6 +253,15 @@ fun AppNavHost(
                 onNavigateToAutoUpdateInterval = {
                     navController.navigateWhenResumed(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL)
                 },
+                onNavigateToBlockResponseSettings = {
+                    navController.navigateWhenResumed(Routes.BLOCK_RESPONSE_SETTINGS)
+                },
+                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+            )
+        }
+        composable(Routes.BLOCK_RESPONSE_SETTINGS) {
+            BlockResponseSettingsScreen(
+                onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }

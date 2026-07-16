@@ -2,6 +2,7 @@ package com.haoze.dnssr.ui
 
 import android.content.Context
 import com.haoze.dnssr.vpn.BlockResponseMode
+import com.haoze.dnssr.vpn.DynamicBlockResponseConfig
 import com.haoze.dnssr.vpn.BootstrapIpDefaults
 import com.haoze.dnssr.vpn.BootstrapIpEntry
 import com.haoze.dnssr.vpn.BootstrapIpValidator
@@ -96,6 +97,10 @@ object AppSettings {
     private const val KEY_DNS_CACHE_STALE_FALLBACK_SECONDS = "dns_cache_stale_fallback_seconds_v2"
     private const val KEY_DNS_CACHE_PRESET = "dns_cache_preset_v3"
     private const val KEY_BLOCK_RESPONSE_MODE = "block_response_mode"
+    private const val KEY_DYNAMIC_BLOCK_RESPONSE_ENABLED = "dynamic_block_response_enabled"
+    private const val KEY_DYNAMIC_BLOCK_REQUEST_THRESHOLD = "dynamic_block_request_threshold"
+    private const val KEY_DYNAMIC_BLOCK_WINDOW_SECONDS = "dynamic_block_window_seconds"
+    private const val KEY_DYNAMIC_BLOCK_NXDOMAIN_DURATION_SECONDS = "dynamic_block_nxdomain_duration_seconds"
     const val KEY_LOG_RETENTION_DAYS = "log_retention_days"
     const val KEY_RACE_MODE_ENABLED = "race_mode_enabled"
     const val KEY_RACE_PROVIDER_IDS = "race_provider_ids"
@@ -625,6 +630,62 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_LEGACY_ICON_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getDynamicBlockResponseConfig(context: Context): DynamicBlockResponseConfig {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return DynamicBlockResponseConfig(
+            enabled = prefs.getBoolean(KEY_DYNAMIC_BLOCK_RESPONSE_ENABLED, false),
+            requestThreshold = prefs.getInt(
+                KEY_DYNAMIC_BLOCK_REQUEST_THRESHOLD,
+                DynamicBlockResponseConfig.DEFAULT_REQUEST_THRESHOLD
+            ).coerceIn(
+                DynamicBlockResponseConfig.MIN_REQUEST_THRESHOLD,
+                DynamicBlockResponseConfig.MAX_REQUEST_THRESHOLD
+            ),
+            windowSeconds = prefs.getInt(
+                KEY_DYNAMIC_BLOCK_WINDOW_SECONDS,
+                DynamicBlockResponseConfig.DEFAULT_WINDOW_SECONDS
+            ).coerceIn(
+                DynamicBlockResponseConfig.MIN_WINDOW_SECONDS,
+                DynamicBlockResponseConfig.MAX_WINDOW_SECONDS
+            ),
+            nxDomainDurationSeconds = prefs.getInt(
+                KEY_DYNAMIC_BLOCK_NXDOMAIN_DURATION_SECONDS,
+                DynamicBlockResponseConfig.DEFAULT_NXDOMAIN_DURATION_SECONDS
+            ).coerceIn(
+                DynamicBlockResponseConfig.MIN_NXDOMAIN_DURATION_SECONDS,
+                DynamicBlockResponseConfig.MAX_NXDOMAIN_DURATION_SECONDS
+            )
+        )
+    }
+
+    fun setDynamicBlockResponseConfig(context: Context, config: DynamicBlockResponseConfig) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_DYNAMIC_BLOCK_RESPONSE_ENABLED, config.enabled)
+            .putInt(
+                KEY_DYNAMIC_BLOCK_REQUEST_THRESHOLD,
+                config.requestThreshold.coerceIn(
+                    DynamicBlockResponseConfig.MIN_REQUEST_THRESHOLD,
+                    DynamicBlockResponseConfig.MAX_REQUEST_THRESHOLD
+                )
+            )
+            .putInt(
+                KEY_DYNAMIC_BLOCK_WINDOW_SECONDS,
+                config.windowSeconds.coerceIn(
+                    DynamicBlockResponseConfig.MIN_WINDOW_SECONDS,
+                    DynamicBlockResponseConfig.MAX_WINDOW_SECONDS
+                )
+            )
+            .putInt(
+                KEY_DYNAMIC_BLOCK_NXDOMAIN_DURATION_SECONDS,
+                config.nxDomainDurationSeconds.coerceIn(
+                    DynamicBlockResponseConfig.MIN_NXDOMAIN_DURATION_SECONDS,
+                    DynamicBlockResponseConfig.MAX_NXDOMAIN_DURATION_SECONDS
+                )
+            )
             .apply()
     }
 

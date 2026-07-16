@@ -96,6 +96,9 @@ class DnsVpnService : VpnService() {
     private var activeResolutionMode: DnsResolutionMode = DnsResolutionMode.SINGLE
     @Volatile
     private var activeBlockResponseMode: BlockResponseMode = BlockResponseMode.NXDOMAIN
+    @Volatile
+    private var activeDynamicBlockResponseConfig = DynamicBlockResponseConfig()
+    private val dynamicBlockResponseTracker = DynamicBlockResponseTracker()
 
     override fun onCreate() {
         super.onCreate()
@@ -107,6 +110,7 @@ class DnsVpnService : VpnService() {
         activeRaceModeStrategy = AppSettings.getRaceModeStrategy(this)
         activeResolutionMode = AppSettings.getDnsResolutionMode(this)
         activeBlockResponseMode = AppSettings.getBlockResponseMode(this)
+        activeDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this)
         dnsCache = DnsResponseCache(db.dnsCacheDao(), activeDnsCachePolicy, serviceScope)
         blockListManager = BlockListManager(db.blockRuleDao())
         allowListManager = AllowListManager(db.allowRuleDao())
@@ -225,6 +229,7 @@ class DnsVpnService : VpnService() {
                 val newRaceModeStrategy = AppSettings.getRaceModeStrategy(this@DnsVpnService)
                 val newResolutionMode = AppSettings.getDnsResolutionMode(this@DnsVpnService)
                 val newBlockResponseMode = AppSettings.getBlockResponseMode(this@DnsVpnService)
+                val newDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this@DnsVpnService)
                 val newResolvers = runCatching {
                     resolveDnsProviders(null).map { provider ->
                         ActiveDnsResolver(
@@ -240,6 +245,8 @@ class DnsVpnService : VpnService() {
                         activeRaceModeStrategy = newRaceModeStrategy
                         activeResolutionMode = newResolutionMode
                         activeBlockResponseMode = newBlockResponseMode
+                        activeDynamicBlockResponseConfig = newDynamicBlockResponseConfig
+                        dynamicBlockResponseTracker.clear()
                         dnsCache.updatePolicy(newCachePolicy)
                         resolvers = updatedResolvers
                         startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -257,6 +264,8 @@ class DnsVpnService : VpnService() {
                         activeRaceModeStrategy = newRaceModeStrategy
                         activeResolutionMode = newResolutionMode
                         activeBlockResponseMode = newBlockResponseMode
+                        activeDynamicBlockResponseConfig = newDynamicBlockResponseConfig
+                        dynamicBlockResponseTracker.clear()
                         dnsCache.updatePolicy(newCachePolicy)
                         startForeground(NOTIFICATION_ID, buildForegroundNotification())
                         Log.w(TAG, "Failed to refresh DNS resolvers; keeping current snapshot", error)
@@ -504,7 +513,12 @@ class DnsVpnService : VpnService() {
             val allowListed = qname != null && allowListManager.isAllowed(qname)
             val blockMatch = qname?.takeIf { !allowListed }?.let(blockListManager::findMatch)
             if (qname != null && blockMatch != null) {
-                val blockResponseMode = activeBlockResponseMode
+                val dynamicConfig = activeDynamicBlockResponseConfig
+                val blockResponseMode = if (dynamicConfig.enabled) {
+                    dynamicBlockResponseTracker.responseModeFor(qname, dynamicConfig)
+                } else {
+                    activeBlockResponseMode
+                }
                 val blockResponse = DnsMessageUtils.buildBlockedResponse(query, blockResponseMode)
                 writeResponse(dnsInfo, blockResponse, output)
                 dnsLogger.log(

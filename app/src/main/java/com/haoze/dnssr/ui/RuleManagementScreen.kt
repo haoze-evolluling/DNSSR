@@ -34,10 +34,8 @@ import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsNavigationItem
-import com.haoze.dnssr.ui.components.SettingsRadioItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
-import com.haoze.dnssr.vpn.BlockResponseMode
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateSettings
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +50,7 @@ fun RuleManagementScreen(
     onNavigateToAllowRuleList: () -> Unit,
     onNavigateToSubscription: () -> Unit,
     onNavigateToAutoUpdateInterval: () -> Unit,
+    onNavigateToBlockResponseSettings: () -> Unit,
     onRuntimeDnsSettingsChanged: () -> Unit = {},
     viewModel: RuleManagementViewModel = viewModel()
 ) {
@@ -70,7 +69,6 @@ fun RuleManagementScreen(
     var showClearAllRulesDialog by remember { mutableStateOf(false) }
     var addRuleError by remember { mutableStateOf<String?>(null) }
     var addAllowRuleError by remember { mutableStateOf<String?>(null) }
-    var blockResponseMode by remember { mutableStateOf(AppSettings.getBlockResponseMode(context)) }
     var autoUpdateEnabled by remember { mutableStateOf(SubscriptionAutoUpdateSettings.isEnabled(context)) }
 
     fun openAddRuleDialog() {
@@ -134,28 +132,16 @@ fun RuleManagementScreen(
             }
             item {
                 SettingsGroup {
-                    BlockResponseMode.values().forEachIndexed { index, mode ->
-                        SettingsRadioItem(
-                            title = mode.displayName,
-                            subtitle = when (mode) {
-                                BlockResponseMode.NXDOMAIN -> "返回域名不存在，并提供 5 分钟负缓存以减少重复查询"
-                                BlockResponseMode.NODATA -> "返回域名存在但没有该记录，并提供 5 分钟负缓存"
-                                BlockResponseMode.REFUSED -> "返回服务器拒绝该查询，不提供缓存记录"
-                                BlockResponseMode.ZERO_ADDRESS -> "A 返回 0.0.0.0，AAAA 返回 ::，其他类型返回空结果"
-                            },
-                            selected = blockResponseMode == mode,
-                            onClick = {
-                                if (blockResponseMode != mode) {
-                                    AppSettings.setBlockResponseMode(context, mode)
-                                    blockResponseMode = mode
-                                    onRuntimeDnsSettingsChanged()
-                                }
-                            }
-                        )
-                        if (index < BlockResponseMode.values().lastIndex) {
-                            SettingsDivider()
-                        }
-                    }
+                    val dynamicConfig = AppSettings.getDynamicBlockResponseConfig(context)
+                    SettingsNavigationItem(
+                        title = "拦截响应",
+                        subtitle = if (dynamicConfig.enabled) {
+                            "动态策略：先 NODATA，高频请求后 NXDOMAIN"
+                        } else {
+                            "当前：${AppSettings.getBlockResponseMode(context).displayName}"
+                        },
+                        onClick = onNavigateToBlockResponseSettings
+                    )
                 }
             }
 
