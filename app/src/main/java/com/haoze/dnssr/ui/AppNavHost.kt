@@ -63,6 +63,7 @@ object Routes {
     const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
+    const val CONFIG_IMPORT_EXPORT = "config_import_export"
     const val PROVIDER_MANAGEMENT = "provider_management"
     const val HOME_PROVIDER_VISIBILITY = "home_provider_visibility"
     const val BOOTSTRAP_SETTINGS = "bootstrap_settings"
@@ -281,7 +282,16 @@ fun AppNavHost(
         composable(titledRoute(Routes.CONFIG_TRANSFER), arguments = listOf(screenTitleArgument("导入与导出"))) { entry ->
             ConfigTransferScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出",
+                onNavigateToConfigImportExport = {
+                    navController.navigateToTitledRoute(Routes.CONFIG_IMPORT_EXPORT, "配置导入与导出")
+                }
+            )
+        }
+        composable(titledRoute(Routes.CONFIG_IMPORT_EXPORT), arguments = listOf(screenTitleArgument("配置导入与导出"))) { entry ->
+            ConfigImportExportScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "配置导入与导出"
             )
         }
         composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("服务商管理"))) { entry ->
