@@ -152,6 +152,8 @@ fun AboutScreen(
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.configureAboutPageSettings() {
+    isVerticalScrollBarEnabled = false
+    isHorizontalScrollBarEnabled = false
     settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = false

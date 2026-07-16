@@ -143,6 +143,7 @@ class DnsVpnService : VpnService() {
                 intent.getStringExtra(EXTRA_REFRESH_REASON)
                     ?: "runtime_config"
             )
+            ACTION_REFRESH_NOTIFICATION -> refreshForegroundNotification()
             else -> startVpn(intent)
         }
         return START_STICKY
@@ -281,11 +282,13 @@ class DnsVpnService : VpnService() {
     }
 
     private fun buildForegroundNotification(): Notification {
-        val notificationText = when {
+        val defaultNotificationText = when {
             resolvers.size > 1 -> "已连接 · ${activeResolutionMode.displayName}（${resolvers.size} 个服务商）"
             resolvers.isNotEmpty() -> "已连接 · ${resolvers.first().provider.name}"
             else -> "已连接"
         }
+        val notificationText = AppSettings.getNotificationTextRunning(this)
+            .ifBlank { defaultNotificationText }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.app_name))
@@ -301,6 +304,12 @@ class DnsVpnService : VpnService() {
             .setOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
+    }
+
+    private fun refreshForegroundNotification() {
+        if (vpnInterface != null) {
+            startForeground(NOTIFICATION_ID, buildForegroundNotification())
+        }
     }
 
     private fun createResolver(provider: DnsProvider): DnsResolver {
@@ -1056,6 +1065,7 @@ class DnsVpnService : VpnService() {
         private const val ACTION_STOP = "com.haoze.dnssr.STOP_VPN"
         private const val ACTION_REFRESH_RACE_MODE_STRATEGY = "com.haoze.dnssr.REFRESH_RACE_MODE_STRATEGY"
         private const val ACTION_REFRESH_RUNTIME_CONFIG = "com.haoze.dnssr.REFRESH_RUNTIME_CONFIG"
+        private const val ACTION_REFRESH_NOTIFICATION = "com.haoze.dnssr.REFRESH_NOTIFICATION"
         const val ACTION_VPN_STATUS_CHANGED = "com.haoze.dnssr.VPN_STATUS_CHANGED"
         const val EXTRA_VPN_RUNNING = "vpn_running"
         private const val EXTRA_REFRESH_REASON = "refresh_reason"
@@ -1117,6 +1127,11 @@ class DnsVpnService : VpnService() {
             return Intent(context, DnsVpnService::class.java)
                 .setAction(ACTION_REFRESH_RUNTIME_CONFIG)
                 .putExtra(EXTRA_REFRESH_REASON, reason)
+        }
+
+        fun refreshNotificationIntent(context: android.content.Context): Intent {
+            return Intent(context, DnsVpnService::class.java)
+                .setAction(ACTION_REFRESH_NOTIFICATION)
         }
 
         fun isRunning(context: android.content.Context): Boolean {

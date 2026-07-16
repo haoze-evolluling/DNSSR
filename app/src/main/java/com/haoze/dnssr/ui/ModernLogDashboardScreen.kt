@@ -191,6 +191,8 @@ private fun DashboardWebView(
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.configureLocalPageSettings() {
+    isVerticalScrollBarEnabled = false
+    isHorizontalScrollBarEnabled = false
     settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = false

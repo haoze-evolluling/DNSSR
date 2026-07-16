@@ -84,7 +84,10 @@ class VpnMonitorService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("鹏翼无由系，青云不得攀\n(未开启)")
+            .setContentText(
+                AppSettings.getNotificationTextStopped(this)
+                    .ifBlank { "未连接" }
+            )
             .setContentIntent(openAppPendingIntent)
             .addAction(R.drawable.ic_play_arrow, "开启", startPendingIntent)
             .setOngoing(true)

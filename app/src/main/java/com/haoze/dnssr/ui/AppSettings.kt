@@ -132,6 +132,8 @@ object AppSettings {
     private const val KEY_HOME_DNS_DETAIL_OPACITY = "home_dns_detail_opacity"
     private const val KEY_HOME_SENTENCE_RUNNING = "home_sentence_running"
     private const val KEY_HOME_SENTENCE_STOPPED = "home_sentence_stopped"
+    private const val KEY_NOTIFICATION_TEXT_RUNNING = "notification_text_running"
+    private const val KEY_NOTIFICATION_TEXT_STOPPED = "notification_text_stopped"
     private const val KEY_CUSTOM_BACKGROUND_ENABLED = "custom_background_enabled"
     private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
@@ -255,6 +257,26 @@ object AppSettings {
             .edit()
             .putString(KEY_HOME_SENTENCE_RUNNING, running)
             .putString(KEY_HOME_SENTENCE_STOPPED, stopped)
+            .apply()
+    }
+
+    fun getNotificationTextRunning(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_NOTIFICATION_TEXT_RUNNING, "")
+            .orEmpty()
+    }
+
+    fun getNotificationTextStopped(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_NOTIFICATION_TEXT_STOPPED, "")
+            .orEmpty()
+    }
+
+    fun setNotificationTexts(context: Context, running: String, stopped: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_NOTIFICATION_TEXT_RUNNING, running)
+            .putString(KEY_NOTIFICATION_TEXT_STOPPED, stopped)
             .apply()
     }
 

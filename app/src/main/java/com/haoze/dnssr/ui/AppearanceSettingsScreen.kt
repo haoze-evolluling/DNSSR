@@ -1,6 +1,9 @@
 package com.haoze.dnssr.ui
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -51,6 +54,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -64,6 +68,8 @@ import com.haoze.dnssr.ui.components.SettingsItem
 import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import com.haoze.dnssr.ui.theme.ThemeColorStyle
+import com.haoze.dnssr.vpn.DnsVpnService
+import com.haoze.dnssr.vpn.VpnMonitorService
 
 @Composable
 fun AppearanceSettingsScreen(
@@ -73,6 +79,7 @@ fun AppearanceSettingsScreen(
     onNavigateToThemeColorSettings: (String) -> Unit,
     onNavigateToHomeComponentOpacity: (String) -> Unit,
     onNavigateToHomeSentence: (String) -> Unit,
+    onNavigateToNotificationText: (String) -> Unit,
     onNavigateToCustomBackground: (String) -> Unit,
     onNavigateToServiceLightEffect: (String) -> Unit
 ) {
@@ -83,6 +90,7 @@ fun AppearanceSettingsScreen(
     val colorStyle = AppSettings.getThemeColorStyle(context)
     val homeComponentOpacityTitle = "首页透明度"
     val homeSentenceTitle = "首页句子"
+    val notificationTextTitle = "通知栏文案"
     val customBackgroundTitle = "软件背景"
     val serviceLightEffectTitle = "服务动态光影"
 
@@ -122,6 +130,12 @@ fun AppearanceSettingsScreen(
                         title = homeSentenceTitle,
                         subtitle = "分别设置 DNS 服务开启和关闭时的句子",
                         onClick = { onNavigateToHomeSentence(homeSentenceTitle) }
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = notificationTextTitle,
+                        subtitle = "分别设置 DNS 服务开启和关闭时的通知栏文案",
+                        onClick = { onNavigateToNotificationText(notificationTextTitle) }
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
@@ -463,6 +477,76 @@ fun HomeSentenceSettingsScreen(onBack: () -> Unit, title: String) {
             item { SettingsInfoText("两项内容均可留空；留空后对应状态下首页不显示句子。") }
         }
     }
+}
+
+@Composable
+fun NotificationTextSettingsScreen(onBack: () -> Unit, title: String) {
+    val context = LocalContext.current
+    var runningText by remember { mutableStateOf(AppSettings.getNotificationTextRunning(context)) }
+    var stoppedText by remember { mutableStateOf(AppSettings.getNotificationTextStopped(context)) }
+
+    SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
+            item { SettingsGroupTitle("通知栏文案") }
+            item {
+                SettingsGroup {
+                    OutlinedTextField(
+                        value = runningText,
+                        onValueChange = { runningText = it },
+                        label = { Text("DNS 服务开启时") },
+                        minLines = 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                    )
+                    OutlinedTextField(
+                        value = stoppedText,
+                        onValueChange = { stoppedText = it },
+                        label = { Text("DNS 服务关闭时") },
+                        minLines = 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
+                    Button(
+                        onClick = {
+                            AppSettings.setNotificationTexts(context, runningText, stoppedText)
+                            refreshNotificationText(context)
+                            onBack()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    ) {
+                        Text("确定")
+                    }
+                }
+            }
+            item { SettingsInfoText("两项内容均可留空；留空后对应通知栏会使用默认状态文案。") }
+        }
+    }
+}
+
+private fun refreshNotificationText(context: Context) {
+    val appContext = context.applicationContext
+    if (DnsVpnService.isRunning(appContext)) {
+        appContext.startService(DnsVpnService.refreshNotificationIntent(appContext))
+        return
+    }
+    if (!AppSettings.isPersistentNotificationEnabled(appContext) ||
+        !hasNotificationPermission(appContext)
+    ) {
+        return
+    }
+    ContextCompat.startForegroundService(appContext, VpnMonitorService.startIntent(appContext))
+}
+
+private fun hasNotificationPermission(context: Context): Boolean {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
 }
 
 @Composable

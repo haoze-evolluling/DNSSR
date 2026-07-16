@@ -81,6 +81,7 @@ object Routes {
     const val THEME_COLOR_SETTINGS = "theme_color_settings"
     const val HOME_COMPONENT_OPACITY = "home_component_opacity"
     const val HOME_SENTENCE_SETTINGS = "home_sentence_settings"
+    const val NOTIFICATION_TEXT_SETTINGS = "notification_text_settings"
     const val CUSTOM_BACKGROUND_SETTINGS = "custom_background_settings"
     const val SERVICE_LIGHT_EFFECT_SETTINGS = "service_light_effect_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
@@ -404,6 +405,9 @@ fun AppNavHost(
                 onNavigateToHomeSentence = { title ->
                     navController.navigateToTitledRoute(Routes.HOME_SENTENCE_SETTINGS, title)
                 },
+                onNavigateToNotificationText = { title ->
+                    navController.navigateToTitledRoute(Routes.NOTIFICATION_TEXT_SETTINGS, title)
+                },
                 onNavigateToCustomBackground = { title ->
                     navController.navigateToTitledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS, title)
                 },
@@ -436,6 +440,12 @@ fun AppNavHost(
             HomeSentenceSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "首页句子"
+            )
+        }
+        composable(titledRoute(Routes.NOTIFICATION_TEXT_SETTINGS), arguments = listOf(screenTitleArgument("通知栏文案"))) { entry ->
+            NotificationTextSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "通知栏文案"
             )
         }
         composable(titledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS), arguments = listOf(screenTitleArgument("软件背景"))) { entry ->
