@@ -1,15 +1,20 @@
 package com.haoze.dnssr.ui
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,12 +22,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
+import com.haoze.dnssr.ui.components.SettingsItem
+import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import com.haoze.dnssr.vpn.DnsVpnService
@@ -35,12 +45,28 @@ fun ForegroundBackgroundSettingsScreen(
     onHideFromRecentsChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scrollState = rememberScrollState()
     var hideFromRecentsEnabled by remember {
         mutableStateOf(AppSettings.isHideFromRecentsEnabled(context))
     }
     var persistentNotificationEnabled by remember {
         mutableStateOf(AppSettings.isPersistentNotificationEnabled(context))
+    }
+    var batteryOptimizationIgnored by remember(context) {
+        mutableStateOf(isBatteryOptimizationIgnored(context))
+    }
+
+    DisposableEffect(context, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                batteryOptimizationIgnored = isBatteryOptimizationIgnored(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     fun saveHideFromRecents(enabled: Boolean) {
@@ -83,7 +109,44 @@ fun ForegroundBackgroundSettingsScreen(
                 )
             }
             SettingsInfoText("关闭“通知常驻”只会停止 VPN 未运行时的监控提醒。VPN 正在运行时，系统要求的前台服务通知会继续显示。")
+            SettingsGroupTitle("电池")
+            SettingsGroup {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    SettingsNavigationItem(
+                        title = "忽略电池优化",
+                        subtitle = if (batteryOptimizationIgnored) {
+                            "已忽略电池优化"
+                        } else {
+                            "允许应用在后台稳定运行"
+                        },
+                        onClick = { requestIgnoreBatteryOptimization(context) }
+                    )
+                } else {
+                    SettingsItem(
+                        title = "忽略电池优化",
+                        subtitle = "当前 Android 版本不支持电池优化设置",
+                        enabled = false
+                    )
+                }
+            }
         }
+    }
+}
+
+private fun isBatteryOptimizationIgnored(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+private fun requestIgnoreBatteryOptimization(context: Context) {
+    val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = android.net.Uri.parse("package:${context.packageName}")
+    }
+    try {
+        context.startActivity(requestIntent)
+    } catch (_: ActivityNotFoundException) {
+        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
     }
 }
 
