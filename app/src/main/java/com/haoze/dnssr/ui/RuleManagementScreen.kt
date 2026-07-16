@@ -141,7 +141,7 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("手动添加屏蔽域名")
+                SettingsGroupTitle("手动添加域名")
             }
             item {
                 SettingsGroup {
@@ -150,24 +150,17 @@ fun RuleManagementScreen(
                         subtitle = "输入要屏蔽的域名，如 example.com",
                         onClick = ::openAddRuleDialog
                     )
-                }
-            }
-            addResult?.let { message ->
-                item {
-                    SettingsInfoText(message)
-                }
-            }
-
-            item {
-                SettingsGroupTitle("手动添加白名单域名")
-            }
-            item {
-                SettingsGroup {
+                    SettingsDivider()
                     SettingsNavigationItem(
                         title = "添加白名单域名",
                         subtitle = "输入要放行的域名，如 example.com",
                         onClick = ::openAddAllowRuleDialog
                     )
+                }
+            }
+            addResult?.let { message ->
+                item {
+                    SettingsInfoText(message)
                 }
             }
             addAllowResult?.let { message ->

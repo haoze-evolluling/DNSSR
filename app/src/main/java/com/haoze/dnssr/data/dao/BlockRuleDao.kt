@@ -107,4 +107,31 @@ interface BlockRuleDao {
 
     @Query("SELECT * FROM block_rule ORDER BY addedAt DESC LIMIT :limit OFFSET :offset")
     suspend fun paged(limit: Int, offset: Int): List<BlockRuleEntity>
+
+    @Query(
+        "SELECT DISTINCT r.* FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source ORDER BY r.addedAt DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun pagedBySource(source: String, limit: Int, offset: Int): List<BlockRuleEntity>
+
+    @Query(
+        "SELECT DISTINCT r.* FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source AND (r.pattern LIKE :query OR r.rawLine LIKE :query) " +
+            "ORDER BY r.addedAt DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun searchPagedBySource(
+        source: String,
+        query: String,
+        limit: Int,
+        offset: Int
+    ): List<BlockRuleEntity>
+
+    @Query("SELECT COUNT(DISTINCT r.id) FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id WHERE s.source = :source")
+    suspend fun countBySourceForList(source: String): Int
+
+    @Query(
+        "SELECT COUNT(DISTINCT r.id) FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source AND (r.pattern LIKE :query OR r.rawLine LIKE :query)"
+    )
+    suspend fun searchCountBySource(source: String, query: String): Int
 }

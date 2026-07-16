@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.haoze.dnssr.data.AppDatabase
+import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     private val db = AppDatabase.getInstance(application)
     private val blockRuleDao = db.blockRuleDao()
     private val allowRuleDao = db.allowRuleDao()
+    private val subscriptionDao = db.subscriptionDao()
     private val blockListManager: BlockListManager by lazy {
         BlockListManager(blockRuleDao)
     }
@@ -42,6 +44,12 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _sourceFilter = MutableStateFlow<RuleSourceFilter>(RuleSourceFilter.All)
+    val sourceFilter: StateFlow<RuleSourceFilter> = _sourceFilter.asStateFlow()
+
+    private val _sourceSubscriptions = MutableStateFlow<List<SubscriptionEntity>>(emptyList())
+    val sourceSubscriptions: StateFlow<List<SubscriptionEntity>> = _sourceSubscriptions.asStateFlow()
+
     private var activated = false
     private var ruleKind = ManagedRuleKind.BLOCK
 
@@ -49,7 +57,9 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
         if (ruleKind == kind) return
         ruleKind = kind
         _searchQuery.value = ""
+        _sourceFilter.value = RuleSourceFilter.All
         if (activated) {
+            loadSourceSubscriptions()
             loadPage(1)
         }
     }
@@ -57,8 +67,9 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     fun activate() {
         if (!activated) {
             activated = true
-            loadPage(1)
         }
+        loadSourceSubscriptions()
+        loadPage(1)
     }
 
     fun loadPage(page: Int) {
@@ -79,6 +90,12 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+        loadPage(1)
+    }
+
+    fun selectSourceFilter(filter: RuleSourceFilter) {
+        if (_sourceFilter.value == filter) return
+        _sourceFilter.value = filter
         loadPage(1)
     }
 
@@ -111,29 +128,74 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun loadRules(query: String, limit: Int, offset: Int): List<RuleListItem> {
+        val source = _sourceFilter.value.source
         return if (ruleKind == ManagedRuleKind.ALLOW) {
-            val rules = if (query.isEmpty()) {
-                allowRuleDao.paged(limit, offset)
+            val rules = if (source == null) {
+                if (query.isEmpty()) allowRuleDao.paged(limit, offset)
+                else allowRuleDao.searchPaged("%$query%", limit, offset)
             } else {
-                allowRuleDao.searchPaged("%$query%", limit, offset)
+                if (query.isEmpty()) allowRuleDao.pagedBySource(source, limit, offset)
+                else allowRuleDao.searchPagedBySource(source, "%$query%", limit, offset)
             }
             rules.map { RuleListItem(it.id, it.pattern, it.rawLine, it.enabled) }
         } else {
-            val rules = if (query.isEmpty()) {
-                blockRuleDao.paged(limit, offset)
+            val rules = if (source == null) {
+                if (query.isEmpty()) blockRuleDao.paged(limit, offset)
+                else blockRuleDao.searchPaged("%$query%", limit, offset)
             } else {
-                blockRuleDao.searchPaged("%$query%", limit, offset)
+                if (query.isEmpty()) blockRuleDao.pagedBySource(source, limit, offset)
+                else blockRuleDao.searchPagedBySource(source, "%$query%", limit, offset)
             }
             rules.map { RuleListItem(it.id, it.pattern, it.rawLine, it.enabled) }
         }
     }
 
     private suspend fun countRules(query: String): Int {
+        val source = _sourceFilter.value.source
         return if (ruleKind == ManagedRuleKind.ALLOW) {
-            if (query.isEmpty()) allowRuleDao.count() else allowRuleDao.searchCount("%$query%")
+            if (source == null) {
+                if (query.isEmpty()) allowRuleDao.count() else allowRuleDao.searchCount("%$query%")
+            } else {
+                if (query.isEmpty()) allowRuleDao.countBySourceForList(source)
+                else allowRuleDao.searchCountBySource(source, "%$query%")
+            }
         } else {
-            if (query.isEmpty()) blockRuleDao.count() else blockRuleDao.searchCount("%$query%")
+            if (source == null) {
+                if (query.isEmpty()) blockRuleDao.count() else blockRuleDao.searchCount("%$query%")
+            } else {
+                if (query.isEmpty()) blockRuleDao.countBySourceForList(source)
+                else blockRuleDao.searchCountBySource(source, "%$query%")
+            }
         }
+    }
+
+    private fun loadSourceSubscriptions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val subscriptions = if (ruleKind == ManagedRuleKind.ALLOW) {
+                subscriptionDao.withAllowRules()
+            } else {
+                subscriptionDao.withBlockRules()
+            }
+            withContext(Dispatchers.Main) {
+                _sourceSubscriptions.value = subscriptions
+            }
+        }
+    }
+}
+
+sealed interface RuleSourceFilter {
+    val source: String?
+
+    data object All : RuleSourceFilter {
+        override val source: String? = null
+    }
+
+    data object Manual : RuleSourceFilter {
+        override val source = "useradd"
+    }
+
+    data class Subscription(val id: Long) : RuleSourceFilter {
+        override val source = "sub_$id"
     }
 }
 

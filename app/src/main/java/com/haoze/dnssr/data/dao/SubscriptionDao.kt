@@ -31,6 +31,20 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscription WHERE kind = :kind ORDER BY addedAt DESC")
     suspend fun allByKind(kind: String): List<SubscriptionEntity>
 
+    @Query(
+        "SELECT DISTINCT sub.* FROM subscription sub " +
+            "JOIN block_rule_source source ON source.source = 'sub_' || sub.id " +
+            "ORDER BY sub.addedAt DESC"
+    )
+    suspend fun withBlockRules(): List<SubscriptionEntity>
+
+    @Query(
+        "SELECT DISTINCT sub.* FROM subscription sub " +
+            "JOIN allow_rule_source source ON source.source = 'sub_' || sub.id " +
+            "ORDER BY sub.addedAt DESC"
+    )
+    suspend fun withAllowRules(): List<SubscriptionEntity>
+
     @Query("SELECT * FROM subscription WHERE id = :id")
     suspend fun byId(id: Long): SubscriptionEntity?
 

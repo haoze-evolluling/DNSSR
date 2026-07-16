@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,10 +16,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,7 +62,10 @@ fun RuleListScreen(
     val totalPages by viewModel.totalPages.collectAsStateWithLifecycle()
     val totalCount by viewModel.totalCount.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val sourceFilter by viewModel.sourceFilter.collectAsStateWithLifecycle()
+    val sourceSubscriptions by viewModel.sourceSubscriptions.collectAsStateWithLifecycle()
     var showPageJumpDialog by remember { mutableStateOf(false) }
+    var showSourceMenu by remember { mutableStateOf(false) }
     var pageInput by remember { mutableStateOf("") }
     var pageInputError by remember { mutableStateOf<String?>(null) }
 
@@ -115,7 +123,49 @@ fun RuleListScreen(
 
     SettingsScaffold(
         title = ruleKind.title,
-        onBack = onBack
+        onBack = onBack,
+        actions = {
+            Box {
+                IconButton(onClick = { showSourceMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "筛选规则来源"
+                    )
+                }
+                DropdownMenu(
+                    expanded = showSourceMenu,
+                    onDismissRequest = { showSourceMenu = false },
+                    modifier = Modifier.heightIn(max = 360.dp)
+                ) {
+                    RuleSourceFilterMenuItem(
+                        text = "全部规则",
+                        selected = sourceFilter == RuleSourceFilter.All,
+                        onClick = {
+                            viewModel.selectSourceFilter(RuleSourceFilter.All)
+                            showSourceMenu = false
+                        }
+                    )
+                    RuleSourceFilterMenuItem(
+                        text = "手动添加",
+                        selected = sourceFilter == RuleSourceFilter.Manual,
+                        onClick = {
+                            viewModel.selectSourceFilter(RuleSourceFilter.Manual)
+                            showSourceMenu = false
+                        }
+                    )
+                    sourceSubscriptions.forEach { subscription ->
+                        RuleSourceFilterMenuItem(
+                            text = subscription.name,
+                            selected = sourceFilter == RuleSourceFilter.Subscription(subscription.id),
+                            onClick = {
+                                viewModel.selectSourceFilter(RuleSourceFilter.Subscription(subscription.id))
+                                showSourceMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -228,6 +278,26 @@ fun RuleListScreen(
             }
         }
     }
+}
+
+@Composable
+private fun RuleSourceFilterMenuItem(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = { Text(text) },
+        onClick = onClick,
+        trailingIcon = {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "已选中"
+                )
+            }
+        }
+    )
 }
 
 @Composable

@@ -104,4 +104,31 @@ interface AllowRuleDao {
 
     @Query("SELECT * FROM allow_rule ORDER BY addedAt DESC LIMIT :limit OFFSET :offset")
     suspend fun paged(limit: Int, offset: Int): List<AllowRuleEntity>
+
+    @Query(
+        "SELECT DISTINCT r.* FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source ORDER BY r.addedAt DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun pagedBySource(source: String, limit: Int, offset: Int): List<AllowRuleEntity>
+
+    @Query(
+        "SELECT DISTINCT r.* FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source AND (r.pattern LIKE :query OR r.rawLine LIKE :query) " +
+            "ORDER BY r.addedAt DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun searchPagedBySource(
+        source: String,
+        query: String,
+        limit: Int,
+        offset: Int
+    ): List<AllowRuleEntity>
+
+    @Query("SELECT COUNT(DISTINCT r.id) FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id WHERE s.source = :source")
+    suspend fun countBySourceForList(source: String): Int
+
+    @Query(
+        "SELECT COUNT(DISTINCT r.id) FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE s.source = :source AND (r.pattern LIKE :query OR r.rawLine LIKE :query)"
+    )
+    suspend fun searchCountBySource(source: String, query: String): Int
 }
