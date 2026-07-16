@@ -478,6 +478,16 @@
               <b id="bootstrapRate">0%</b>
             </div>
             <div class="bar"><i id="bootstrapBar"></i></div>
+            <div class="legend-row" style="margin-top:14px">
+              <span>拦截率</span>
+              <b id="blockRate">0%</b>
+            </div>
+            <div class="bar"><i id="blockBar"></i></div>
+            <div class="legend-row" style="margin-top:14px">
+              <span>缓存率</span>
+              <b id="cacheRate">0%</b>
+            </div>
+            <div class="bar"><i id="cacheBar"></i></div>
           </div>
         </div>
       </article>
@@ -629,6 +639,14 @@
       const bootstrap = data.bootstrap || {};
       $("bootstrapRate").textContent = `${pct(bootstrap.successRate)} · ${fmt.format(bootstrap.attempts || 0)} 次 · ${ms(bootstrap.avgElapsedMs)}`;
       $("bootstrapBar").style.width = `${Math.max(0, Math.min(100, (bootstrap.successRate || 0) * 100))}%`;
+
+      const blockRate = stats.total ? (stats.blocked || 0) / stats.total : 0;
+      $("blockRate").textContent = `${pct(blockRate)} · ${fmt.format(stats.blocked || 0)} 次`;
+      $("blockBar").style.width = `${Math.max(0, Math.min(100, blockRate * 100))}%`;
+
+      const cacheRate = stats.total ? (stats.cached || 0) / stats.total : 0;
+      $("cacheRate").textContent = `${pct(cacheRate)} · ${fmt.format(stats.cached || 0)} 次`;
+      $("cacheBar").style.width = `${Math.max(0, Math.min(100, cacheRate * 100))}%`;
 
       renderRows("recentLogs", data.recentLogs, "暂无 DNS 请求日志", item => {
         const cls = item.result === "PASSED" ? "accent-green" : item.result === "BLOCKED" ? "accent-red" : "accent-amber";

@@ -82,7 +82,7 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                     )
             }
             .sortedByDescending { it.optInt("hits") }
-            .take(TOP_LIST_LIMIT)
+            .take(SUBSCRIPTION_LIST_LIMIT)
 
         val totalLogs = dailyStats.passed + dailyStats.blocked + dailyStats.error
         return JSONObject()
@@ -234,8 +234,9 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
     }
 
     private companion object {
-        private const val RECENT_LOG_LIMIT = 12
-        private const val RECENT_CACHE_LIMIT = 8
+        private const val RECENT_LOG_LIMIT = 5
+        private const val RECENT_CACHE_LIMIT = 5
+        private const val SUBSCRIPTION_LIST_LIMIT = 5
         private const val TOP_LIST_LIMIT = 8
     }
 }
