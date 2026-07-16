@@ -4,6 +4,7 @@ import android.content.Context
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.vpn.AllowListManager
+import com.haoze.dnssr.vpn.AdGuardRuleParser
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.DnsProtocol
 import com.haoze.dnssr.vpn.DnsProvider
@@ -83,6 +84,27 @@ class ConfigTransferManager(private val context: Context) {
             })
         }
         return root.toString(2)
+    }
+
+    suspend fun exportRules(): RuleExportResult {
+        val allowPatterns = database.allowRuleDao().enabledPatterns()
+            .mapNotNull(AdGuardRuleParser::parseAllowLine)
+            .mapTo(sortedSetOf()) { it.pattern }
+        val blockPatterns = database.blockRuleDao().enabledPatterns()
+            .mapNotNull(AdGuardRuleParser::parseLine)
+            .mapTo(sortedSetOf()) { it.pattern }
+            .apply { removeAll(allowPatterns) }
+        val exportedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date())
+        val content = buildString {
+            appendLine("! DNSSR rules export")
+            appendLine("! Exported at: $exportedAt")
+            appendLine("! Block rules: ${blockPatterns.size}; allow rules: ${allowPatterns.size}")
+            appendLine()
+            blockPatterns.forEach { appendLine("||$it^") }
+            allowPatterns.forEach { appendLine("@@||$it^") }
+        }
+        return RuleExportResult(content, blockPatterns.size, allowPatterns.size)
     }
 
     suspend fun import(
@@ -285,3 +307,9 @@ class ConfigTransferManager(private val context: Context) {
         private val SUPPORTED_FORMAT_VERSIONS = setOf(1, FORMAT_VERSION)
     }
 }
+
+data class RuleExportResult(
+    val content: String,
+    val blockRuleCount: Int,
+    val allowRuleCount: Int
+)

@@ -65,6 +65,7 @@ object Routes {
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
     const val CONFIG_IMPORT_EXPORT = "config_import_export"
+    const val RULE_EXPORT = "rule_export"
     const val PROVIDER_MANAGEMENT = "provider_management"
     const val HOME_PROVIDER_VISIBILITY = "home_provider_visibility"
     const val BOOTSTRAP_SETTINGS = "bootstrap_settings"
@@ -290,14 +291,23 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出",
                 onNavigateToConfigImportExport = {
-                    navController.navigateToTitledRoute(Routes.CONFIG_IMPORT_EXPORT, "配置导入与导出")
+                    navController.navigateToTitledRoute(Routes.CONFIG_IMPORT_EXPORT, "设置配置")
+                },
+                onNavigateToRuleExport = {
+                    navController.navigateToTitledRoute(Routes.RULE_EXPORT, "规则导出")
                 }
             )
         }
-        composable(titledRoute(Routes.CONFIG_IMPORT_EXPORT), arguments = listOf(screenTitleArgument("配置导入与导出"))) { entry ->
+        composable(titledRoute(Routes.CONFIG_IMPORT_EXPORT), arguments = listOf(screenTitleArgument("设置配置"))) { entry ->
             ConfigImportExportScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "配置导入与导出"
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "设置配置"
+            )
+        }
+        composable(titledRoute(Routes.RULE_EXPORT), arguments = listOf(screenTitleArgument("规则导出"))) { entry ->
+            RuleExportScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "规则导出"
             )
         }
         composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("服务商管理"))) { entry ->

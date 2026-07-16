@@ -60,6 +60,12 @@ interface AllowRuleDao {
     )
     suspend fun enabledRules(): List<AllowRuleEntity>
 
+    @Query(
+        "SELECT DISTINCT r.pattern FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1"
+    )
+    suspend fun enabledPatterns(): List<String>
+
     @Query("SELECT COUNT(*) FROM allow_rule")
     suspend fun count(): Int
 

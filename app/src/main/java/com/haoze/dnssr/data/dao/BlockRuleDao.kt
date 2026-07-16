@@ -63,6 +63,12 @@ interface BlockRuleDao {
     )
     suspend fun enabledRules(): List<EnabledBlockRule>
 
+    @Query(
+        "SELECT DISTINCT r.pattern FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1"
+    )
+    suspend fun enabledPatterns(): List<String>
+
     @Query("SELECT COUNT(*) FROM block_rule")
     suspend fun count(): Int
 

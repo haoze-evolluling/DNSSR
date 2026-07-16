@@ -53,7 +53,7 @@ import java.util.Locale
 @Composable
 fun ConfigImportExportScreen(
     onBack: () -> Unit,
-    title: String = "配置导入与导出",
+    title: String = "设置配置",
     viewModel: ConfigTransferViewModel = viewModel()
 ) {
     val context = LocalContext.current

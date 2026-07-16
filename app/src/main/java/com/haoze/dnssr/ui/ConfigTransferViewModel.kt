@@ -43,6 +43,18 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    fun exportRules(uri: Uri) {
+        runOperation(ConfigTransferOperation.EXPORTING) {
+            val context = getApplication<Application>()
+            val result = manager.exportRules()
+            context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter().use { writer ->
+                requireNotNull(writer) { "无法打开导出文件" }
+                writer.write(result.content)
+            }
+            "规则已导出：拦截 ${result.blockRuleCount} 条，白名单 ${result.allowRuleCount} 条"
+        }
+    }
+
     fun import(uri: Uri) {
         _importProgress.value = ConfigImportProgress(0, 0, "正在读取配置文件")
         runOperation(ConfigTransferOperation.IMPORTING, MIN_IMPORT_DURATION_MILLIS) {
