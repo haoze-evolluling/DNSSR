@@ -250,31 +250,24 @@ private fun ProtocolToggleRow(
     protocols: List<DnsProtocol>,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth()
     ) {
-        protocols.chunked(2).forEach { protocolRow ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                protocolRow.forEach { option ->
-                    FilterChip(
-                        selected = selectedProtocol == option,
-                        onClick = { onSelect(option) },
-                        label = {
-                            Text(
-                                text = option.label,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
+        protocols.forEach { option ->
+            FilterChip(
+                selected = selectedProtocol == option,
+                onClick = { onSelect(option) },
+                label = {
+                    Text(
+                        text = option.label,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                }
-            }
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
