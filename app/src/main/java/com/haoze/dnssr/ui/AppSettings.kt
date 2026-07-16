@@ -137,6 +137,7 @@ object AppSettings {
     private const val KEY_CUSTOM_BACKGROUND_ENABLED = "custom_background_enabled"
     private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
+    private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -277,6 +278,21 @@ object AppSettings {
             .edit()
             .putString(KEY_NOTIFICATION_TEXT_RUNNING, running)
             .putString(KEY_NOTIFICATION_TEXT_STOPPED, stopped)
+            .apply()
+    }
+
+    fun getExcludedAppPackages(context: Context): Set<String> {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_EXCLUDED_APP_PACKAGES, emptySet())
+            .orEmpty()
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
+
+    fun setExcludedAppPackages(context: Context, packageNames: Set<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(KEY_EXCLUDED_APP_PACKAGES, packageNames.filter { it.isNotBlank() }.toSet())
             .apply()
     }
 

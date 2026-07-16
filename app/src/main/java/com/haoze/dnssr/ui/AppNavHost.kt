@@ -61,6 +61,7 @@ object Routes {
     const val RULE_LIST = "rule_list"
     const val ALLOW_RULE_LIST = "allow_rule_list"
     const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
+    const val EXCLUDED_APPS = "excluded_apps"
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
     const val CONFIG_IMPORT_EXPORT = "config_import_export"
@@ -168,6 +169,7 @@ fun AppNavHost(
             SettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 onNavigateToRuleManagement = { title -> navController.navigateToTitledRoute(Routes.RULE_MANAGEMENT, title) },
+                onNavigateToExcludedApps = { navController.navigateWhenResumed(Routes.EXCLUDED_APPS) },
                 onNavigateToDataCleanup = { title -> navController.navigateToTitledRoute(Routes.DATA_CLEANUP, title) },
                 onNavigateToConfigTransfer = { title -> navController.navigateToTitledRoute(Routes.CONFIG_TRANSFER, title) },
                 onNavigateToProviderManagement = { title -> navController.navigateToTitledRoute(Routes.PROVIDER_MANAGEMENT, title) },
@@ -260,6 +262,9 @@ fun AppNavHost(
                 },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
+        }
+        composable(Routes.EXCLUDED_APPS) {
+            ExcludedAppsScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.BLOCK_RESPONSE_SETTINGS) {
             BlockResponseSettingsScreen(

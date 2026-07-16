@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FlipToBack
 import androidx.compose.material.icons.filled.Groups
@@ -32,6 +33,7 @@ import com.haoze.dnssr.ui.components.SettingsScaffold
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToRuleManagement: (String) -> Unit,
+    onNavigateToExcludedApps: (String) -> Unit,
     onNavigateToDataCleanup: (String) -> Unit,
     onNavigateToConfigTransfer: (String) -> Unit,
     onNavigateToProviderManagement: (String) -> Unit,
@@ -56,6 +58,7 @@ fun SettingsScreen(
     val cacheSettingsTitle = "缓存设置"
     val raceModeSettingsTitle = "解析模式"
     val ruleManagementTitle = "域名规则"
+    val excludedAppsTitle = "排除应用"
     val logRetentionTitle = "日志保留"
     val dataCleanupTitle = "数据清理"
     val configTransferTitle = "导入与导出"
@@ -128,6 +131,13 @@ fun SettingsScreen(
                         subtitle = "添加屏蔽或白名单规则，导入规则订阅",
                         leadingIcon = Icons.AutoMirrored.Filled.Rule,
                         onClick = { onNavigateToRuleManagement(ruleManagementTitle) }
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = excludedAppsTitle,
+                        subtitle = "指定使用系统 DNS 的应用",
+                        leadingIcon = Icons.Filled.Apps,
+                        onClick = { onNavigateToExcludedApps(excludedAppsTitle) }
                     )
                 }
             }

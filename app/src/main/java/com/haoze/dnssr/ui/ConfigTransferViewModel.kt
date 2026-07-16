@@ -54,7 +54,11 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
             val result = manager.import(content) { progress ->
                 _importProgress.value = progress
             }
-            RuntimeDnsSettingsRefresher.refreshIfRunning(context, "configuration_imported")
+            if (result.excludedAppsUpdated) {
+                RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
+            } else {
+                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "configuration_imported")
+            }
             result.message()
         }
     }

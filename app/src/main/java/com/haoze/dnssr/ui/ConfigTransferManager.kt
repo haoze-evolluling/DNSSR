@@ -14,13 +14,15 @@ import org.json.JSONObject
 data class ConfigExportSelection(
     val providers: Boolean,
     val bootstrapIps: Boolean,
-    val subscriptions: Boolean
+    val subscriptions: Boolean,
+    val excludedApps: Boolean
 )
 
 data class ConfigImportResult(
     val added: Int,
     val skipped: Int,
-    val failed: Int
+    val failed: Int,
+    val excludedAppsUpdated: Boolean
 ) {
     fun message(): String = "导入完成：新增 $added 项，跳过 $skipped 项，失败 $failed 项"
 }
@@ -75,6 +77,11 @@ class ConfigTransferManager(private val context: Context) {
                 }
             })
         }
+        if (selection.excludedApps) {
+            root.put("excludedApps", JSONArray().apply {
+                AppSettings.getExcludedAppPackages(context).forEach(::put)
+            })
+        }
         return root.toString(2)
     }
 
@@ -86,8 +93,9 @@ class ConfigTransferManager(private val context: Context) {
         var added = 0
         var skipped = 0
         var failed = 0
+        var excludedAppsUpdated = false
         var processed = 0
-        val total = config.providers.size + config.bootstrapIps.size + config.subscriptions.size
+        val total = config.providers.size + config.bootstrapIps.size + config.subscriptions.size + config.excludedApps.size
 
         fun report(item: String) {
             onProgress(ConfigImportProgress(processed, total, item))
@@ -152,7 +160,21 @@ class ConfigTransferManager(private val context: Context) {
             }
             complete(item)
         }
-        return ConfigImportResult(added, skipped, failed)
+
+        if (config.excludedApps.isNotEmpty()) {
+            val installedPackages = context.packageManager.getInstalledApplications(0)
+                .mapTo(mutableSetOf()) { it.packageName }
+            val validPackages = config.excludedApps.filter { it in installedPackages }.toSet()
+            val invalidCount = config.excludedApps.size - validPackages.size
+            val existingPackages = AppSettings.getExcludedAppPackages(context)
+            val newPackages = validPackages - existingPackages
+            AppSettings.setExcludedAppPackages(context, existingPackages + validPackages)
+            excludedAppsUpdated = newPackages.isNotEmpty()
+            added += newPackages.size
+            skipped += validPackages.size - newPackages.size + invalidCount
+            config.excludedApps.forEach { packageName -> complete("排除应用：$packageName") }
+        }
+        return ConfigImportResult(added, skipped, failed, excludedAppsUpdated)
     }
 
     private fun parseAndValidate(content: String): TransferConfig {
@@ -161,7 +183,7 @@ class ConfigTransferManager(private val context: Context) {
         } catch (_: Exception) {
             throw IllegalArgumentException("配置文件不是有效的 JSON")
         }
-        if (root.optInt("formatVersion", -1) != FORMAT_VERSION) {
+        if (root.optInt("formatVersion", -1) !in SUPPORTED_FORMAT_VERSIONS) {
             throw IllegalArgumentException("不支持的配置文件版本")
         }
 
@@ -199,7 +221,10 @@ class ConfigTransferManager(private val context: Context) {
             }
             ImportedSubscription(obj.requiredString("name"), url)
         }
-        return TransferConfig(providers, bootstrapIps, subscriptions)
+        val excludedApps = root.optionalArray("excludedApps").mapStrings()
+            .filter { it.isNotBlank() }
+            .toSet()
+        return TransferConfig(providers, bootstrapIps, subscriptions, excludedApps)
     }
 
     private fun providerKey(provider: DnsProvider): String = providerKey(
@@ -229,10 +254,19 @@ class ConfigTransferManager(private val context: Context) {
         }
     }
 
+    private fun JSONArray.mapStrings(): List<String> = buildList {
+        for (index in 0 until length()) {
+            val item = optString(index, "").trim()
+            if (item.isEmpty()) throw IllegalArgumentException("配置列表格式错误")
+            add(item)
+        }
+    }
+
     private data class TransferConfig(
         val providers: List<ImportedProvider>,
         val bootstrapIps: List<ImportedBootstrap>,
-        val subscriptions: List<ImportedSubscription>
+        val subscriptions: List<ImportedSubscription>,
+        val excludedApps: Set<String>
     )
 
     private data class ImportedProvider(
@@ -247,6 +281,7 @@ class ConfigTransferManager(private val context: Context) {
     private data class ImportedSubscription(val name: String, val url: String)
 
     companion object {
-        private const val FORMAT_VERSION = 1
+        private const val FORMAT_VERSION = 2
+        private val SUPPORTED_FORMAT_VERSIONS = setOf(1, FORMAT_VERSION)
     }
 }

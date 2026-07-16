@@ -138,6 +138,7 @@ class DnsVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopVpn()
+            ACTION_REFRESH_APP_EXCLUSIONS -> refreshAppExclusions()
             ACTION_REFRESH_RACE_MODE_STRATEGY,
             ACTION_REFRESH_RUNTIME_CONFIG -> refreshRuntimeConfig(
                 intent.getStringExtra(EXTRA_REFRESH_REASON)
@@ -181,10 +182,12 @@ class DnsVpnService : VpnService() {
             builder.setBlocking(true)
         }
 
-        try {
-            builder.addDisallowedApplication(packageName)
-        } catch (e: Exception) {
-            Log.w(TAG, "addDisallowedApplication failed", e)
+        (AppSettings.getExcludedAppPackages(this) + packageName).forEach { excludedPackage ->
+            try {
+                builder.addDisallowedApplication(excludedPackage)
+            } catch (e: Exception) {
+                Log.w(TAG, "addDisallowedApplication failed for $excludedPackage", e)
+            }
         }
 
         vpnInterface = builder.establish() ?: run {
@@ -304,6 +307,24 @@ class DnsVpnService : VpnService() {
             .setOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
+    }
+
+    private fun refreshAppExclusions() {
+        if (vpnInterface == null) {
+            Log.d(TAG, "Skip application exclusion refresh because VPN is not running")
+            return
+        }
+
+        serviceScope.launch {
+            refreshMutex.withLock {
+                readJob?.cancel()
+                readJob = null
+                closeResolvers()
+                runCatching { vpnInterface?.close() }
+                vpnInterface = null
+                startVpn(startIntent)
+            }
+        }
     }
 
     private fun refreshForegroundNotification() {
@@ -1063,6 +1084,7 @@ class DnsVpnService : VpnService() {
     companion object {
         private const val TAG = "DnsVpnService"
         private const val ACTION_STOP = "com.haoze.dnssr.STOP_VPN"
+        private const val ACTION_REFRESH_APP_EXCLUSIONS = "com.haoze.dnssr.REFRESH_APP_EXCLUSIONS"
         private const val ACTION_REFRESH_RACE_MODE_STRATEGY = "com.haoze.dnssr.REFRESH_RACE_MODE_STRATEGY"
         private const val ACTION_REFRESH_RUNTIME_CONFIG = "com.haoze.dnssr.REFRESH_RUNTIME_CONFIG"
         private const val ACTION_REFRESH_NOTIFICATION = "com.haoze.dnssr.REFRESH_NOTIFICATION"
@@ -1127,6 +1149,10 @@ class DnsVpnService : VpnService() {
             return Intent(context, DnsVpnService::class.java)
                 .setAction(ACTION_REFRESH_RUNTIME_CONFIG)
                 .putExtra(EXTRA_REFRESH_REASON, reason)
+        }
+
+        fun refreshAppExclusionsIntent(context: android.content.Context): Intent {
+            return Intent(context, DnsVpnService::class.java).setAction(ACTION_REFRESH_APP_EXCLUSIONS)
         }
 
         fun refreshNotificationIntent(context: android.content.Context): Intent {

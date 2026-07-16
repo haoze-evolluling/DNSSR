@@ -17,4 +17,15 @@ object RuntimeDnsSettingsRefresher {
             Log.w(TAG, "Failed to request DNS runtime config refresh", error)
         }
     }
+
+    fun refreshAppExclusionsIfRunning(context: Context) {
+        val appContext = context.applicationContext
+        if (!DnsVpnService.isRunning(appContext)) return
+
+        runCatching {
+            appContext.startService(DnsVpnService.refreshAppExclusionsIntent(appContext))
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to refresh application exclusions", error)
+        }
+    }
 }
