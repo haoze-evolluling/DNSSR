@@ -139,7 +139,7 @@ fun ResolutionModeHomeScreen(
                             DnsResolutionMode.SINGLE -> providers.firstOrNull { it.id == singleId }?.name ?: "未配置"
                             DnsResolutionMode.SMART_PREDICTION -> "${smartIds.size} 个服务商"
                             DnsResolutionMode.PARALLEL_RACE -> "${parallelIds.size} 个服务商"
-                            DnsResolutionMode.PRIMARY_BACKUP -> "${backupIds.size} 个主备服务"
+                            DnsResolutionMode.PRIMARY_BACKUP -> "${backupIds.size} 个服务商"
                         }
                         SettingsNavigationItem(
                             title = itemMode.displayName,

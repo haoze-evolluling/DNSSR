@@ -35,9 +35,6 @@ import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
-import com.haoze.dnssr.ui.components.SettingsSwitchItem
-import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
-import com.haoze.dnssr.vpn.SubscriptionAutoUpdateSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,7 +66,6 @@ fun RuleManagementScreen(
     var showClearAllRulesDialog by remember { mutableStateOf(false) }
     var addRuleError by remember { mutableStateOf<String?>(null) }
     var addAllowRuleError by remember { mutableStateOf<String?>(null) }
-    var autoUpdateEnabled by remember { mutableStateOf(SubscriptionAutoUpdateSettings.isEnabled(context)) }
 
     fun openAddRuleDialog() {
         newRule = ""
@@ -101,7 +97,6 @@ fun RuleManagementScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.loadRuleCount()
-                autoUpdateEnabled = SubscriptionAutoUpdateSettings.isEnabled(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -186,24 +181,9 @@ fun RuleManagementScreen(
             }
             item {
                 SettingsGroup {
-                    SettingsSwitchItem(
-                        title = "自动更新规则订阅",
-                        subtitle = "在后台定期更新所有网络订阅，实际执行时间可能受系统调度影响",
-                        checked = autoUpdateEnabled,
-                        onCheckedChange = { enabled ->
-                            autoUpdateEnabled = enabled
-                            SubscriptionAutoUpdateSettings.save(
-                                context,
-                                enabled,
-                                SubscriptionAutoUpdateSettings.intervalHours(context)
-                            )
-                            SubscriptionAutoUpdateScheduler.sync(context)
-                        }
-                    )
-                    SettingsDivider()
                     SettingsNavigationItem(
-                        title = "更新间隔",
-                        subtitle = "设置后台自动更新规则订阅的频率",
+                        title = "自动更新设置",
+                        subtitle = "设置规则订阅的自动更新开关和频率",
                         onClick = onNavigateToAutoUpdateInterval
                     )
                 }

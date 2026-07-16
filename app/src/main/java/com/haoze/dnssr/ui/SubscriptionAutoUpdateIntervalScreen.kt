@@ -29,6 +29,7 @@ import com.haoze.dnssr.ui.components.SettingsInfoText
 import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsRadioItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
+import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
 import com.haoze.dnssr.vpn.SubscriptionAutoUpdateSettings
 
@@ -38,6 +39,9 @@ fun SubscriptionAutoUpdateIntervalScreen(onBack: () -> Unit) {
     val scrollState = rememberScrollState()
     var intervalHours by remember {
         mutableIntStateOf(SubscriptionAutoUpdateSettings.intervalHours(context))
+    }
+    var autoUpdateEnabled by remember {
+        mutableStateOf(SubscriptionAutoUpdateSettings.isEnabled(context))
     }
     var showCustomDialog by remember { mutableStateOf(false) }
     var customHours by remember { mutableStateOf("") }
@@ -64,7 +68,7 @@ fun SubscriptionAutoUpdateIntervalScreen(onBack: () -> Unit) {
         customError = null
     }
 
-    SettingsScaffold(title = "更新间隔", onBack = onBack) { innerPadding ->
+    SettingsScaffold(title = "自动更新设置", onBack = onBack) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -72,6 +76,20 @@ fun SubscriptionAutoUpdateIntervalScreen(onBack: () -> Unit) {
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            SettingsGroupTitle("自动更新")
+            SettingsGroup {
+                SettingsSwitchItem(
+                    title = "自动更新规则订阅",
+                    subtitle = "在后台定期更新所有网络订阅，实际执行时间可能受系统调度影响",
+                    checked = autoUpdateEnabled,
+                    onCheckedChange = { enabled ->
+                        autoUpdateEnabled = enabled
+                        SubscriptionAutoUpdateSettings.save(context, enabled, intervalHours)
+                        SubscriptionAutoUpdateScheduler.sync(context)
+                    }
+                )
+            }
+
             SettingsGroupTitle("自动更新时间")
             SettingsGroup {
                 SubscriptionAutoUpdateSettings.intervals.forEachIndexed { index, hours ->
