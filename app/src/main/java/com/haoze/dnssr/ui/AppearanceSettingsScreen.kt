@@ -3,6 +3,7 @@ package com.haoze.dnssr.ui
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -72,7 +73,8 @@ fun AppearanceSettingsScreen(
     onNavigateToThemeColorSettings: (String) -> Unit,
     onNavigateToHomeComponentOpacity: (String) -> Unit,
     onNavigateToHomeSentence: (String) -> Unit,
-    onNavigateToCustomBackground: (String) -> Unit
+    onNavigateToCustomBackground: (String) -> Unit,
+    onNavigateToServiceLightEffect: (String) -> Unit
 ) {
     val context = LocalContext.current
     val mode = AppSettings.getAppThemeMode(context)
@@ -82,13 +84,14 @@ fun AppearanceSettingsScreen(
     val homeComponentOpacityTitle = "首页透明度"
     val homeSentenceTitle = "首页句子"
     val customBackgroundTitle = "软件背景"
+    val serviceLightEffectTitle = "服务动态光影"
 
     SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = innerPadding
         ) {
-            item { SettingsGroupTitle("显示") }
+            item { SettingsGroupTitle("界面显示") }
             item {
                 SettingsGroup {
                     SettingsNavigationItem(
@@ -110,7 +113,11 @@ fun AppearanceSettingsScreen(
                         subtitle = "分别调整首页按钮、选择框与文字的透明度",
                         onClick = { onNavigateToHomeComponentOpacity(homeComponentOpacityTitle) }
                     )
-                    SettingsDivider()
+                }
+            }
+            item { SettingsGroupTitle("首页与效果") }
+            item {
+                SettingsGroup {
                     SettingsNavigationItem(
                         title = homeSentenceTitle,
                         subtitle = "分别设置 DNS 服务开启和关闭时的句子",
@@ -121,6 +128,54 @@ fun AppearanceSettingsScreen(
                         title = customBackgroundTitle,
                         subtitle = "选取手机图片作为应用背景",
                         onClick = { onNavigateToCustomBackground(customBackgroundTitle) }
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = serviceLightEffectTitle,
+                        subtitle = "设置服务启动和关闭时的动态光影效果",
+                        onClick = { onNavigateToServiceLightEffect(serviceLightEffectTitle) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ServiceLightEffectSettingsScreen(onBack: () -> Unit, title: String) {
+    val context = LocalContext.current
+    val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val customBackgroundEnabled = AppSettings.isCustomBackgroundEnabled(context)
+    var enabled by remember { mutableStateOf(AppSettings.isServiceLightEffectEnabled(context)) }
+
+    SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
+        ) {
+            item { SettingsGroupTitle("服务动态光影") }
+            item {
+                SettingsGroup {
+                    SettingsSwitchItem(
+                        title = "启用服务动态光影",
+                        subtitle = when {
+                            customBackgroundEnabled -> "软件背景已启用，服务动态光影不可同时使用"
+                            supported -> "启动和关闭服务时，光影从电源按钮向整个页面展开或收回"
+                            else -> "需要 Android 13 或更高版本"
+                        },
+                        checked = enabled,
+                        enabled = supported && !customBackgroundEnabled,
+                        onCheckedChange = {
+                            enabled = it
+                            AppSettings.setServiceLightEffectEnabled(context, it)
+                        }
+                    )
+                }
+            }
+            if (supported && !customBackgroundEnabled) {
+                item {
+                    SettingsInfoText(
+                        "光影效果代码来源于开源项目:\nhttps://github.com/badnng/Hyper-pick-up-code/"
                     )
                 }
             }
@@ -139,11 +194,34 @@ fun CustomBackgroundSettingsScreen(
     var selectedUri by remember { mutableStateOf(AppSettings.getCustomBackgroundUri(context)) }
     var wallpaperUris by remember { mutableStateOf(AppSettings.getCustomBackgroundUris(context)) }
     var pendingDeletionUri by remember { mutableStateOf<String?>(null) }
+    var pendingBackgroundChange by remember { mutableStateOf<PendingBackgroundChange?>(null) }
 
     fun refreshBackgroundState() {
         enabled = AppSettings.isCustomBackgroundEnabled(context)
         selectedUri = AppSettings.getCustomBackgroundUri(context)
         wallpaperUris = AppSettings.getCustomBackgroundUris(context)
+    }
+
+    fun applyBackgroundChange(change: PendingBackgroundChange, enableServiceLightEffect: Boolean = false) {
+        AppSettings.setCustomBackground(context, change.enabled, change.uri)
+        if (enableServiceLightEffect) {
+            AppSettings.setServiceLightEffectEnabled(context, true)
+        }
+        refreshBackgroundState()
+        onBackgroundChanged()
+    }
+
+    fun requestBackgroundChange(requestedEnabled: Boolean, uri: String?) {
+        val change = PendingBackgroundChange(requestedEnabled, uri)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            applyBackgroundChange(change)
+        } else if (requestedEnabled && !enabled) {
+            pendingBackgroundChange = change
+        } else if (!requestedEnabled && enabled) {
+            pendingBackgroundChange = change
+        } else {
+            applyBackgroundChange(change)
+        }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
@@ -152,9 +230,7 @@ fun CustomBackgroundSettingsScreen(
                 context.contentResolver.takePersistableUriPermission(selected, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             AppSettings.addCustomBackgroundUri(context, selected.toString())
-            AppSettings.setCustomBackground(context, true, selected.toString())
-            refreshBackgroundState()
-            onBackgroundChanged()
+            requestBackgroundChange(requestedEnabled = true, uri = selected.toString())
         }
     }
 
@@ -180,9 +256,7 @@ fun CustomBackgroundSettingsScreen(
                         checked = enabled,
                         enabled = selectedUri != null,
                         onCheckedChange = {
-                            AppSettings.setCustomBackground(context, it, selectedUri)
-                            refreshBackgroundState()
-                            onBackgroundChanged()
+                            requestBackgroundChange(requestedEnabled = it, uri = selectedUri)
                         }
                     )
                     SettingsDivider()
@@ -208,9 +282,7 @@ fun CustomBackgroundSettingsScreen(
                                     uri = uri,
                                     selected = uri == selectedUri,
                                     onClick = {
-                                        AppSettings.setCustomBackground(context, true, uri)
-                                        refreshBackgroundState()
-                                        onBackgroundChanged()
+                                        requestBackgroundChange(requestedEnabled = true, uri = uri)
                                     },
                                     onLongClick = { pendingDeletionUri = uri }
                                 )
@@ -242,8 +314,48 @@ fun CustomBackgroundSettingsScreen(
                 }
             )
         }
+
+        pendingBackgroundChange?.let { change ->
+            val enablingBackground = change.enabled
+            AlertDialog(
+                onDismissRequest = { pendingBackgroundChange = null },
+                title = {
+                    Text(if (enablingBackground) "开启软件背景" else "关闭软件背景")
+                },
+                text = {
+                    Text(
+                        if (enablingBackground) {
+                            "开启软件背景会关闭服务动态光影。是否继续？"
+                        } else {
+                            "关闭软件背景后，是否开启服务动态光影？"
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        applyBackgroundChange(change, enableServiceLightEffect = !enablingBackground)
+                        pendingBackgroundChange = null
+                    }) {
+                        Text(if (enablingBackground) "继续开启" else "开启")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        if (!enablingBackground) applyBackgroundChange(change)
+                        pendingBackgroundChange = null
+                    }) {
+                        Text(if (enablingBackground) "取消" else "不开启")
+                    }
+                }
+            )
+        }
     }
 }
+
+private data class PendingBackgroundChange(
+    val enabled: Boolean,
+    val uri: String?
+)
 
 @Composable
 private fun WallpaperThumbnail(

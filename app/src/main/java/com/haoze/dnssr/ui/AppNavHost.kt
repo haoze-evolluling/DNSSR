@@ -80,7 +80,9 @@ object Routes {
     const val HOME_COMPONENT_OPACITY = "home_component_opacity"
     const val HOME_SENTENCE_SETTINGS = "home_sentence_settings"
     const val CUSTOM_BACKGROUND_SETTINGS = "custom_background_settings"
+    const val SERVICE_LIGHT_EFFECT_SETTINGS = "service_light_effect_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
+    const val DOH3_SERVICE = "doh3_service"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
     const val ABOUT = "about"
@@ -336,8 +338,12 @@ fun AppNavHost(
         composable(titledRoute(Routes.EXPERIMENTAL_FEATURES), arguments = listOf(screenTitleArgument("实验功能"))) { entry ->
             ExperimentalFeaturesScreen(
                 onBack = { navController.popWhenResumed() },
+                onNavigateToDoh3Service = { navController.navigateWhenResumed(Routes.DOH3_SERVICE) },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
             )
+        }
+        composable(Routes.DOH3_SERVICE) {
+            Doh3ServiceScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.SUBSCRIPTION_MANAGEMENT) {
             SubscriptionScreen(
@@ -380,6 +386,9 @@ fun AppNavHost(
                 },
                 onNavigateToCustomBackground = { title ->
                     navController.navigateToTitledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS, title)
+                },
+                onNavigateToServiceLightEffect = { title ->
+                    navController.navigateToTitledRoute(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, title)
                 }
             )
         }
@@ -414,6 +423,12 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "软件背景",
                 onBackgroundChanged = onCustomBackgroundChanged
+            )
+        }
+        composable(titledRoute(Routes.SERVICE_LIGHT_EFFECT_SETTINGS), arguments = listOf(screenTitleArgument("服务动态光影"))) { entry ->
+            ServiceLightEffectSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "服务动态光影"
             )
         }
         composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->

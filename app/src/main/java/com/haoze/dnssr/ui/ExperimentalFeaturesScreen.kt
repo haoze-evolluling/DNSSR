@@ -1,12 +1,13 @@
 package com.haoze.dnssr.ui
 
-import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Construction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,12 +19,14 @@ import androidx.compose.ui.unit.dp
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
+import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
 
 @Composable
 fun ExperimentalFeaturesScreen(
     onBack: () -> Unit,
+    onNavigateToDoh3Service: () -> Unit,
     title: String = "实验功能"
 ) {
     val context = LocalContext.current
@@ -34,12 +37,6 @@ fun ExperimentalFeaturesScreen(
     var legacyLogPageEnabled by remember {
         mutableStateOf(AppSettings.isLegacyLogPageEnabled(context))
     }
-    val serviceLightEffectSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-    var serviceLightEffectEnabled by remember {
-        mutableStateOf(AppSettings.isServiceLightEffectEnabled(context))
-    }
-    val customBackgroundEnabled = AppSettings.isCustomBackgroundEnabled(context)
-
     fun saveLegacyIconEnabled(enabled: Boolean) {
         legacyIconEnabled = enabled
         AppSettings.setLegacyIconEnabled(context, enabled)
@@ -49,12 +46,6 @@ fun ExperimentalFeaturesScreen(
     fun saveLegacyLogPageEnabled(enabled: Boolean) {
         legacyLogPageEnabled = enabled
         AppSettings.setLegacyLogPageEnabled(context, enabled)
-    }
-
-    fun saveServiceLightEffectEnabled(enabled: Boolean) {
-        if (!serviceLightEffectSupported) return
-        serviceLightEffectEnabled = enabled
-        AppSettings.setServiceLightEffectEnabled(context, enabled)
     }
 
     SettingsScaffold(
@@ -73,21 +64,18 @@ fun ExperimentalFeaturesScreen(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
+            SettingsGroupTitle("服务")
+            SettingsGroup {
+                SettingsNavigationItem(
+                    title = "DOH3 服务",
+                    subtitle = "查看开发进度",
+                    leadingIcon = Icons.Filled.Construction,
+                    onClick = onNavigateToDoh3Service
+                )
+            }
+
             SettingsGroupTitle("外观")
             SettingsGroup {
-                SettingsSwitchItem(
-                    title = "服务动态光影",
-                    subtitle = if (customBackgroundEnabled) {
-                        "软件背景已启用，服务动态光影不可同时使用"
-                    } else if (serviceLightEffectSupported) {
-                        "启动和关闭服务时，光影从电源按钮向整个页面展开或收回\n光影效果代码来源于开源项目:\nhttps://github.com/badnng/Hyper-pick-up-code/"
-                    } else {
-                        "需要 Android 13 或更高版本"
-                    },
-                    checked = serviceLightEffectEnabled,
-                    enabled = serviceLightEffectSupported && !customBackgroundEnabled,
-                    onCheckedChange = ::saveServiceLightEffectEnabled
-                )
                 SettingsSwitchItem(
                     title = "使用旧版图标",
                     subtitle = "开启后仅将桌面入口图标切换为旧版样式",
