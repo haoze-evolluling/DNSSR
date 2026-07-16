@@ -120,7 +120,8 @@ fun SubscriptionScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .padding(top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             // 操作结果消息
@@ -559,7 +560,8 @@ private fun AddSubscriptionDialog(
                     placeholder = { Text("https://example.com/filter.txt") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     shape = SettingsCornerShape,
-                    singleLine = true,
+                    minLines = 2,
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -669,7 +671,8 @@ private fun EditSubscriptionDialog(
                     onValueChange = { url = it },
                     label = { Text("订阅地址") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    singleLine = true,
+                    minLines = 2,
+                    maxLines = 4,
                     shape = SettingsCornerShape,
                     modifier = Modifier.fillMaxWidth()
                 )
