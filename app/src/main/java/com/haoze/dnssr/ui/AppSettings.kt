@@ -130,6 +130,7 @@ object AppSettings {
     private const val KEY_HOME_SENTENCE_STOPPED = "home_sentence_stopped"
     private const val KEY_CUSTOM_BACKGROUND_ENABLED = "custom_background_enabled"
     private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
+    private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -684,7 +685,7 @@ object AppSettings {
     fun isCustomBackgroundEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(KEY_CUSTOM_BACKGROUND_ENABLED, false) &&
-            !prefs.getString(KEY_CUSTOM_BACKGROUND_URI, null).isNullOrEmpty()
+            getCustomBackgroundUri(context) in getCustomBackgroundUris(context)
     }
 
     fun getCustomBackgroundUri(context: Context): String? {
@@ -692,15 +693,67 @@ object AppSettings {
             .getString(KEY_CUSTOM_BACKGROUND_URI, null)
     }
 
+    fun getCustomBackgroundUris(context: Context): List<String> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val stored = prefs.getString(KEY_CUSTOM_BACKGROUND_URIS, null)
+        if (stored != null) {
+            return try {
+                val array = JSONArray(stored)
+                buildList {
+                    for (index in 0 until array.length()) {
+                        array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                    }
+                }.distinct()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+        val legacyUri = prefs.getString(KEY_CUSTOM_BACKGROUND_URI, null)?.takeIf { it.isNotBlank() }
+        val uris = listOfNotNull(legacyUri)
+        saveCustomBackgroundUris(context, uris)
+        return uris
+    }
+
+    fun addCustomBackgroundUri(context: Context, uri: String) {
+        val normalizedUri = uri.takeIf { it.isNotBlank() } ?: return
+        val uris = getCustomBackgroundUris(context)
+        if (normalizedUri !in uris) {
+            saveCustomBackgroundUris(context, uris + normalizedUri)
+        }
+    }
+
+    fun removeCustomBackgroundUri(context: Context, uri: String) {
+        val remainingUris = getCustomBackgroundUris(context).filterNot { it == uri }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val isCurrentUri = prefs.getString(KEY_CUSTOM_BACKGROUND_URI, null) == uri
+        saveCustomBackgroundUris(context, remainingUris)
+        if (isCurrentUri) {
+            prefs.edit()
+                .putBoolean(KEY_CUSTOM_BACKGROUND_ENABLED, false)
+                .putString(KEY_CUSTOM_BACKGROUND_URI, null)
+                .apply()
+        }
+    }
+
     fun setCustomBackground(context: Context, enabled: Boolean, uri: String?) {
-        val actualEnabled = enabled && !uri.isNullOrEmpty()
+        val normalizedUri = uri?.takeIf { it.isNotBlank() }
+        if (normalizedUri != null) addCustomBackgroundUri(context, normalizedUri)
+        val actualEnabled = enabled && normalizedUri != null
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_CUSTOM_BACKGROUND_ENABLED, actualEnabled)
-            .putString(KEY_CUSTOM_BACKGROUND_URI, uri)
+            .putString(KEY_CUSTOM_BACKGROUND_URI, normalizedUri)
             .apply {
                 if (actualEnabled) putBoolean(KEY_SERVICE_LIGHT_EFFECT_ENABLED, false)
             }
+            .apply()
+    }
+
+    private fun saveCustomBackgroundUris(context: Context, uris: List<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CUSTOM_BACKGROUND_URIS, JSONArray(uris.distinct()).toString())
             .apply()
     }
 

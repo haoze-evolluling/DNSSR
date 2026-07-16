@@ -1,20 +1,35 @@
 package com.haoze.dnssr.ui
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
@@ -25,12 +40,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
@@ -115,53 +136,172 @@ fun CustomBackgroundSettingsScreen(
 ) {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(AppSettings.isCustomBackgroundEnabled(context)) }
-    var uri by remember { mutableStateOf(AppSettings.getCustomBackgroundUri(context)) }
+    var selectedUri by remember { mutableStateOf(AppSettings.getCustomBackgroundUri(context)) }
+    var wallpaperUris by remember { mutableStateOf(AppSettings.getCustomBackgroundUris(context)) }
+    var pendingDeletionUri by remember { mutableStateOf<String?>(null) }
+
+    fun refreshBackgroundState() {
+        enabled = AppSettings.isCustomBackgroundEnabled(context)
+        selectedUri = AppSettings.getCustomBackgroundUri(context)
+        wallpaperUris = AppSettings.getCustomBackgroundUris(context)
+    }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(selected, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            uri = selected.toString()
-            enabled = true
-            AppSettings.setCustomBackground(context, true, uri)
+            AppSettings.addCustomBackgroundUri(context, selected.toString())
+            AppSettings.setCustomBackground(context, true, selected.toString())
+            refreshBackgroundState()
             onBackgroundChanged()
         }
     }
 
     SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
-            item { SettingsGroupTitle("自定义背景") }
-            item {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                top = innerPadding.calculateTopPadding(),
+                end = 8.dp,
+                bottom = innerPadding.calculateBottomPadding()
+            ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) { SettingsGroupTitle("自定义背景") }
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 SettingsGroup {
                     SettingsSwitchItem(
                         title = "启用软件背景",
-                        subtitle = if (uri == null) "请先选择一张图片" else "启用后服务动态光影将自动关闭",
+                        subtitle = if (selectedUri == null) "请先添加一张图片" else "启用后服务动态光影将自动关闭",
                         checked = enabled,
-                        enabled = uri != null,
+                        enabled = selectedUri != null,
                         onCheckedChange = {
-                            enabled = it
-                            AppSettings.setCustomBackground(context, it, uri)
+                            AppSettings.setCustomBackground(context, it, selectedUri)
+                            refreshBackgroundState()
                             onBackgroundChanged()
                         }
                     )
                     SettingsDivider()
-                    SettingsItem(title = if (uri == null) "选择图片" else "更换图片") {
-                        TextButton(onClick = { picker.launch(arrayOf("image/*")) }) { Text("选择") }
+                    SettingsItem(title = "添加图片") {
+                        TextButton(onClick = { picker.launch(arrayOf("image/*")) }) { Text("添加") }
                     }
-                    if (uri != null) {
-                        SettingsDivider()
-                        SettingsItem(title = "移除当前图片") {
-                            TextButton(onClick = {
-                                uri = null
-                                enabled = false
-                                AppSettings.setCustomBackground(context, false, null)
-                                onBackgroundChanged()
-                            }) { Text("移除") }
+                }
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) { SettingsInfoText("软件背景与服务动态光影不可同时启用。") }
+            if (wallpaperUris.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { SettingsGroupTitle("已添加壁纸") }
+                wallpaperUris.chunked(3).forEach { rowUris ->
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowUris.forEach { uri ->
+                                WallpaperThumbnail(
+                                    modifier = Modifier.weight(1f),
+                                    uri = uri,
+                                    selected = uri == selectedUri,
+                                    onClick = {
+                                        AppSettings.setCustomBackground(context, true, uri)
+                                        refreshBackgroundState()
+                                        onBackgroundChanged()
+                                    },
+                                    onLongClick = { pendingDeletionUri = uri }
+                                )
+                            }
+                            repeat(3 - rowUris.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }
             }
-            item { SettingsInfoText("软件背景与服务动态光影不可同时启用。") }
+        }
+
+        pendingDeletionUri?.let { uri ->
+            AlertDialog(
+                onDismissRequest = { pendingDeletionUri = null },
+                title = { Text("删除壁纸") },
+                text = { Text("确定删除这张已添加的壁纸吗？") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        AppSettings.removeCustomBackgroundUri(context, uri)
+                        pendingDeletionUri = null
+                        refreshBackgroundState()
+                        onBackgroundChanged()
+                    }) { Text("删除") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeletionUri = null }) { Text("取消") }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun WallpaperThumbnail(
+    modifier: Modifier = Modifier,
+    uri: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val screenAspectRatio = configuration.screenWidthDp.toFloat() /
+        configuration.screenHeightDp.coerceAtLeast(1).toFloat()
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(uri)).use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .aspectRatio(screenAspectRatio)
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+    ) {
+        bitmap?.let {
+            Image(
+                bitmap = it,
+                contentDescription = "软件背景",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.2f))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "当前背景",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
