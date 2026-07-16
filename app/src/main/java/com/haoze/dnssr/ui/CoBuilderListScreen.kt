@@ -57,6 +57,11 @@ private val CO_BUILDERS = listOf(
         name = "酷安@widiOA",
         avatarRes = R.drawable.widioa_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "遇屿",
+        avatarRes = R.drawable.yuyu_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     )
 )
 
