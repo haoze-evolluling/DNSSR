@@ -6,13 +6,13 @@ DNSSR 是一款 Android 本地 DNS 解析管理工具。应用通过 Android `Vp
 
 ## 功能
 
-- 支持普通 DNS、DNS-over-HTTPS（DoH）、HTTP/3 DNS-over-HTTPS（DoH3）和 DNS-over-TLS（DoT）。
+- 支持普通 DNS、DNS-over-HTTPS（DoH）和 DNS-over-TLS（DoT）。
 - 内置多个服务商，可添加、编辑、删除自定义服务商，并在首页控制服务商显示。
 - 提供四种解析模式：单服务商、择优而行（按健康权重选择）、百舸争流（并发查询并采用最快成功响应）和有备无患（按优先级切换主备服务）。
 - 支持 DNS 缓存，可选择跟随上游 TTL、限制最长 TTL 或固定 TTL，并可在上游失败时使用短暂过期缓存。
 - 支持域名屏蔽规则、白名单规则和 AdGuard DNS 规则订阅；订阅可手动刷新或定期自动更新。
 - 支持 NXDOMAIN、返回 `0.0.0.0` 或 `::` 等屏蔽响应方式。
-- 支持 Bootstrap IP，减少解析 DoH、DoH3 与 DoT 服务商域名时对系统 DNS 的依赖。
+- 支持 Bootstrap IP，减少解析 DoH 与 DoT 服务商域名时对系统 DNS 的依赖。
 - 提供 DNS 请求日志、规则拦截率、缓存记录、竞速统计、服务商健康状态与 Bootstrap 统计。
 - 支持导入、导出自定义服务商和规则订阅配置，以及 Android 快捷设置磁贴开关。
 
@@ -20,7 +20,7 @@ DNSSR 是一款 Android 本地 DNS 解析管理工具。应用通过 Android `Vp
 
 启动服务后，Android 会要求授予 VPN 权限。DNSSR 创建虚拟网卡并仅拦截 DNS 查询，将其交给已配置的上游服务处理。
 
-DNS 缓存、日志、规则和服务商配置均保存在设备本机。上游服务商仍会收到为完成解析所必需的域名请求。DoH、DoH3 和 DoT 会加密设备到上游之间的 DNS 传输；普通 DNS 不具备此保护。DoH3 基于 QUIC，网络需要允许 UDP/443。
+DNS 缓存、日志、规则和服务商配置均保存在设备本机。上游服务商仍会收到为完成解析所必需的域名请求。DoH 和 DoT 会加密设备到上游之间的 DNS 传输；普通 DNS 不具备此保护。
 
 ## 使用
 
@@ -49,7 +49,7 @@ app/build/outputs/apk/debug/app-debug.apk
 - Kotlin 与 Jetpack Compose
 - Android `VpnService`
 - Room
-- OkHttp 与 Cronet
+- OkHttp
 - Navigation Compose、Paging 与 WorkManager
 
 ## 作者与许可证

@@ -56,7 +56,6 @@ object DnsLatencyTester {
         return when (provider.protocol) {
             DnsProtocol.DNS -> testPlainDns(provider, query, bootstrapSelector)
             DnsProtocol.DOH -> testDoh(provider, query, bootstrapSelector)
-            DnsProtocol.DOH3 -> testDoh3(context, provider, query)
             DnsProtocol.DOT -> testDot(provider, query, bootstrapSelector)
         }
     }
@@ -103,37 +102,6 @@ object DnsLatencyTester {
             successCount = 0,
             elapsedSamplesMs = emptyList()
         )
-    }
-
-    private suspend fun testDoh3(
-        context: android.content.Context,
-        provider: DnsProvider,
-        query: ByteArray
-    ): Result {
-        val start = System.currentTimeMillis()
-        val resolver = Doh3Resolver(context, provider.url)
-        return try {
-            val response = resolver.resolve(query)
-            Result(
-                providerId = provider.id,
-                providerName = provider.name,
-                protocol = provider.protocol,
-                elapsedMs = System.currentTimeMillis() - start,
-                success = DnsMessageUtils.isSuccessResponse(response),
-                message = null
-            )
-        } catch (e: Exception) {
-            Result(
-                providerId = provider.id,
-                providerName = provider.name,
-                protocol = provider.protocol,
-                elapsedMs = System.currentTimeMillis() - start,
-                success = false,
-                message = e.message
-            )
-        } finally {
-            resolver.close()
-        }
     }
 
     private suspend fun testDoh(

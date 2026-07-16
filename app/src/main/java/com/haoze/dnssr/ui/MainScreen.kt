@@ -246,7 +246,6 @@ private fun MainContent(
             .coerceAtLeast(0)
         val raceDisplayValue = raceProviderSummary(raceProviders.map { it.name })
         var expanded by remember { mutableStateOf(false) }
-        var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
 
         Column(
             modifier = Modifier
@@ -314,13 +313,7 @@ private fun MainContent(
                                             when (provider.id) {
                                                 MANAGE_PROVIDER_ID -> onNavigateToProviderManagement()
                                                 PROVIDER_VISIBILITY_ID -> onNavigateToHomeProviderVisibility()
-                                                else -> {
-                                                    if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
-                                                        pendingDoh3Provider = provider
-                                                    } else {
-                                                        viewModel.selectProvider(provider.id)
-                                                    }
-                                                }
+                                                else -> viewModel.selectProvider(provider.id)
                                             }
                                         }
                                     )
@@ -382,22 +375,6 @@ private fun MainContent(
             Text(text = "模式切换 · ${resolutionMode.displayName}")
         }
 
-        pendingDoh3Provider?.let { provider ->
-            Doh3FirstUseDialog(
-                provider = provider,
-                providers = providers,
-                onContinue = {
-                    AppSettings.acknowledgeDoh3Provider(context, provider.id)
-                    viewModel.selectProvider(provider.id)
-                    pendingDoh3Provider = null
-                },
-                onReplacementSelected = { replacement ->
-                    viewModel.selectProvider(replacement.id)
-                    pendingDoh3Provider = null
-                },
-                onDismiss = { pendingDoh3Provider = null }
-            )
-        }
     }
 }
 

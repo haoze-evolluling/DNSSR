@@ -206,7 +206,6 @@ fun ResolutionModeConfigScreen(
         DnsResolutionMode.PRIMARY_BACKUP -> backupIds.toSet()
         DnsResolutionMode.SINGLE -> setOf(singleId)
     }
-    var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
 
     fun applyProviderSelection(provider: DnsProvider) {
         if (mode == DnsResolutionMode.SINGLE) {
@@ -220,28 +219,9 @@ fun ResolutionModeConfigScreen(
         if (mode == DnsResolutionMode.SINGLE && provider.id == singleId) return
         if (mode != DnsResolutionMode.SINGLE && provider.id in selected) {
             applyProviderSelection(provider)
-        } else if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
-            pendingDoh3Provider = provider
         } else {
             applyProviderSelection(provider)
         }
-    }
-
-    pendingDoh3Provider?.let { provider ->
-        Doh3FirstUseDialog(
-            provider = provider,
-            providers = providers,
-            onContinue = {
-                AppSettings.acknowledgeDoh3Provider(context, provider.id)
-                applyProviderSelection(provider)
-                pendingDoh3Provider = null
-            },
-            onReplacementSelected = { replacement ->
-                applyProviderSelection(replacement)
-                pendingDoh3Provider = null
-            },
-            onDismiss = { pendingDoh3Provider = null }
-        )
     }
 
     SettingsScaffold(title = mode.displayName, onBack = onBack) { padding ->

@@ -166,8 +166,12 @@ class ConfigTransferManager(private val context: Context) {
         }
 
         val providers = root.optionalArray("providers").mapObjects { obj ->
-            val protocol = DnsProtocol.entries.firstOrNull { it.name == obj.requiredString("protocol") }
-                ?: throw IllegalArgumentException("配置中包含不支持的 DNS 协议")
+            val protocolName = obj.requiredString("protocol")
+            val protocol = if (protocolName.equals("DOH3", ignoreCase = true)) {
+                DnsProtocol.DOH
+            } else {
+                DnsProtocol.entries.firstOrNull { it.name == protocolName }
+            } ?: throw IllegalArgumentException("配置中包含不支持的 DNS 协议")
             val provider = ImportedProvider(
                 name = obj.requiredString("name"),
                 protocol = protocol,
@@ -176,7 +180,7 @@ class ConfigTransferManager(private val context: Context) {
                 port = obj.optInt("port", if (protocol == DnsProtocol.DNS) 53 else 853)
             )
             val valid = when (protocol) {
-                DnsProtocol.DOH, DnsProtocol.DOH3 -> DnsProvider.isValidDohUrl(provider.url)
+                DnsProtocol.DOH -> DnsProvider.isValidDohUrl(provider.url)
                 DnsProtocol.DOT -> DnsProvider.isValidDotHost(provider.host) && DnsProvider.isValidDotPort(provider.port)
                 DnsProtocol.DNS -> DnsProvider.isValidDnsHost(provider.host) && DnsProvider.isValidDotPort(provider.port)
             }
@@ -203,7 +207,7 @@ class ConfigTransferManager(private val context: Context) {
     )
 
     private fun providerKey(provider: ImportedProvider): String = when (provider.protocol) {
-        DnsProtocol.DOH, DnsProtocol.DOH3 -> "${provider.protocol.name}:${provider.url.lowercase()}"
+        DnsProtocol.DOH -> "${provider.protocol.name}:${provider.url.lowercase()}"
         else -> "${provider.protocol.name}:${provider.host.lowercase()}:${provider.port}"
     }
 

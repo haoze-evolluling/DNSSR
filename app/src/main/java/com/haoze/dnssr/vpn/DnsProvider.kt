@@ -10,11 +10,10 @@ import java.util.UUID
 enum class DnsProtocol(val label: String) {
     DNS("DNS"),
     DOH("DoH"),
-    DOH3("DoH3"),
     DOT("DoT");
 
     companion object {
-        val MANAGED_PROTOCOLS = listOf(DNS, DOH, DOH3, DOT)
+        val MANAGED_PROTOCOLS = listOf(DNS, DOH, DOT)
 
         fun fromStorage(value: String?): DnsProtocol {
             return entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: DOH
@@ -40,7 +39,6 @@ data class DnsProvider(
         return when (protocol) {
             DnsProtocol.DNS -> "[${protocol.label}] $host:$port"
             DnsProtocol.DOH -> "[${protocol.label}] $url"
-            DnsProtocol.DOH3 -> "[${protocol.label}] $url"
             DnsProtocol.DOT -> "[${protocol.label}] $host:$port"
         }
     }
@@ -49,7 +47,6 @@ data class DnsProvider(
         return when (protocol) {
             DnsProtocol.DNS -> "$host:$port"
             DnsProtocol.DOH -> url
-            DnsProtocol.DOH3 -> url
             DnsProtocol.DOT -> "$host:$port"
         }
     }
@@ -155,34 +152,6 @@ data class DnsProvider(
                 isPreset = true
             ),
             DnsProvider(
-                id = "preset_alidns_doh3",
-                name = "AdGuard DNS",
-                protocol = DnsProtocol.DOH3,
-                url = "https://dns.adguard-dns.com/dns-query",
-                isPreset = true
-            ),
-            DnsProvider(
-                id = "preset_dnspod_doh3",
-                name = "Quad9",
-                protocol = DnsProtocol.DOH3,
-                url = "https://dns.quad9.net/dns-query",
-                isPreset = true
-            ),
-            DnsProvider(
-                id = "preset_cloudflare_doh3",
-                name = "Cloudflare",
-                protocol = DnsProtocol.DOH3,
-                url = "https://cloudflare-dns.com/dns-query",
-                isPreset = true
-            ),
-            DnsProvider(
-                id = "preset_google_doh3",
-                name = "Google",
-                protocol = DnsProtocol.DOH3,
-                url = "https://dns.google/dns-query",
-                isPreset = true
-            ),
-            DnsProvider(
                 id = "preset_alidns_dot",
                 name = "阿里云",
                 protocol = DnsProtocol.DOT,
@@ -247,6 +216,10 @@ data class DnsProvider(
         fun loadSelected(context: Context): DnsProvider {
             val all = loadRuntimeProviders(context)
             val selectedId = prefs(context).getString(KEY_SELECTED_PROVIDER_ID, null)
+            if (selectedId in LEGACY_DOH3_PRESET_IDS) {
+                saveSelected(context, GOOGLE_DOH_PROVIDER_ID)
+                return all.first { it.id == GOOGLE_DOH_PROVIDER_ID }
+            }
             return all.find { it.id == selectedId }
                 ?: all.find { it.id == DEFAULT_SELECTED_PROVIDER_ID }
                 ?: PRESETS.first()
@@ -287,12 +260,18 @@ data class DnsProvider(
             val json = prefs(context).getString(KEY_USER_PROVIDERS_JSON, null) ?: return emptyList()
             return try {
                 val array = JSONArray(json)
-                buildList {
+                var migratedLegacyProtocol = false
+                val providers = buildList {
                     for (i in 0 until array.length()) {
                         val obj = array.getJSONObject(i)
+                        if (obj.optString("protocol").equals(LEGACY_DOH3_PROTOCOL, ignoreCase = true)) {
+                            migratedLegacyProtocol = true
+                        }
                         obj.toDnsProvider()?.let(::add)
                     }
                 }
+                if (migratedLegacyProtocol) saveUserProviders(context, providers)
+                providers
             } catch (_: Exception) {
                 emptyList()
             }
@@ -388,8 +367,10 @@ data class DnsProvider(
 
         private fun JSONObject.toDnsProvider(): DnsProvider? {
             val protocolValue = optString("protocol", "").takeIf { it.isNotBlank() }
-            val protocol = DnsProtocol.entries.firstOrNull {
-                it.name.equals(protocolValue, ignoreCase = true)
+            val protocol = if (protocolValue.equals(LEGACY_DOH3_PROTOCOL, ignoreCase = true)) {
+                DnsProtocol.DOH
+            } else {
+                DnsProtocol.entries.firstOrNull { it.name.equals(protocolValue, ignoreCase = true) }
             } ?: return null
             if (protocol !in DnsProtocol.MANAGED_PROTOCOLS) return null
             return DnsProvider(
@@ -412,5 +393,14 @@ data class DnsProvider(
             if (trimmed.contains(":")) return true
             return false
         }
+
+        private const val LEGACY_DOH3_PROTOCOL = "DOH3"
+        const val GOOGLE_DOH_PROVIDER_ID = "preset_google_doh"
+        val LEGACY_DOH3_PRESET_IDS = setOf(
+            "preset_alidns_doh3",
+            "preset_dnspod_doh3",
+            "preset_cloudflare_doh3",
+            "preset_google_doh3"
+        )
     }
 }

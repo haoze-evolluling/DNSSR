@@ -307,10 +307,6 @@ class DnsVpnService : VpnService() {
                 dohUrl = provider.url,
                 bootstrapSelector = bootstrapSelector
             )
-            DnsProtocol.DOH3 -> Doh3Resolver(
-                context = this,
-                dohUrl = provider.url
-            )
             DnsProtocol.DOT -> DotResolver(
                 vpnService = this,
                 host = provider.host,
@@ -329,7 +325,7 @@ class DnsVpnService : VpnService() {
                 DnsProvider(
                     id = runtimeCustomProviderId(url),
                     name = name,
-                    protocol = protocol.takeIf { it == DnsProtocol.DOH || it == DnsProtocol.DOH3 } ?: DnsProtocol.DOH,
+                    protocol = DnsProtocol.DOH,
                     url = url,
                     isPreset = false
                 )
@@ -1080,7 +1076,7 @@ class DnsVpnService : VpnService() {
             return Intent(context, DnsVpnService::class.java).apply {
                 provider?.let {
                     putExtra(EXTRA_DNS_PROTOCOL, it.protocol.name)
-                    if (it.protocol == DnsProtocol.DOH || it.protocol == DnsProtocol.DOH3) {
+                    if (it.protocol == DnsProtocol.DOH) {
                         putExtra(EXTRA_DOH_URL, it.url)
                     } else {
                         putExtra(EXTRA_DNS_HOST, it.host)

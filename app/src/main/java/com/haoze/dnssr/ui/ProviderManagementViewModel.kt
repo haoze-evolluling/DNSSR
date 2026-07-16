@@ -142,7 +142,7 @@ class ProviderManagementViewModel(application: Application) : AndroidViewModel(a
             return false
         }
         when (protocol) {
-            DnsProtocol.DOH, DnsProtocol.DOH3 -> {
+            DnsProtocol.DOH -> {
                 if (!DnsProvider.isValidDohUrl(url)) {
                     _message.value = "${protocol.label} 解析地址必须以 https:// 开头"
                     return false
@@ -173,7 +173,7 @@ class ProviderManagementViewModel(application: Application) : AndroidViewModel(a
     }
 
     private fun parsePortOrDefault(protocol: DnsProtocol, portText: String): Int? {
-        if (protocol == DnsProtocol.DOH || protocol == DnsProtocol.DOH3) return DnsProvider.DEFAULT_DOT_PORT
+        if (protocol == DnsProtocol.DOH) return DnsProvider.DEFAULT_DOT_PORT
         val defaultPort = if (protocol == DnsProtocol.DNS) {
             DnsProvider.DEFAULT_DNS_PORT
         } else {

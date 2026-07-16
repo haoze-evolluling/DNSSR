@@ -347,7 +347,7 @@
     <section class="section" aria-labelledby="capabilitiesTitle">
       <div class="section-heading"><h2 id="capabilitiesTitle">核心能力</h2><span class="section-index">01 / CAPABILITIES</span></div>
       <div class="capability-grid">
-        <article class="capability"><span class="capability-mark">[01]</span><h3>加密上游</h3><p>支持 DNS、DoH、DoH3 与 DoT，并可管理自定义服务商。</p></article>
+        <article class="capability"><span class="capability-mark">[01]</span><h3>加密上游</h3><p>支持 DNS、DoH 与 DoT，并可管理自定义服务商。</p></article>
         <article class="capability"><span class="capability-mark">[02]</span><h3>规则与缓存</h3><p>以缓存、屏蔽规则、白名单和订阅规则减少重复请求与干扰。</p></article>
         <article class="capability"><span class="capability-mark">[03]</span><h3>可观测性</h3><p>通过请求日志、竞速统计、服务商健康和 Bootstrap 数据追踪状态。</p></article>
         <article class="capability"><span class="capability-mark">[04]</span><h3>独立引导</h3><p>支持 Bootstrap IP，降低解析加密上游域名时对系统 DNS 的依赖。</p></article>
@@ -360,8 +360,8 @@
       <div class="section-heading"><h2 id="architectureTitle">运行边界</h2><span class="section-index">02 / ARCHITECTURE</span></div>
       <div class="detail-grid">
         <article class="detail-panel"><h3>仅处理 DNS</h3><p>DNSSR 通过 Android VpnService 建立仅处理 DNS 的本地通道，不代理普通网页、应用数据或文件传输流量。启用时 Android 会请求 VPN 权限。</p></article>
-        <article class="detail-panel"><h3>实际解析表现</h3><p>解析速度、稳定性和可用性取决于网络环境、所选上游和本机规则。DoH3 基于 QUIC，需要网络允许 UDP/443。</p></article>
-        <article class="detail-panel"><h3>隐私与本地存储</h3><p>缓存、请求日志、规则与服务商配置保存在设备本机。上游仍会收到必要查询；仅 DoH、DoH3、DoT 会加密到上游的 DNS 传输。</p></article>
+        <article class="detail-panel"><h3>实际解析表现</h3><p>解析速度、稳定性和可用性取决于网络环境、所选上游和本机规则。</p></article>
+        <article class="detail-panel"><h3>隐私与本地存储</h3><p>缓存、请求日志、规则与服务商配置保存在设备本机。上游仍会收到必要查询；仅 DoH、DoT 会加密到上游的 DNS 传输。</p></article>
       </div>
     </section>
 

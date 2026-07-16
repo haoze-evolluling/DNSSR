@@ -15,7 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-private val DEFAULT_HOME_VISIBLE_PROTOCOLS = DnsProtocol.MANAGED_PROTOCOLS.toSet() - DnsProtocol.DOH3
+private val DEFAULT_HOME_VISIBLE_PROTOCOLS = DnsProtocol.MANAGED_PROTOCOLS.toSet()
 
 enum class RaceModeStrategy(
     val storageValue: String,
@@ -117,7 +117,6 @@ object AppSettings {
     private const val KEY_HOME_VISIBLE_PROTOCOLS = "home_visible_protocols"
     private const val KEY_HOME_HIDDEN_PROVIDER_IDS = "home_hidden_provider_ids"
     private const val KEY_HOME_VISIBLE_PROVIDER_IDS = "home_visible_provider_ids"
-    private const val KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS = "acknowledged_doh3_provider_ids"
     private const val KEY_APP_THEME_MODE = "app_theme_mode"
     private const val KEY_THEME_COLOR_STYLE = "theme_color_style"
     private const val KEY_HOME_COMPONENT_OPACITY = "home_component_opacity"
@@ -144,12 +143,6 @@ object AppSettings {
     private val DEFAULT_RACE_PROVIDER_IDS = setOf(
         "preset_alidns_dns",
         "preset_dnspod_dns",
-    )
-    private val BUILT_IN_DOH3_PROVIDER_IDS = setOf(
-        "preset_alidns_doh3",
-        "preset_dnspod_doh3",
-        "preset_cloudflare_doh3",
-        "preset_google_doh3"
     )
     private val DEFAULT_LATENCY_TEST_PROVIDER_IDS = emptySet<String>()
     private const val DEFAULT_RACE_TEST_DOMAIN = "mihoyo.com"
@@ -359,7 +352,7 @@ object AppSettings {
             for (i in 0 until array.length()) {
                 ids.add(array.getString(i))
             }
-            ids
+            migrateLegacyProviderIds(context, KEY_RACE_PROVIDER_IDS, ids)
         } catch (_: Exception) {
             DEFAULT_RACE_PROVIDER_IDS
         }
@@ -388,7 +381,7 @@ object AppSettings {
             for (i in 0 until array.length()) {
                 ids.add(array.getString(i))
             }
-            ids
+            migrateLegacyProviderIds(context, KEY_LATENCY_TEST_PROVIDER_IDS, ids)
         } catch (_: Exception) {
             DEFAULT_LATENCY_TEST_PROVIDER_IDS
         }
@@ -406,28 +399,6 @@ object AppSettings {
             .edit()
             .putString(KEY_LATENCY_TEST_PROVIDER_IDS, array.toString())
             .apply()
-    }
-
-    fun shouldConfirmDoh3Provider(context: Context, provider: DnsProvider): Boolean {
-        return provider.id in BUILT_IN_DOH3_PROVIDER_IDS &&
-            provider.protocol == DnsProtocol.DOH3 &&
-            provider.id !in acknowledgedDoh3ProviderIds(context)
-    }
-
-    fun acknowledgeDoh3Provider(context: Context, providerId: String) {
-        if (providerId !in BUILT_IN_DOH3_PROVIDER_IDS) return
-        val ids = acknowledgedDoh3ProviderIds(context) + providerId
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putStringSet(KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS, ids)
-            .apply()
-    }
-
-    private fun acknowledgedDoh3ProviderIds(context: Context): Set<String> {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getStringSet(KEY_ACKNOWLEDGED_DOH3_PROVIDER_IDS, emptySet())
-            ?.toSet()
-            ?: emptySet()
     }
 
     fun getRaceTestDomain(context: Context): String {
@@ -501,7 +472,11 @@ object AppSettings {
         }
         return try {
             val array = JSONArray(json)
-            buildSet { for (index in 0 until array.length()) add(array.getString(index)) }
+            migrateLegacyProviderIds(
+                context,
+                key,
+                buildSet { for (index in 0 until array.length()) add(array.getString(index)) }
+            )
         } catch (_: Exception) {
             emptySet()
         }
@@ -532,9 +507,9 @@ object AppSettings {
             ?: return getRaceProviderIds(context).toList()
         return try {
             val array = JSONArray(json)
-            buildList {
+            migrateLegacyProviderIds(context, KEY_PRIMARY_BACKUP_PROVIDER_IDS, buildList {
                 for (index in 0 until array.length()) add(array.getString(index))
-            }.distinct()
+            }.distinct()).toList()
         } catch (_: Exception) {
             getRaceProviderIds(context).toList()
         }
@@ -651,6 +626,19 @@ object AppSettings {
             .edit()
             .putBoolean(KEY_LEGACY_ICON_ENABLED, enabled)
             .apply()
+    }
+
+    private fun migrateLegacyProviderIds(context: Context, key: String, ids: Collection<String>): Set<String> {
+        val migrated = ids.mapTo(linkedSetOf()) { id ->
+            if (id in DnsProvider.LEGACY_DOH3_PRESET_IDS) DnsProvider.GOOGLE_DOH_PROVIDER_ID else id
+        }
+        if (migrated != ids.toSet()) {
+            val array = JSONArray()
+            migrated.forEach(array::put)
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(key, array.toString()).apply()
+        }
+        return migrated
     }
 
     fun isLegacyLogPageEnabled(context: Context): Boolean {

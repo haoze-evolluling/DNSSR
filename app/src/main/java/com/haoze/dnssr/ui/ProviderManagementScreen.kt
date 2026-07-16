@@ -63,15 +63,10 @@ fun ProviderManagementScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var providerToDelete by remember { mutableStateOf<DnsProvider?>(null) }
     var selectedProtocol by remember { mutableStateOf(DnsProtocol.DNS) }
-    var pendingDoh3Provider by remember { mutableStateOf<DnsProvider?>(null) }
 
     fun handleProviderSelection(provider: DnsProvider) {
         if (provider.id == selectedId) return
-        if (AppSettings.shouldConfirmDoh3Provider(context, provider)) {
-            pendingDoh3Provider = provider
-        } else {
-            viewModel.select(provider.id)
-        }
+        viewModel.select(provider.id)
     }
 
     NavigationSettledEffect {
@@ -230,22 +225,6 @@ fun ProviderManagementScreen(
         )
     }
 
-    pendingDoh3Provider?.let { provider ->
-        Doh3FirstUseDialog(
-            provider = provider,
-            providers = providers,
-            onContinue = {
-                AppSettings.acknowledgeDoh3Provider(context, provider.id)
-                viewModel.select(provider.id)
-                pendingDoh3Provider = null
-            },
-            onReplacementSelected = { replacement ->
-                viewModel.select(replacement.id)
-                pendingDoh3Provider = null
-            },
-            onDismiss = { pendingDoh3Provider = null }
-        )
-    }
 }
 
 @Composable
@@ -254,31 +233,24 @@ private fun ProtocolToggleRow(
     onSelect: (DnsProtocol) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth()
     ) {
-        DnsProtocol.MANAGED_PROTOCOLS.chunked(2).forEach { protocolRow ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                protocolRow.forEach { option ->
-                    FilterChip(
-                        selected = selectedProtocol == option,
-                        onClick = { onSelect(option) },
-                        label = {
-                            Text(
-                                text = option.label,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
+        DnsProtocol.MANAGED_PROTOCOLS.forEach { option ->
+            FilterChip(
+                selected = selectedProtocol == option,
+                onClick = { onSelect(option) },
+                label = {
+                    Text(
+                        text = option.label,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                }
-            }
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -370,7 +342,7 @@ private fun ProviderEditDialog(
                         showAddressError = false
                     }
                 )
-                if (protocol == DnsProtocol.DOH || protocol == DnsProtocol.DOH3) {
+                if (protocol == DnsProtocol.DOH) {
                     OutlinedTextField(
                         value = url,
                         onValueChange = {
@@ -478,7 +450,7 @@ private fun isProviderInputValid(
 ): Boolean {
     if (name.trim().isEmpty()) return false
     return when (protocol) {
-        DnsProtocol.DOH, DnsProtocol.DOH3 -> DnsProvider.isValidDohUrl(url)
+        DnsProtocol.DOH -> DnsProvider.isValidDohUrl(url)
         DnsProtocol.DNS -> {
             val port = portText.trim()
                 .ifBlank { DnsProvider.DEFAULT_DNS_PORT.toString() }
@@ -500,7 +472,7 @@ private fun isProviderAddressValid(
     host: String
 ): Boolean {
     return when (protocol) {
-        DnsProtocol.DOH, DnsProtocol.DOH3 -> DnsProvider.isValidDohUrl(url)
+        DnsProtocol.DOH -> DnsProvider.isValidDohUrl(url)
         DnsProtocol.DNS -> DnsProvider.isValidDnsHost(host)
         DnsProtocol.DOT -> DnsProvider.isValidDotHost(host)
     }
