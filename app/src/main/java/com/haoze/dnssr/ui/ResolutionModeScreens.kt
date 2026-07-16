@@ -97,10 +97,12 @@ fun ResolutionModeHomeScreen(
     val parallelIds by viewModel.parallelRaceIds.collectAsStateWithLifecycle()
     val backupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
     val singleId by viewModel.singleProviderId.collectAsStateWithLifecycle()
+    val presetDnsService by viewModel.presetDnsService.collectAsStateWithLifecycle()
     val loading by viewModel.initialLoading.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showModeDialog by remember { mutableStateOf(false) }
+    var showPresetDnsServiceDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.activate() }
     LaunchedEffect(message) { message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); viewModel.clearMessage() } }
 
@@ -114,6 +116,17 @@ fun ResolutionModeHomeScreen(
                 }
             },
             onDismiss = { showModeDialog = false }
+        )
+    }
+
+    if (showPresetDnsServiceDialog) {
+        PresetDnsServicePickerDialog(
+            selectedService = presetDnsService,
+            onSelect = { service ->
+                showPresetDnsServiceDialog = false
+                viewModel.setPresetDnsService(service)
+            },
+            onDismiss = { showPresetDnsServiceDialog = false }
         )
     }
 
@@ -151,8 +164,46 @@ fun ResolutionModeHomeScreen(
                     }
                 }
             }
+            item { SettingsGroupTitle("预设 DNS 服务") }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "预设 DNS 服务",
+                        subtitle = "切换阿里云和腾讯 DNSPod 的预设服务协议",
+                        value = presetDnsService.displayName,
+                        onClick = { showPresetDnsServiceDialog = true }
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun PresetDnsServicePickerDialog(
+    selectedService: PresetDnsService,
+    onSelect: (PresetDnsService) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择预设 DNS 服务") },
+        text = {
+            Column {
+                PresetDnsService.entries.forEachIndexed { index, service ->
+                    SettingsRadioItem(
+                        title = service.displayName,
+                        selected = selectedService == service,
+                        onClick = { onSelect(service) }
+                    )
+                    if (index < PresetDnsService.entries.lastIndex) SettingsDivider()
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 @Composable

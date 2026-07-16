@@ -229,6 +229,14 @@ data class DnsProvider(
             prefs(context).edit().putString(KEY_SELECTED_PROVIDER_ID, id).apply()
         }
 
+        fun presetIdForProtocol(id: String, protocol: DnsProtocol): String? {
+            val provider = PRESETS.firstOrNull { it.id == id } ?: return null
+            if (provider.name !in SWITCHABLE_PRESET_PROVIDER_NAMES) return null
+            return PRESETS.firstOrNull {
+                it.name == provider.name && it.protocol == protocol
+            }?.id
+        }
+
         fun loadRaceProviderIds(context: Context): Set<String> {
             val all = loadRuntimeProviders(context)
             val allIds = all.map { it.id }.toSet()
@@ -402,5 +410,6 @@ data class DnsProvider(
             "preset_cloudflare_doh3",
             "preset_google_doh3"
         )
+        private val SWITCHABLE_PRESET_PROVIDER_NAMES = setOf("阿里云", "腾讯云 DNSPod")
     }
 }

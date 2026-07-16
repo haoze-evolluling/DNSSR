@@ -48,6 +48,19 @@ enum class DnsResolutionMode(
     }
 }
 
+enum class PresetDnsService(
+    val displayName: String
+) {
+    DNS("DNS"),
+    DOT("DoT"),
+    DOH("DoH");
+
+    companion object {
+        fun fromStorageValue(value: String?): PresetDnsService =
+            entries.firstOrNull { it.name == value } ?: DNS
+    }
+}
+
 enum class AppThemeMode(
     val storageValue: String,
     val displayName: String
@@ -108,6 +121,7 @@ object AppSettings {
     const val KEY_LATENCY_TEST_PROVIDER_IDS = "latency_test_provider_ids"
     const val KEY_RACE_MODE_STRATEGY = "race_mode_strategy"
     private const val KEY_DNS_RESOLUTION_MODE = "dns_resolution_mode"
+    private const val KEY_PRESET_DNS_SERVICE = "preset_dns_service"
     private const val KEY_SMART_PREDICTION_PROVIDER_IDS = "smart_prediction_provider_ids"
     private const val KEY_PARALLEL_RACE_PROVIDER_IDS = "parallel_race_provider_ids"
     private const val KEY_PRIMARY_BACKUP_PROVIDER_IDS = "primary_backup_provider_ids"
@@ -668,6 +682,19 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_LEGACY_ICON_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getPresetDnsService(context: Context): PresetDnsService {
+        val value = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_PRESET_DNS_SERVICE, null)
+        return PresetDnsService.fromStorageValue(value)
+    }
+
+    fun setPresetDnsService(context: Context, service: PresetDnsService) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_PRESET_DNS_SERVICE, service.name)
             .apply()
     }
 

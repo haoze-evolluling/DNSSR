@@ -9,6 +9,7 @@ import com.haoze.dnssr.vpn.BootstrapLogger
 import com.haoze.dnssr.vpn.BootstrapSelector
 import com.haoze.dnssr.vpn.DnsLatencyTester
 import com.haoze.dnssr.vpn.DnsProvider
+import com.haoze.dnssr.vpn.DnsProtocol
 import com.haoze.dnssr.vpn.ProviderHealthEngine
 import com.haoze.dnssr.vpn.ProviderHealthSnapshot
 import com.haoze.dnssr.vpn.ProviderHealthStore
@@ -53,6 +54,9 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
 
     private val _resolutionMode = MutableStateFlow(DnsResolutionMode.SINGLE)
     val resolutionMode: StateFlow<DnsResolutionMode> = _resolutionMode.asStateFlow()
+
+    private val _presetDnsService = MutableStateFlow(PresetDnsService.DNS)
+    val presetDnsService: StateFlow<PresetDnsService> = _presetDnsService.asStateFlow()
 
     private val _primaryBackupIds = MutableStateFlow<List<String>>(emptyList())
     val primaryBackupIds: StateFlow<List<String>> = _primaryBackupIds.asStateFlow()
@@ -102,6 +106,7 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
             val raceModeEnabled = AppSettings.isRaceModeEnabled(context)
             val strategy = AppSettings.getRaceModeStrategy(context)
             val resolutionMode = AppSettings.getDnsResolutionMode(context)
+            val presetDnsService = AppSettings.getPresetDnsService(context)
             val primaryBackupIds = AppSettings.getPrimaryBackupProviderIds(context)
                 .filter { id -> all.any { it.id == id } }
             val smartIds = AppSettings.getSmartPredictionProviderIds(context).filterTo(mutableSetOf()) { id -> all.any { it.id == id } }
@@ -114,6 +119,7 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
                 _raceModeEnabled.value = raceModeEnabled
                 _raceModeStrategy.value = strategy
                 _resolutionMode.value = resolutionMode
+                _presetDnsService.value = presetDnsService
                 _primaryBackupIds.value = primaryBackupIds
                 _smartPredictionIds.value = smartIds
                 _parallelRaceIds.value = parallelIds
@@ -226,6 +232,33 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
         val from = _primaryBackupIds.value.indexOf(id)
         if (from < 0) return
         reorderPrimaryBackupProvider(id, from + direction)
+    }
+
+    fun setPresetDnsService(service: PresetDnsService) {
+        if (_presetDnsService.value == service) return
+        val context = getApplication<Application>()
+        val targetProtocol = when (service) {
+            PresetDnsService.DNS -> DnsProtocol.DNS
+            PresetDnsService.DOT -> DnsProtocol.DOT
+            PresetDnsService.DOH -> DnsProtocol.DOH
+        }
+        fun remap(id: String): String = DnsProvider.presetIdForProtocol(id, targetProtocol) ?: id
+
+        DnsProvider.saveSelected(context, remap(_singleProviderId.value))
+        val smartIds = _smartPredictionIds.value.mapTo(linkedSetOf(), ::remap)
+        AppSettings.setSmartPredictionProviderIds(context, smartIds)
+        val parallelIds = _parallelRaceIds.value.mapTo(linkedSetOf(), ::remap)
+        AppSettings.setParallelRaceProviderIds(context, parallelIds)
+        val primaryBackupIds = _primaryBackupIds.value.map(::remap).distinct()
+        AppSettings.setPrimaryBackupProviderIds(context, primaryBackupIds)
+        AppSettings.setPresetDnsService(context, service)
+
+        _singleProviderId.value = remap(_singleProviderId.value)
+        _smartPredictionIds.value = smartIds
+        _parallelRaceIds.value = parallelIds
+        _primaryBackupIds.value = primaryBackupIds
+        _presetDnsService.value = service
+        RuntimeDnsSettingsRefresher.refreshIfRunning(context, "preset_dns_service_changed")
     }
 
     fun reorderPrimaryBackupProvider(id: String, targetIndex: Int) {
