@@ -26,6 +26,9 @@ interface DnsCacheDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: DnsCacheEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<DnsCacheEntity>)
+
     @Query("UPDATE dns_cache SET hitCount = hitCount + 1, lastHitAt = :now WHERE `key` = :key")
     suspend fun recordHit(key: String, now: Long)
 

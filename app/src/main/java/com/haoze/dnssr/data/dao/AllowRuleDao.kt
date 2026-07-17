@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import com.haoze.dnssr.data.entity.AllowRuleEntity
 import com.haoze.dnssr.data.entity.AllowRuleSourceEntity
+import com.haoze.dnssr.data.dao.EnabledBlockRule
 
 @Dao
 interface AllowRuleDao {
@@ -59,6 +60,20 @@ interface AllowRuleDao {
             "WHERE r.enabled = 1 AND s.enabled = 1 ORDER BY r.addedAt DESC"
     )
     suspend fun enabledRules(): List<AllowRuleEntity>
+
+    @Query(
+        "SELECT r.pattern, r.pattern AS source FROM allow_rule r " +
+            "JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1 AND s.source LIKE 'sub_%' GROUP BY r.pattern"
+    )
+    suspend fun enabledSubscriptionRules(): List<EnabledBlockRule>
+
+    @Query(
+        "SELECT r.pattern, 'useradd' AS source FROM allow_rule r " +
+            "JOIN allow_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1 AND s.source = 'useradd' GROUP BY r.pattern"
+    )
+    suspend fun enabledCustomRules(): List<EnabledBlockRule>
 
     @Query(
         "SELECT DISTINCT r.pattern FROM allow_rule r JOIN allow_rule_source s ON s.ruleId = r.id " +

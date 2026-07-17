@@ -2,15 +2,19 @@ package com.haoze.dnssr.vpn
 
 import com.haoze.dnssr.data.dao.AllowRuleDao
 import com.haoze.dnssr.data.entity.AllowRuleEntity
+import java.io.File
 
 /**
  * DNS 白名单规则管理器。
  *
  * 白名单命中时会绕过本应用的屏蔽规则，但仍继续走所选加密 DNS 上游解析。
  */
-class AllowListManager(private val dao: AllowRuleDao) {
+class AllowListManager(
+    private val dao: AllowRuleDao,
+    indexDirectory: File? = null
+) {
 
-    private val cache = AllowRuleCache()
+    private val cache = AllowRuleCache(indexDirectory?.let { File(it, "subscription-allow.trie") })
 
     suspend fun refreshCache() {
         cache.reload(dao)

@@ -13,6 +13,7 @@ import com.haoze.dnssr.data.dao.DnsLogDao
 import com.haoze.dnssr.data.entity.DnsLogEntity
 import com.haoze.dnssr.vpn.LogResult
 import com.haoze.dnssr.util.dayStartMillis
+import com.haoze.dnssr.ui.DnsLogMode
 
 class DnsLogRepository(private val dao: DnsLogDao) {
 
@@ -41,6 +42,21 @@ class DnsLogRepository(private val dao: DnsLogDao) {
         return dao.queryList(
             SimpleSQLiteQuery(
                 "SELECT * FROM dns_log ORDER BY timestamp DESC LIMIT ?",
+                arrayOf(limit.coerceAtLeast(0))
+            )
+        )
+    }
+
+    suspend fun recentLogs(limit: Int, mode: DnsLogMode): List<DnsLogEntity> {
+        if (mode == DnsLogMode.OFF) return emptyList()
+        val where = if (mode == DnsLogMode.BLOCKED_AND_ERRORS) {
+            "WHERE result IN ('${LogResult.BLOCKED.value}', '${LogResult.ERROR.value}') "
+        } else {
+            ""
+        }
+        return dao.queryList(
+            SimpleSQLiteQuery(
+                "SELECT * FROM dns_log $where ORDER BY timestamp DESC LIMIT ?",
                 arrayOf(limit.coerceAtLeast(0))
             )
         )

@@ -64,6 +64,20 @@ interface BlockRuleDao {
     suspend fun enabledRules(): List<EnabledBlockRule>
 
     @Query(
+        "SELECT r.pattern, MIN(s.source) AS source FROM block_rule r " +
+            "JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1 AND s.source LIKE 'sub_%' GROUP BY r.pattern"
+    )
+    suspend fun enabledSubscriptionRules(): List<EnabledBlockRule>
+
+    @Query(
+        "SELECT r.pattern, 'useradd' AS source FROM block_rule r " +
+            "JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.enabled = 1 AND s.enabled = 1 AND s.source = 'useradd' GROUP BY r.pattern"
+    )
+    suspend fun enabledCustomRules(): List<EnabledBlockRule>
+
+    @Query(
         "SELECT DISTINCT r.pattern FROM block_rule r JOIN block_rule_source s ON s.ruleId = r.id " +
             "WHERE r.enabled = 1 AND s.enabled = 1"
     )

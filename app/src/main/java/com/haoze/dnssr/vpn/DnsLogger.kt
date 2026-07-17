@@ -2,6 +2,7 @@ package com.haoze.dnssr.vpn
 
 import com.haoze.dnssr.data.dao.DnsLogDao
 import com.haoze.dnssr.data.entity.DnsLogEntity
+import com.haoze.dnssr.ui.DnsLogMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -15,7 +16,8 @@ import kotlinx.coroutines.sync.withLock
 class DnsLogger(
     private val dao: DnsLogDao,
     private val retentionDays: Int,
-    private val flushScope: CoroutineScope? = null
+    private val flushScope: CoroutineScope? = null,
+    private val modeProvider: () -> DnsLogMode = { DnsLogMode.ALL }
 ) {
 
     private val pruneIntervalMs = 60 * 60 * 1000L // 1 小时
@@ -32,6 +34,9 @@ class DnsLogger(
         cached: Boolean = false,
         blockSubscriptionId: Long? = null
     ) {
+        val mode = modeProvider()
+        if (mode == DnsLogMode.OFF) return
+        if (mode == DnsLogMode.BLOCKED_AND_ERRORS && result == LogResult.PASSED) return
         enqueue(
             DnsLogEntity(
                 timestamp = System.currentTimeMillis(),

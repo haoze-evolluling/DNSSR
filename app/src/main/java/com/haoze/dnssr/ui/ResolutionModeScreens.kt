@@ -598,9 +598,9 @@ private fun PrimaryBackupOrderGroup(
 }
 
 private fun subtitleFor(mode: DnsResolutionMode) = when (mode) {
-    DnsResolutionMode.SINGLE -> "固定使用一个 DNS 服务商"
-    DnsResolutionMode.SMART_PREDICTION -> "根据健康权重选择服务商"
-    DnsResolutionMode.PARALLEL_RACE -> "并发查询并采用最快响应"
+    DnsResolutionMode.SINGLE -> "单路查询，网络与处理开销最低"
+    DnsResolutionMode.SMART_PREDICTION -> "优先查询健康服务商，必要时再启动备用请求"
+    DnsResolutionMode.PARALLEL_RACE -> "并发查询并采用最快响应，耗电相对更高"
     DnsResolutionMode.PRIMARY_BACKUP -> "失败时按优先级切换备用服务"
 }
 

@@ -40,6 +40,9 @@ class DnsResponseCache(
     private val pendingHitMutex = Mutex()
     private val pendingHits = HashMap<String, PendingHit>()
     private var pendingHitFlushJob: Job? = null
+    private val pendingWriteMutex = Mutex()
+    private val pendingWrites = LinkedHashMap<String, DnsCacheEntity>()
+    private var pendingWriteFlushJob: Job? = null
 
     fun updatePolicy(policy: DnsCachePolicy) {
         this.policy = policy
@@ -116,6 +119,7 @@ class DnsResponseCache(
 
     suspend fun clear() {
         clearMemory()
+        clearPendingWrites()
         clearPendingHits()
         dao.clearAll()
     }
@@ -184,8 +188,53 @@ class DnsResponseCache(
             staleExpiresAt = staleExpiresAt(entity.expiresAt, currentPolicy)
         )
         shardFor(cacheKey.storageKey).put(cacheKey.storageKey, entry)
-        scope.launch { dao.insert(entity) }
+        enqueueWrite(entity)
         return true
+    }
+
+    private suspend fun enqueueWrite(entity: DnsCacheEntity) {
+        var flushNow = false
+        pendingWriteMutex.withLock {
+            pendingWrites[entity.key] = entity
+            flushNow = pendingWrites.size >= WRITE_BATCH_SIZE
+            if (flushNow) {
+                pendingWriteFlushJob?.cancel()
+                pendingWriteFlushJob = null
+            } else if (pendingWriteFlushJob?.isActive != true) {
+                pendingWriteFlushJob = scope.launch {
+                    delay(WRITE_FLUSH_DELAY_MS)
+                    flushPendingWrites()
+                }
+            }
+        }
+        if (flushNow) flushPendingWrites()
+    }
+
+    suspend fun flushPendingWrites() {
+        val writes = pendingWriteMutex.withLock {
+            pendingWriteFlushJob = null
+            pendingWrites.values.toList().also { pendingWrites.clear() }
+        }
+        if (writes.isEmpty()) return
+        runCatching { dao.insertAll(writes) }.onFailure {
+            pendingWriteMutex.withLock {
+                writes.forEach { entity -> pendingWrites.putIfAbsent(entity.key, entity) }
+                if (pendingWriteFlushJob?.isActive != true) {
+                    pendingWriteFlushJob = scope.launch {
+                        delay(WRITE_FLUSH_DELAY_MS)
+                        flushPendingWrites()
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun clearPendingWrites() {
+        pendingWriteMutex.withLock {
+            pendingWriteFlushJob?.cancel()
+            pendingWriteFlushJob = null
+            pendingWrites.clear()
+        }
     }
 
     private suspend fun materialize(
@@ -340,6 +389,8 @@ class DnsResponseCache(
         private const val DEFAULT_MAX_ENTRIES = 2048
         private const val DEFAULT_SHARD_COUNT = 16
         private const val HIT_FLUSH_DELAY_MS = 2_000L
+        private const val WRITE_FLUSH_DELAY_MS = 2_000L
+        private const val WRITE_BATCH_SIZE = 32
     }
 }
 

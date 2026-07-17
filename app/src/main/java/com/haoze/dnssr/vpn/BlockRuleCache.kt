@@ -1,6 +1,7 @@
 package com.haoze.dnssr.vpn
 
 import com.haoze.dnssr.data.dao.BlockRuleDao
+import java.io.File
 
 /**
  * 屏蔽规则内存缓存。
@@ -18,19 +19,31 @@ data class BlockRuleMatch(
     val source: String
 )
 
-class BlockRuleCache {
+class BlockRuleCache(private val indexFile: File? = null) {
 
     @Volatile
-    private var rulesByPattern: Map<String, String> = emptyMap()
+    private var customRules: Map<String, String> = emptyMap()
+    @Volatile
+    private var subscriptionFallback: Map<String, String> = emptyMap()
+    @Volatile
+    private var subscriptionIndex: MappedSubscriptionRuleIndex? = null
 
     /**
      * 从数据库全量重载已启用规则到内存。
      */
     suspend fun reload(dao: BlockRuleDao) {
-        val rules = dao.enabledRules()
-        val updatedRules = HashMap<String, String>(rules.size)
-        rules.forEach { rule -> updatedRules[rule.pattern] = rule.source }
-        synchronized(this) { rulesByPattern = updatedRules }
+        val custom = dao.enabledCustomRules().associate { it.pattern to it.source }
+        val subscriptions = dao.enabledSubscriptionRules()
+        val mapped = indexFile?.let { file ->
+            runCatching { MappedSubscriptionRuleIndex.compileAndLoad(file, subscriptions) }.getOrNull()
+        }
+        val fallback = if (mapped == null) subscriptions.associate { it.pattern to it.source } else emptyMap()
+        synchronized(this) {
+            subscriptionIndex?.close()
+            customRules = custom
+            subscriptionFallback = fallback
+            subscriptionIndex = mapped
+        }
     }
 
     /**
@@ -40,37 +53,51 @@ class BlockRuleCache {
      */
     fun findMatch(qname: String): BlockRuleMatch? {
         val domain = qname.lowercase().trimEnd('.')
-        val rules = rulesByPattern
-        rules[domain]?.let { source ->
+        val custom = customRules
+        custom[domain]?.let { source ->
             return BlockRuleMatch(pattern = domain, source = source)
         }
         var pos = domain.indexOf('.')
         while (pos >= 0 && pos < domain.length - 1) {
             val suffix = domain.substring(pos + 1)
-            rules[suffix]?.let { source ->
+            custom[suffix]?.let { source ->
                 return BlockRuleMatch(pattern = suffix, source = source)
             }
             pos = domain.indexOf('.', pos + 1)
+        }
+        subscriptionIndex?.find(domain)?.let { source -> return BlockRuleMatch(domain, source) }
+        val subscriptions = subscriptionFallback
+        subscriptions[domain]?.let { source -> return BlockRuleMatch(domain, source) }
+        var subscriptionPos = domain.indexOf('.')
+        while (subscriptionPos >= 0 && subscriptionPos < domain.length - 1) {
+            val suffix = domain.substring(subscriptionPos + 1)
+            subscriptions[suffix]?.let { source -> return BlockRuleMatch(suffix, source) }
+            subscriptionPos = domain.indexOf('.', subscriptionPos + 1)
         }
         return null
     }
 
     fun addPattern(pattern: String, source: String) {
         synchronized(this) {
-            rulesByPattern = HashMap(rulesByPattern).apply { put(pattern, source) }
+            customRules = HashMap(customRules).apply { put(pattern, source) }
         }
     }
 
     fun removePattern(pattern: String) {
         synchronized(this) {
-            if (pattern !in rulesByPattern) return
-            rulesByPattern = HashMap(rulesByPattern).apply { remove(pattern) }
+            if (pattern !in customRules) return
+            customRules = HashMap(customRules).apply { remove(pattern) }
         }
     }
 
     fun clear() {
-        synchronized(this) { rulesByPattern = emptyMap() }
+        synchronized(this) {
+            customRules = emptyMap()
+            subscriptionFallback = emptyMap()
+            subscriptionIndex?.close()
+            subscriptionIndex = null
+        }
     }
 
-    fun size(): Int = rulesByPattern.size
+    fun size(): Int = customRules.size + subscriptionFallback.size
 }

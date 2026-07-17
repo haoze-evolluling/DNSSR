@@ -59,18 +59,24 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
 
     private suspend fun buildDashboardJson(): String {
         val now = System.currentTimeMillis()
-        val dailyStats = dnsLogRepository.dailyStats(dayStartMillis())
-        val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT)
+        val logMode = AppSettings.getDnsLogMode(getApplication())
+        val storedDailyStats = if (logMode == DnsLogMode.OFF) null else dnsLogRepository.dailyStats(dayStartMillis())
+        val dailyStats = storedDailyStats?.let {
+            if (logMode == DnsLogMode.BLOCKED_AND_ERRORS) it.copy(passed = 0, cached = 0) else it
+        }
+        val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT, logMode)
         val recentCacheEntries = dnsCacheRepository.recentEntries(now, RECENT_CACHE_LIMIT)
         val raceStats = raceLogRepository.stats(RaceStatsRange.TODAY)
         val bootstrapStats = bootstrapLogRepository.stats(BootstrapStatsRange.TODAY)
-        val subscriptionStats = dnsLogRepository.subscriptionInterceptionStats(SubscriptionInterceptionStatsRange.TODAY)
-        val subscriptions = database.subscriptionDao().allByKind(SubscriptionKind.BLOCK)
+        val subscriptionStats = if (logMode == DnsLogMode.OFF) null else
+            dnsLogRepository.subscriptionInterceptionStats(SubscriptionInterceptionStatsRange.TODAY)
+        val subscriptions = if (logMode == DnsLogMode.OFF) emptyList() else
+            database.subscriptionDao().allByKind(SubscriptionKind.BLOCK)
         val subscriptionsById = subscriptions.associateBy { it.id }
-        val subscriptionItems = (subscriptionsById.keys + subscriptionStats.hitsBySubscriptionId.keys)
+        val subscriptionItems = (subscriptionsById.keys + subscriptionStats?.hitsBySubscriptionId.orEmpty().keys)
             .map { id ->
                 val subscription = subscriptionsById[id]
-                val hits = subscriptionStats.hitsBySubscriptionId[id] ?: 0
+                val hits = subscriptionStats?.hitsBySubscriptionId?.get(id) ?: 0
                 JSONObject()
                     .put("name", subscription?.name ?: "已删除订阅 #$id")
                     .put("enabled", subscription?.enabled ?: false)
@@ -78,23 +84,25 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                     .put("hits", hits)
                     .put(
                         "rate",
-                        if (subscriptionStats.totalRequests == 0) 0.0 else hits.toDouble() / subscriptionStats.totalRequests
+                        if (subscriptionStats == null || subscriptionStats.totalRequests == 0) 0.0
+                        else hits.toDouble() / subscriptionStats.totalRequests
                     )
             }
             .sortedByDescending { it.optInt("hits") }
             .take(SUBSCRIPTION_LIST_LIMIT)
 
-        val totalLogs = dailyStats.passed + dailyStats.blocked + dailyStats.error
+        val totalLogs = dailyStats?.let { it.passed + it.blocked + it.error } ?: 0
         return JSONObject()
             .put("generatedAt", now)
+            .put("logMode", logMode.storageValue)
             .put(
                 "dailyStats",
                 JSONObject()
                     .put("total", totalLogs)
-                    .put("passed", dailyStats.passed)
-                    .put("blocked", dailyStats.blocked)
-                    .put("error", dailyStats.error)
-                    .put("cached", dailyStats.cached)
+                    .put("passed", dailyStats?.passed ?: 0)
+                    .put("blocked", dailyStats?.blocked ?: 0)
+                    .put("error", dailyStats?.error ?: 0)
+                    .put("cached", dailyStats?.cached ?: 0)
             )
             .put("recentLogs", recentLogs.toLogArray())
             .put("cacheEntries", recentCacheEntries.toCacheArray(now))
@@ -151,7 +159,7 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             .put(
                 "subscriptions",
                 JSONObject()
-                    .put("totalRequests", subscriptionStats.totalRequests)
+                    .put("totalRequests", subscriptionStats?.totalRequests ?: 0)
                     .put("items", JSONArray(subscriptionItems))
             )
             .toString()

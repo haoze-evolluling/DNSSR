@@ -59,7 +59,7 @@ fun SettingsScreen(
     val raceModeSettingsTitle = "解析模式"
     val ruleManagementTitle = "域名规则"
     val excludedAppsTitle = "排除应用"
-    val logRetentionTitle = "日志保留"
+    val logRetentionTitle = "日志模式"
     val dataCleanupTitle = "数据清理"
     val configTransferTitle = "导入与导出"
     val foregroundBackgroundTitle = "前后台行为"
@@ -97,7 +97,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsNavigationItem(
                         title = raceModeSettingsTitle,
-                        subtitle = "选择一脉直达、择优而行、百舸争流或有备无患",
+                        subtitle = "选择省电、均衡、极速或主备解析策略",
                         leadingIcon = Icons.AutoMirrored.Filled.AltRoute,
                         onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                     )

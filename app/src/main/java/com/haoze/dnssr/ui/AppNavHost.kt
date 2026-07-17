@@ -361,10 +361,11 @@ fun AppNavHost(
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
-        composable(titledRoute(Routes.LOG_RETENTION_SETTINGS), arguments = listOf(screenTitleArgument("日志保留"))) { entry ->
+        composable(titledRoute(Routes.LOG_RETENTION_SETTINGS), arguments = listOf(screenTitleArgument("日志模式"))) { entry ->
             LogRetentionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日志保留"
+                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged,
+                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日志模式"
             )
         }
         composable(titledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS), arguments = listOf(screenTitleArgument("前后台行为"))) { entry ->

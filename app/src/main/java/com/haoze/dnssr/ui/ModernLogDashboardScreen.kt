@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,21 +32,22 @@ import org.json.JSONObject
 import java.util.Locale
 
 private object DashboardWebViewCache {
-    var webView: WebView? = null
-    var pageReady: Boolean = false
+    val webViews = mutableMapOf<String, WebView>()
+    val readyUrls = mutableSetOf<String>()
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 internal fun preloadLogDashboard(context: Context) {
-    if (DashboardWebViewCache.webView != null) return
-    DashboardWebViewCache.webView = WebView(context.applicationContext).apply {
+    val assetUrl = dashboardAssetUrl(AppSettings.getDnsLogMode(context))
+    if (DashboardWebViewCache.webViews[assetUrl] != null) return
+    DashboardWebViewCache.webViews[assetUrl] = WebView(context.applicationContext).apply {
         configureLocalPageSettings()
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
-                DashboardWebViewCache.pageReady = true
+                DashboardWebViewCache.readyUrls.add(assetUrl)
             }
         }
-        loadUrl(DASHBOARD_ASSET_URL)
+        loadUrl(assetUrl)
     }
 }
 
@@ -60,10 +62,11 @@ fun ModernLogDashboardScreen(
     viewModel: ModernLogDashboardViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val assetUrl = dashboardAssetUrl(AppSettings.getDnsLogMode(LocalContext.current))
     val dashboardTheme = rememberDashboardThemeColors()
-    val cachedWebView = DashboardWebViewCache.webView
+    val cachedWebView = DashboardWebViewCache.webViews[assetUrl]
     var webView by remember { mutableStateOf(cachedWebView) }
-    var pageReady by remember { mutableStateOf(DashboardWebViewCache.pageReady) }
+    var pageReady by remember(assetUrl) { mutableStateOf(assetUrl in DashboardWebViewCache.readyUrls) }
     var webViewAttached by rememberSaveable { mutableStateOf(false) }
     val hasDashboardData = uiState.dashboardJson != EMPTY_DASHBOARD_JSON
     LaunchedEffect(viewModel) {
@@ -98,14 +101,15 @@ fun ModernLogDashboardScreen(
     ) {
         if (webViewAttached) DashboardWebView(
             cachedWebView = cachedWebView,
+            assetUrl = assetUrl,
             themeColors = dashboardTheme,
             onPageReady = {
-                DashboardWebViewCache.pageReady = true
+                DashboardWebViewCache.readyUrls.add(assetUrl)
                 pageReady = true
             },
             onWebViewCreated = {
                 webView = it
-                DashboardWebViewCache.webView = it
+                DashboardWebViewCache.webViews[assetUrl] = it
             },
             onBack = onBack,
             onRefresh = viewModel::refresh,
@@ -133,6 +137,7 @@ fun ModernLogDashboardScreen(
 @Composable
 private fun DashboardWebView(
     cachedWebView: WebView?,
+    assetUrl: String,
     themeColors: DashboardThemeColors,
     onPageReady: () -> Unit,
     onWebViewCreated: (WebView) -> Unit,
@@ -176,7 +181,7 @@ private fun DashboardWebView(
             view.webViewClient = webViewClient
             view.setBackgroundColor(themeColors.background.toArgb())
             if (cachedWebView == null) {
-                view.loadUrl(DASHBOARD_ASSET_URL)
+                view.loadUrl(assetUrl)
             }
             onWebViewCreated(view)
             view
@@ -309,5 +314,9 @@ private fun handleDashboardUri(
     return true
 }
 
-private const val DASHBOARD_ASSET_URL = "file:///android_asset/log_dashboard.html"
+private fun dashboardAssetUrl(mode: DnsLogMode): String = when (mode) {
+    DnsLogMode.ALL -> "file:///android_asset/log_dashboard.html"
+    DnsLogMode.BLOCKED_AND_ERRORS -> "file:///android_asset/log_dashboard_filtered.html"
+    DnsLogMode.OFF -> "file:///android_asset/log_dashboard_off.html"
+}
 private const val EMPTY_DASHBOARD_JSON = "{}"

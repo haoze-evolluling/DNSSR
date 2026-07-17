@@ -25,6 +25,7 @@ import com.haoze.dnssr.R
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.ui.AppSettings
 import com.haoze.dnssr.ui.DnsResolutionMode
+import com.haoze.dnssr.ui.DnsLogMode
 import com.haoze.dnssr.ui.RaceModeStrategy
 import com.haoze.dnssr.vpn.cache.DnsCacheController
 import com.haoze.dnssr.vpn.cache.DnsCachePolicy
@@ -52,6 +53,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.File
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -111,6 +113,8 @@ class DnsVpnService : VpnService() {
     @Volatile
     private var activeResolutionMode: DnsResolutionMode = DnsResolutionMode.SINGLE
     @Volatile
+    private var activeDnsLogMode: DnsLogMode = DnsLogMode.OFF
+    @Volatile
     private var activeBlockResponseMode: BlockResponseMode = BlockResponseMode.NXDOMAIN
     @Volatile
     private var activeDynamicBlockResponseConfig = DynamicBlockResponseConfig()
@@ -128,12 +132,14 @@ class DnsVpnService : VpnService() {
         activeDnsCachePolicy = AppSettings.getDnsCachePolicy(this)
         activeRaceModeStrategy = AppSettings.getRaceModeStrategy(this)
         activeResolutionMode = AppSettings.getDnsResolutionMode(this)
+        activeDnsLogMode = AppSettings.getDnsLogMode(this)
         activeBlockResponseMode = AppSettings.getBlockResponseMode(this)
         activeDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this)
         dnsCache = DnsResponseCache(db.dnsCacheDao(), activeDnsCachePolicy, serviceScope)
-        blockListManager = BlockListManager(db.blockRuleDao())
-        allowListManager = AllowListManager(db.allowRuleDao())
-        dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope)
+        val ruleIndexDirectory = File(filesDir, "rule-index")
+        blockListManager = BlockListManager(db.blockRuleDao(), ruleIndexDirectory)
+        allowListManager = AllowListManager(db.allowRuleDao(), ruleIndexDirectory)
+        dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope)
         http1RequestInspector = Http1RequestInspector(
             HttpDomainPolicy(allowListManager, blockListManager),
@@ -307,6 +313,7 @@ class DnsVpnService : VpnService() {
                 val newCachePolicy = AppSettings.getDnsCachePolicy(this@DnsVpnService)
                 val newRaceModeStrategy = AppSettings.getRaceModeStrategy(this@DnsVpnService)
                 val newResolutionMode = AppSettings.getDnsResolutionMode(this@DnsVpnService)
+                activeDnsLogMode = AppSettings.getDnsLogMode(this@DnsVpnService)
                 val newBlockResponseMode = AppSettings.getBlockResponseMode(this@DnsVpnService)
                 val newDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this@DnsVpnService)
                 val newResolvers = runCatching {
@@ -1234,6 +1241,7 @@ class DnsVpnService : VpnService() {
 
     private suspend fun flushLoggers() {
         if (::dnsCache.isInitialized) {
+            dnsCache.flushPendingWrites()
             dnsCache.flushPendingHits()
         }
         if (::dnsLogger.isInitialized) {

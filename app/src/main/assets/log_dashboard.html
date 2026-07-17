@@ -90,97 +90,6 @@
       padding: 0 14px 28px;
     }
 
-    .topbar {
-      position: sticky;
-      top: calc(8px + env(safe-area-inset-top));
-      z-index: 10;
-      display: grid;
-      grid-template-columns: 40px minmax(112px, 1fr) 40px;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      min-height: 56px;
-      margin: calc(8px + env(safe-area-inset-top)) auto 14px;
-      padding: 7px 8px;
-      border: 1px solid rgba(var(--primary-rgb), 0.2);
-      border-radius: 999px;
-      background:
-        linear-gradient(135deg, rgba(var(--primary-rgb), 0.12), rgba(var(--secondary-rgb), 0.09)),
-        linear-gradient(135deg, var(--panel-strong), var(--panel));
-      box-shadow: 0 18px 48px var(--elevation);
-      backdrop-filter: blur(12px) saturate(145%);
-      -webkit-backdrop-filter: blur(12px) saturate(145%);
-    }
-
-    .nav-button {
-      position: relative;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 0;
-      border-radius: 999px;
-      color: var(--text);
-      text-decoration: none;
-      background: rgba(var(--primary-rgb), 0.12);
-      font-size: 18px;
-      font-weight: 750;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 180ms cubic-bezier(0.2, 1.35, 0.45, 1), background-color 160ms ease;
-      will-change: transform;
-    }
-
-    .nav-button:active {
-      transform: scale(0.9);
-    }
-
-    .nav-button.back {
-      font-size: 0;
-    }
-
-    .nav-button.back::before {
-      content: "";
-      width: 10px;
-      height: 10px;
-      border-left: 2px solid currentColor;
-      border-bottom: 2px solid currentColor;
-      transform: rotate(45deg);
-      margin-left: 3px;
-    }
-
-    .refresh-icon {
-      width: 20px;
-      height: 20px;
-      fill: none;
-      stroke: currentColor;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-width: 2;
-    }
-
-    .topbar-title {
-      min-width: 0;
-      text-align: center;
-    }
-
-    .topbar-title h1 {
-      margin: 0;
-      font-size: 19px;
-      line-height: 1.2;
-      letter-spacing: 0;
-    }
-
-    .topbar-title p {
-      margin: 3px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
     .hero {
       display: grid;
       grid-template-columns: 1fr;
@@ -204,33 +113,6 @@
       margin: 10px 0 0;
       color: var(--muted);
       font-size: 14px;
-    }
-
-    .quick-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .action {
-      min-height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      color: var(--text);
-      text-decoration: none;
-      background: rgba(var(--primary-rgb), 0.1);
-      font-size: 14px;
-      font-weight: 650;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 180ms cubic-bezier(0.2, 1.35, 0.45, 1), background-color 160ms ease;
-      will-change: transform;
-    }
-
-    .action:active {
-      transform: scale(0.96);
     }
 
     .grid {
@@ -428,42 +310,87 @@
         grid-template-columns: minmax(0, 1fr) 360px;
         align-items: center;
       }
-      .quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .charts { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* Match the focused visual language used by the filtered and disabled dashboards. */
+    body {
+      background: var(--bg);
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: min(980px, 100%);
+      padding: 0 16px 28px;
+    }
+
+    .hero {
+      display: block;
+      margin: 0;
+      padding: 20px 4px 12px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .hero h1 { font-size: 24px; }
+    .hero p { font-size: 14px; }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .grid {
+      gap: 12px;
+      padding-top: 0;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .metric { min-height: 104px; }
+    .value { font-size: 28px; }
+    .section-title h2 { font-size: 16px; }
+
+    .donut {
+      box-shadow: none;
+      filter: none;
+    }
+
+    .bar,
+    .bar i {
+      border-radius: 4px;
+    }
+
+    .list-row {
+      border-radius: 0;
+      background: transparent;
     }
   </style>
 </head>
 <body>
+  <script src="log_dashboard_topbar.js"></script>
+  <script>mountLogDashboardTopbar('等待数据同步...');</script>
   <main class="page">
-    <header class="topbar">
-      <a class="nav-button back" href="dnssr://back" aria-label="返回"></a>
-      <div class="topbar-title">
-        <h1>日志仪表盘</h1>
-        <p id="updated">等待数据同步...</p>
-      </div>
-      <a class="nav-button" href="dnssr://refresh" aria-label="刷新">
-        <svg class="refresh-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
-          <path d="M3 21v-5h5" />
-          <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" />
-          <path d="M21 3v5h-5" />
-        </svg>
-      </a>
-    </header>
 
     <section class="hero">
       <div>
         <h1>DNS 日志仪表盘</h1>
         <p>请求、缓存、竞速与规则拦截的实时概览</p>
       </div>
-      <nav class="quick-actions" aria-label="日志详情入口">
-        <a class="action" href="dnssr://dns_logs">请求记录</a>
-        <a class="action" href="dnssr://dns_cache">缓存记录</a>
-        <a class="action" href="dnssr://race_stats">竞速统计</a>
-        <a class="action" href="dnssr://bootstrap_stats">Bootstrap</a>
-        <a class="action" href="dnssr://subscription_interception_stats">规则拦截</a>
-      </nav>
     </section>
 
     <section class="grid">

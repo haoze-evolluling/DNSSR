@@ -2,6 +2,7 @@ package com.haoze.dnssr.vpn
 
 import com.haoze.dnssr.data.dao.BlockRuleDao
 import com.haoze.dnssr.data.entity.BlockRuleEntity
+import java.io.File
 
 /**
  * AdGuard 风格屏蔽规则管理器。
@@ -15,9 +16,12 @@ import com.haoze.dnssr.data.entity.BlockRuleEntity
  * - 使用 BlockRuleCache 内存 HashSet 缓存，isBlocked() 从 O(N) 降至 O(domain标签数)
  * - VPN 启动时全量加载缓存，规则变更时增量更新
  */
-class BlockListManager(private val dao: BlockRuleDao) {
+class BlockListManager(
+    private val dao: BlockRuleDao,
+    indexDirectory: File? = null
+) {
 
-    private val cache = BlockRuleCache()
+    private val cache = BlockRuleCache(indexDirectory?.let { File(it, "subscription-block.trie") })
 
     /**
      * 从数据库全量重载缓存。VPN 启动时或大批量操作后调用。

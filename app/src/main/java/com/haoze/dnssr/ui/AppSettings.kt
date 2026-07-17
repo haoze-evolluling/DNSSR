@@ -37,14 +37,25 @@ enum class DnsResolutionMode(
     val storageValue: String,
     val displayName: String
 ) {
-    SINGLE("single", "一脉直达"),
-    SMART_PREDICTION("smart_prediction", "择优而行"),
-    PARALLEL_RACE("parallel_race", "百舸争流"),
-    PRIMARY_BACKUP("primary_backup", "有备无患");
+    SINGLE("single", "省电"),
+    SMART_PREDICTION("smart_prediction", "均衡"),
+    PARALLEL_RACE("parallel_race", "极速"),
+    PRIMARY_BACKUP("primary_backup", "主备（高级）");
 
     companion object {
         fun fromStorageValue(value: String?): DnsResolutionMode? =
             entries.firstOrNull { it.storageValue == value }
+    }
+}
+
+enum class DnsLogMode(val storageValue: String, val displayName: String) {
+    ALL("all", "记录全部"),
+    BLOCKED_AND_ERRORS("blocked_and_errors", "仅拦截和错误"),
+    OFF("off", "关闭");
+
+    companion object {
+        fun fromStorageValue(value: String?): DnsLogMode =
+            entries.firstOrNull { it.storageValue == value } ?: OFF
     }
 }
 
@@ -115,6 +126,7 @@ object AppSettings {
     private const val KEY_DYNAMIC_BLOCK_WINDOW_SECONDS = "dynamic_block_window_seconds"
     private const val KEY_DYNAMIC_BLOCK_NXDOMAIN_DURATION_SECONDS = "dynamic_block_nxdomain_duration_seconds"
     const val KEY_LOG_RETENTION_DAYS = "log_retention_days"
+    private const val KEY_DNS_LOG_MODE = "dns_log_mode"
     const val KEY_RACE_MODE_ENABLED = "race_mode_enabled"
     const val KEY_RACE_PROVIDER_IDS = "race_provider_ids"
     const val KEY_RACE_TEST_DOMAIN = "race_test_domain"
@@ -522,6 +534,19 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_LATENCY_TEST_PROVIDER_IDS, array.toString())
+            .apply()
+    }
+
+    fun getDnsLogMode(context: Context): DnsLogMode {
+        val value = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_DNS_LOG_MODE, null)
+        return DnsLogMode.fromStorageValue(value)
+    }
+
+    fun setDnsLogMode(context: Context, mode: DnsLogMode) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_DNS_LOG_MODE, mode.storageValue)
             .apply()
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -26,12 +27,14 @@ private val logRetentionOptions = listOf(1, 7, 30)
 @Composable
 fun LogRetentionSettingsScreen(
     onBack: () -> Unit,
-    title: String = "日志保留"
+    onRuntimeDnsSettingsChanged: () -> Unit,
+    title: String = "日志模式"
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     var logRetention by remember { mutableIntStateOf(AppSettings.logRetentionDays(context)) }
+    var logMode by remember { mutableStateOf(AppSettings.getDnsLogMode(context)) }
 
     SettingsScaffold(
         title = title,
@@ -44,6 +47,29 @@ fun LogRetentionSettingsScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            SettingsGroupTitle("DNS 请求日志")
+            SettingsGroup {
+                DnsLogMode.entries.forEachIndexed { index, mode ->
+                    SettingsRadioItem(
+                        title = mode.displayName,
+                        subtitle = when (mode) {
+                            DnsLogMode.ALL -> "保存通过、拦截和错误请求"
+                            DnsLogMode.BLOCKED_AND_ERRORS -> "减少数据库写入，同时保留关键记录"
+                            DnsLogMode.OFF -> "不创建或写入 DNS 请求日志"
+                        },
+                        selected = logMode == mode,
+                        onClick = {
+                            logMode = mode
+                            AppSettings.setDnsLogMode(context, mode)
+                            onRuntimeDnsSettingsChanged()
+                        }
+                    )
+                    if (index < DnsLogMode.entries.lastIndex) SettingsDivider()
+                }
+            }
+            SettingsInfoText("关闭后不会删除已有日志，重新开启即可继续查看。")
+
+            if (logMode != DnsLogMode.OFF) {
             SettingsGroupTitle("自动清理时间")
             SettingsGroup {
                 logRetentionOptions.forEachIndexed { index, days ->
@@ -61,6 +87,7 @@ fun LogRetentionSettingsScreen(
                 }
             }
             SettingsInfoText("超过所选时间的 DNS 请求日志会自动删除，用于控制本地日志占用。")
+            }
         }
     }
 }
