@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.Copy
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -54,6 +56,28 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+        }
+    }
+}
+
+val apkVersionName = android.defaultConfig.versionName ?: "unknown"
+
+listOf("debug", "release").forEach { buildType ->
+    val capitalizedBuildType = buildType.replaceFirstChar { it.uppercase() }
+    val apkOutputDirectory = layout.buildDirectory.dir("outputs/apk/$buildType")
+    val versionedApkOutputDirectory = layout.buildDirectory.dir("outputs/apk/versioned/$buildType")
+
+    val copyApkTask = tasks.register<Copy>("copy${capitalizedBuildType}ApkWithVersion") {
+        dependsOn("assemble$capitalizedBuildType")
+        from(apkOutputDirectory)
+        include("app-$buildType.apk")
+        rename("app-$buildType.apk", "DNSSR-$buildType-v$apkVersionName.apk")
+        into(versionedApkOutputDirectory)
+    }
+
+    tasks.configureEach {
+        if (name == "assemble$capitalizedBuildType") {
+            finalizedBy(copyApkTask)
         }
     }
 }
