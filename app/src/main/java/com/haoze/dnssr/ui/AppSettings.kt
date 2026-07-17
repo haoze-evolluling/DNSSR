@@ -154,6 +154,7 @@ object AppSettings {
     private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
     private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
+    private const val KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED = "http_inspection_notice_acknowledged"
     private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
 
     private const val MIN_CACHE_SECONDS = 30L
@@ -337,6 +338,17 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_HTTP_INSPECTION_APP_PACKAGES, packageNames.filter { it.isNotBlank() }.toSet())
+            .apply()
+    }
+
+    fun isHttpInspectionNoticeAcknowledged(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED, false)
+
+    fun setHttpInspectionNoticeAcknowledged(context: Context, acknowledged: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED, acknowledged)
             .apply()
     }
 

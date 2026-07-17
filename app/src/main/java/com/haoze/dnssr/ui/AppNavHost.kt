@@ -88,6 +88,7 @@ object Routes {
     const val SERVICE_LIGHT_EFFECT_SETTINGS = "service_light_effect_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
     const val HTTP_INSPECTION_SETTINGS = "http_inspection_settings"
+    const val HTTP_INSPECTION_APPS = "http_inspection_apps"
     const val HTTP_REQUEST_LOGS = "http_request_logs"
     const val DOH3_SERVICE = "doh3_service"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
@@ -384,8 +385,12 @@ fun AppNavHost(
         composable(Routes.HTTP_INSPECTION_SETTINGS) {
             HttpInspectionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                onNavigateToRequestLogs = { navController.navigateWhenResumed(Routes.HTTP_REQUEST_LOGS) }
+                onNavigateToRequestLogs = { navController.navigateWhenResumed(Routes.HTTP_REQUEST_LOGS) },
+                onNavigateToApps = { navController.navigateWhenResumed(Routes.HTTP_INSPECTION_APPS) }
             )
+        }
+        composable(Routes.HTTP_INSPECTION_APPS) {
+            HttpInspectionAppsScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.HTTP_REQUEST_LOGS) {
             HttpRequestLogScreen(onBack = { navController.popWhenResumed() })

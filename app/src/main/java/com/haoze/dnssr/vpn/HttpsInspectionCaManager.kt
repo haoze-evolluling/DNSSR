@@ -110,6 +110,25 @@ object HttpsInspectionCaManager {
 
     fun certificateDer(): ByteArray = ensureCertificate().encoded
 
+    fun hasExportedCertificateInDownloads(context: Context): Boolean {
+        val projection = arrayOf(MediaStore.MediaColumns._ID)
+        context.contentResolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            projection,
+            downloadCertificateSelection,
+            downloadCertificateSelectionArgs,
+            null
+        )?.use { return it.moveToFirst() }
+        return false
+    }
+
+    fun deleteExportedCertificatesInDownloads(context: Context): Int =
+        context.contentResolver.delete(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            downloadCertificateSelection,
+            downloadCertificateSelectionArgs
+        )
+
     fun exportCertificateToDownloads(context: Context): Uri {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
@@ -147,6 +166,13 @@ object HttpsInspectionCaManager {
 
     private fun isInspectionCa(certificate: X509Certificate): Boolean =
         certificate.basicConstraints >= 0 && certificate.subjectX500Principal.name.contains("DNSSR User CA")
+
+    private val downloadCertificateSelection =
+        "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+    private val downloadCertificateSelectionArgs = arrayOf(
+        "${Environment.DIRECTORY_DOWNLOADS}/",
+        "$EXPORTED_CERTIFICATE_NAME%"
+    )
 
     private fun randomSerial(seed: Long): BigInteger = BigInteger.valueOf(seed).shiftLeft(16)
         .or(BigInteger.valueOf((Math.random() * 65535).toLong()))
