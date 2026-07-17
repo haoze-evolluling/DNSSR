@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -18,10 +19,25 @@ static jmethodID release_connection_method;
 static zdtun_t *tunnel;
 static int tun_fd = -1;
 static pthread_t event_thread;
+static int wake_pipe[2] = {-1, -1};
 static pthread_mutex_t tunnel_mutex = PTHREAD_MUTEX_INITIALIZER;
 static volatile bool running;
 static bool thread_started;
 static volatile bool protection_failed;
+
+static void wake_event_loop(void) {
+    if (wake_pipe[1] < 0) return;
+    const uint8_t signal_byte = 1;
+    ssize_t result = write(wake_pipe[1], &signal_byte, sizeof(signal_byte));
+    (void) result;
+}
+
+static void close_wake_pipe(void) {
+    if (wake_pipe[0] >= 0) close(wake_pipe[0]);
+    if (wake_pipe[1] >= 0) close(wake_pipe[1]);
+    wake_pipe[0] = -1;
+    wake_pipe[1] = -1;
+}
 
 enum connection_disposition {
     CONNECTION_DIRECT = 0,
@@ -149,16 +165,26 @@ static void *run_event_loop(void *unused) {
         fd_set read_fds;
         fd_set write_fds;
         int max_fd = 0;
-        struct timeval timeout = {.tv_sec = 0, .tv_usec = 100000};
 
         FD_ZERO(&read_fds);
         FD_ZERO(&write_fds);
         pthread_mutex_lock(&tunnel_mutex);
         if (tunnel != NULL) zdtun_fds(tunnel, &max_fd, &read_fds, &write_fds);
+        if (wake_pipe[0] >= 0) {
+            FD_SET(wake_pipe[0], &read_fds);
+            if (wake_pipe[0] > max_fd) max_fd = wake_pipe[0];
+        }
         pthread_mutex_unlock(&tunnel_mutex);
 
-        int selected = select(max_fd + 1, &read_fds, &write_fds, NULL, &timeout);
+        int selected = select(max_fd + 1, &read_fds, &write_fds, NULL, NULL);
         if (selected <= 0 || !running) continue;
+        if (wake_pipe[0] >= 0 && FD_ISSET(wake_pipe[0], &read_fds)) {
+            uint8_t buffer[64];
+            while (read(wake_pipe[0], buffer, sizeof(buffer)) > 0) {
+            }
+            FD_CLR(wake_pipe[0], &read_fds);
+        }
+        if (!running) continue;
         pthread_mutex_lock(&tunnel_mutex);
         if (tunnel != NULL) zdtun_handle_fd(tunnel, &read_fds, &write_fds);
         pthread_mutex_unlock(&tunnel_mutex);
@@ -227,6 +253,16 @@ Java_com_haoze_dnssr_vpn_NativeTrafficForwarder_nativeStart(
     );
 
     signal(SIGPIPE, SIG_IGN);
+    if (pipe(wake_pipe) != 0) goto failure;
+    int read_flags = fcntl(wake_pipe[0], F_GETFL, 0);
+    int write_flags = fcntl(wake_pipe[1], F_GETFL, 0);
+    if (read_flags < 0 || write_flags < 0 ||
+        fcntl(wake_pipe[0], F_SETFL, read_flags | O_NONBLOCK) != 0 ||
+        fcntl(wake_pipe[1], F_SETFL, write_flags | O_NONBLOCK) != 0
+    ) {
+        close_wake_pipe();
+        goto failure;
+    }
     running = true;
     protection_failed = false;
     if (pthread_create(&event_thread, NULL, run_event_loop, NULL) != 0) {
@@ -250,6 +286,7 @@ failure:
     }
     if (tun_fd >= 0) close(tun_fd);
     tun_fd = -1;
+    close_wake_pipe();
     pthread_mutex_unlock(&tunnel_mutex);
     return JNI_FALSE;
 }
@@ -277,6 +314,7 @@ Java_com_haoze_dnssr_vpn_NativeTrafficForwarder_nativeForward(
     int result = protection_failed ? -1 : (connection == NULL ? 0 : 1);
     pthread_mutex_unlock(&tunnel_mutex);
     (*env)->ReleaseByteArrayElements(env, packet, bytes, JNI_ABORT);
+    wake_event_loop();
     return result;
 }
 
@@ -287,6 +325,7 @@ Java_com_haoze_dnssr_vpn_NativeTrafficForwarder_nativeStop(
 ) {
     (void) instance;
     running = false;
+    wake_event_loop();
     if (thread_started) {
         pthread_join(event_thread, NULL);
         thread_started = false;
@@ -298,6 +337,7 @@ Java_com_haoze_dnssr_vpn_NativeTrafficForwarder_nativeStop(
     }
     if (tun_fd >= 0) close(tun_fd);
     tun_fd = -1;
+    close_wake_pipe();
     if (vpn_service != NULL) {
         (*env)->DeleteGlobalRef(env, vpn_service);
         vpn_service = NULL;
