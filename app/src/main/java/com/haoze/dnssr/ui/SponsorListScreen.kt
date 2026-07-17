@@ -16,32 +16,37 @@ private val SPONSORS = listOf(
     RecognitionMember(
         name = "alone",
         avatarRes = R.drawable.alone_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     ),
     RecognitionMember(
-        name = "酷安@睿上源",
+        name = "睿上源",
         avatarRes = R.drawable.ruishangyuan_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     ),
     RecognitionMember(
         name = "理塘丁真",
         avatarRes = R.drawable.litangdingzhen_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     ),
     RecognitionMember(
-        name = "酷安@天涯浮客",
+        name = "天涯浮客",
         avatarRes = R.drawable.tianyafuke_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     ),
     RecognitionMember(
         name = "AceTaffy1883",
         avatarRes = R.drawable.acetaffy1883_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     ),
     RecognitionMember(
-        name = "酷安@心疼头头哥",
+        name = "心疼头头哥",
         avatarRes = R.drawable.xintengtoutouge_avatar,
-        acknowledgement = "感谢对 DNSSR 项目的支持"
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
+    ),
+    RecognitionMember(
+        name = "恐龙复生",
+        avatarRes = R.drawable.konglongfusheng_avatar,
+        acknowledgement = "感谢对 DNSSR 项目的赞助支持"
     )
 )
 

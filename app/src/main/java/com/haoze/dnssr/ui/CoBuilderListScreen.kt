@@ -24,7 +24,12 @@ private val CO_BUILDERS = listOf(
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@乐野",
+        name = "恐龙复生",
+        avatarRes = R.drawable.konglongfusheng_avatar,
+        acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
+    ),
+    RecognitionMember(
+        name = "乐野",
         avatarRes = R.drawable.leye_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
@@ -34,28 +39,28 @@ private val CO_BUILDERS = listOf(
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@睿上源",
+        name = "睿上源",
         avatarRes = R.drawable.ruishangyuan_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@天涯浮客",
+        name = "天涯浮客",
         avatarRes = R.drawable.tianyafuke_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@妄炁",
+        name = "妄炁",
         avatarRes = R.drawable.wangqi_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@心疼头头哥",
-        avatarRes = R.drawable.xintengtoutouge_avatar,
+        name = "widiOA",
+        avatarRes = R.drawable.widioa_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
-        name = "酷安@widiOA",
-        avatarRes = R.drawable.widioa_avatar,
+        name = "心疼头头哥",
+        avatarRes = R.drawable.xintengtoutouge_avatar,
         acknowledgement = "感谢为 DNSSR 提出建议与帮助测试"
     ),
     RecognitionMember(
