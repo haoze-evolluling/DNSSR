@@ -20,6 +20,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +41,7 @@ import com.haoze.dnssr.ui.AppSettings
 import com.haoze.dnssr.ui.AppThemeMode
 import com.haoze.dnssr.ui.LauncherIconManager
 import com.haoze.dnssr.ui.MainViewModel
+import com.haoze.dnssr.ui.PermissionDisclosureSettings
 import com.haoze.dnssr.ui.preloadAboutPage
 import com.haoze.dnssr.ui.preloadLogDashboard
 import com.haoze.dnssr.ui.theme.DNSSRTheme
@@ -55,14 +59,23 @@ private const val LOG_DASHBOARD_WARMUP_DELAY_MS = 900L
 private const val ABOUT_PAGE_WARMUP_DELAY_MS = 700L
 private const val PREFERRED_REFRESH_RATE_HZ = 120f
 
+private enum class PermissionDisclosure {
+    NOTIFICATION,
+    VPN
+}
+
 class MainActivity : ComponentActivity() {
+
+    private var permissionDisclosure by mutableStateOf<PermissionDisclosure?>(null)
 
     private val vpnPrepareLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
+            PermissionDisclosureSettings.updateVpnGrant(this, true)
             startVpnService()
         } else {
+            PermissionDisclosureSettings.updateVpnGrant(this, false)
             ensureMonitorServiceState()
             mainViewModel?.refreshStatus()
         }
@@ -70,7 +83,8 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ ->
+    ) { granted ->
+        PermissionDisclosureSettings.updateNotificationGrant(this, granted)
         prepareVpn()
     }
 
@@ -151,6 +165,13 @@ class MainActivity : ComponentActivity() {
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                        permissionDisclosure?.let { disclosure ->
+                            PermissionDisclosureDialog(
+                                disclosure = disclosure,
+                                onContinue = { continuePermissionRequest(disclosure) },
+                                onDismiss = { dismissPermissionRequest(disclosure) }
+                            )
+                        }
                     }
                 }
             }
@@ -199,6 +220,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         applyRecentsPrivacySetting()
         mainViewModel.refreshStatus()
+        PermissionDisclosureSettings.updateNotificationGrant(this, hasNotificationPermission())
+        PermissionDisclosureSettings.updateVpnGrant(this, VpnService.prepare(this) == null)
     }
 
     private fun applyRecentsPrivacySetting() {
@@ -243,8 +266,20 @@ class MainActivity : ComponentActivity() {
     private fun requestNotificationPermissionThenPrepare() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             when (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
-                PackageManager.PERMISSION_GRANTED -> prepareVpn()
-                else -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                PackageManager.PERMISSION_GRANTED -> {
+                    PermissionDisclosureSettings.updateNotificationGrant(this, true)
+                    prepareVpn()
+                }
+                else -> {
+                    PermissionDisclosureSettings.updateNotificationGrant(this, false)
+                    when {
+                        !PermissionDisclosureSettings.isNotificationExplained(this) -> {
+                            permissionDisclosure = PermissionDisclosure.NOTIFICATION
+                        }
+                        PermissionDisclosureSettings.wasNotificationRequested(this) -> prepareVpn()
+                        else -> requestNotificationPermission()
+                    }
+                }
             }
         } else {
             prepareVpn()
@@ -254,9 +289,50 @@ class MainActivity : ComponentActivity() {
     private fun prepareVpn() {
         val intent = VpnService.prepare(this)
         if (intent != null) {
-            vpnPrepareLauncher.launch(intent)
+            PermissionDisclosureSettings.updateVpnGrant(this, false)
+            if (PermissionDisclosureSettings.isVpnExplained(this)) {
+                vpnPrepareLauncher.launch(intent)
+            } else {
+                permissionDisclosure = PermissionDisclosure.VPN
+            }
         } else {
+            PermissionDisclosureSettings.updateVpnGrant(this, true)
             startVpnService()
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        PermissionDisclosureSettings.markNotificationRequested(this)
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun continuePermissionRequest(disclosure: PermissionDisclosure) {
+        permissionDisclosure = null
+        when (disclosure) {
+            PermissionDisclosure.NOTIFICATION -> {
+                PermissionDisclosureSettings.setNotificationExplained(this, true)
+                requestNotificationPermission()
+            }
+            PermissionDisclosure.VPN -> {
+                PermissionDisclosureSettings.setVpnExplained(this, true)
+                prepareVpn()
+            }
+        }
+    }
+
+    private fun dismissPermissionRequest(disclosure: PermissionDisclosure) {
+        permissionDisclosure = null
+        when (disclosure) {
+            PermissionDisclosure.NOTIFICATION -> {
+                PermissionDisclosureSettings.setNotificationExplained(this, true)
+                PermissionDisclosureSettings.markNotificationRequested(this)
+                prepareVpn()
+            }
+            PermissionDisclosure.VPN -> {
+                PermissionDisclosureSettings.setVpnExplained(this, true)
+                ensureMonitorServiceState()
+                mainViewModel.refreshStatus()
+            }
         }
     }
 
@@ -272,4 +348,31 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_AUTO_START_VPN = "auto_start_vpn"
     }
+}
+
+@androidx.compose.runtime.Composable
+private fun PermissionDisclosureDialog(
+    disclosure: PermissionDisclosure,
+    onContinue: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val title: String
+    val message: String
+    when (disclosure) {
+        PermissionDisclosure.NOTIFICATION -> {
+            title = "通知权限"
+            message = "通知用于显示 DNS VPN 的运行和停止状态。拒绝不会阻止核心功能运行，但你可能无法及时看到连接状态提醒。"
+        }
+        PermissionDisclosure.VPN -> {
+            title = "VPN 连接权限"
+            message = "DNSSR 需要建立本地 VPN 来处理和过滤 DNS 请求。此权限用于在设备上接管 DNS 流量，不会将全部网络流量发送到远程 VPN 服务器。"
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = { TextButton(onClick = onContinue) { Text("继续") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("暂不允许") } }
+    )
 }

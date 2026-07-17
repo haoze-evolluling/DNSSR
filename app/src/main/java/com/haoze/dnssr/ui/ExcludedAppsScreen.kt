@@ -35,7 +35,6 @@ import com.haoze.dnssr.ui.components.SettingsCheckboxItem
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsInfoText
-import com.haoze.dnssr.ui.components.SettingsLoadingContent
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -60,13 +59,12 @@ private data class InstalledApp(
 @Composable
 fun ExcludedAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var apps by remember { mutableStateOf<List<InstalledApp>?>(null) }
     var selectedPackages by remember { mutableStateOf(AppSettings.getExcludedAppPackages(context)) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(AppFilter.USER) }
 
-    LaunchedEffect(Unit) {
-        apps = withContext(Dispatchers.IO) {
+    val appListAccess = rememberAppListAccessState {
+        withContext(Dispatchers.IO) {
             @Suppress("DEPRECATION")
             context.packageManager.getInstalledApplications(0)
                 .asSequence()
@@ -85,11 +83,21 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
                 .sortedWith(compareBy<InstalledApp> { it.normalizedLabel }.thenBy { it.packageName })
         }
     }
+    AppListDisclosureDialog(appListAccess)
 
-    val loadedApps = apps
+    val loadedApps = appListAccess.apps
     if (loadedApps == null) {
         SettingsScaffold(title = "排除应用", onBack = onBack) { innerPadding ->
-            SettingsLoadingContent(Modifier.padding(innerPadding))
+            AppListLoadingContent(Modifier.padding(innerPadding))
+        }
+        return
+    }
+    if (appListAccess.unavailable) {
+        SettingsScaffold(title = "排除应用", onBack = onBack) { innerPadding ->
+            AppListUnavailableContent(
+                modifier = Modifier.padding(innerPadding),
+                onRetry = appListAccess.retry
+            )
         }
         return
     }

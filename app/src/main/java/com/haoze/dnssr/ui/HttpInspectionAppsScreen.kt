@@ -35,7 +35,6 @@ import com.haoze.dnssr.ui.components.SettingsCheckboxItem
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsInfoText
-import com.haoze.dnssr.ui.components.SettingsLoadingContent
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -57,13 +56,12 @@ private data class InspectionInstalledApp(
 @Composable
 fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var apps by remember { mutableStateOf<List<InspectionInstalledApp>?>(null) }
     var selectedPackages by remember { mutableStateOf(AppSettings.getHttpInspectionAppPackages(context)) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(InspectionAppFilter.USER) }
 
-    LaunchedEffect(Unit) {
-        apps = withContext(Dispatchers.IO) {
+    val appListAccess = rememberAppListAccessState {
+        withContext(Dispatchers.IO) {
             @Suppress("DEPRECATION")
             context.packageManager.getInstalledApplications(0).asSequence()
                 .filter { it.packageName != context.packageName }
@@ -75,9 +73,16 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
                 .toList()
         }
     }
-    val loadedApps = apps
+    AppListDisclosureDialog(appListAccess)
+    val loadedApps = appListAccess.apps
     if (loadedApps == null) {
-        SettingsScaffold(title = "选择过滤应用", onBack = onBack) { SettingsLoadingContent(Modifier.padding(it)) }
+        SettingsScaffold(title = "选择过滤应用", onBack = onBack) { AppListLoadingContent(Modifier.padding(it)) }
+        return
+    }
+    if (appListAccess.unavailable) {
+        SettingsScaffold(title = "选择过滤应用", onBack = onBack) {
+            AppListUnavailableContent(Modifier.padding(it), appListAccess.retry)
+        }
         return
     }
     var debouncedQuery by remember { mutableStateOf("") }
