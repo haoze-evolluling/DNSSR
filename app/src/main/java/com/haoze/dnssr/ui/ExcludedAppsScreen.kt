@@ -61,7 +61,13 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var selectedPackages by remember { mutableStateOf(AppSettings.getExcludedAppPackages(context)) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(AppFilter.USER) }
+    var filter by remember {
+        mutableStateOf(
+            AppFilter.entries.firstOrNull {
+                it.name == AppSettings.getExcludedAppsFilter(context)
+            } ?: AppFilter.USER
+        )
+    }
 
     val appListAccess = rememberAppListAccessState {
         withContext(Dispatchers.IO) {
@@ -145,6 +151,7 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
                             text = { Text(option.label) },
                             onClick = {
                                 filter = option
+                                AppSettings.setExcludedAppsFilter(context, option.name)
                                 showFilterMenu = false
                             },
                             leadingIcon = {

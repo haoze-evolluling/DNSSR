@@ -152,6 +152,7 @@ object AppSettings {
     private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
     private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
+    private const val KEY_EXCLUDED_APPS_FILTER = "excluded_apps_filter"
     private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
     private const val KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED = "http_inspection_notice_acknowledged"
@@ -311,6 +312,19 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_EXCLUDED_APP_PACKAGES, packageNames.filter { it.isNotBlank() }.toSet())
+            .apply()
+    }
+
+    fun getExcludedAppsFilter(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_EXCLUDED_APPS_FILTER, "USER")
+            ?: "USER"
+    }
+
+    fun setExcludedAppsFilter(context: Context, filter: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_EXCLUDED_APPS_FILTER, filter)
             .apply()
     }
 
