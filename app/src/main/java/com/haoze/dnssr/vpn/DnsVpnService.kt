@@ -1,11 +1,13 @@
 package com.haoze.dnssr.vpn
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.net.ConnectivityManager
 import android.os.Build
@@ -1174,7 +1176,11 @@ class DnsVpnService : VpnService() {
     }
 
     private fun startMonitorService() {
-        if (!AppSettings.isPersistentNotificationEnabled(this)) {
+        if (!AppSettings.isPersistentNotificationEnabled(this) ||
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
             stopMonitorService()
             return
         }
