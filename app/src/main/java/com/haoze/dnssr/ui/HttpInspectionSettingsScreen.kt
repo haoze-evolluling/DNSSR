@@ -145,12 +145,12 @@ fun HttpInspectionSettingsScreen(
                 com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
                     title = "选择过滤应用",
-                    subtitle = if (selectedCount == 0) "选择需要进行 HTTP/HTTPS 过滤的应用" else "已选择 $selectedCount 个应用",
+                    subtitle = if (selectedCount == 0) "选择需要进行 HTTP(S) 过滤的应用" else "已选择 $selectedCount 个应用",
                     onClick = { if (supported) onNavigateToApps() }
                 )
                 com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
-                    title = "HTTP/HTTPS 请求记录",
+                    title = "HTTP(S) 请求记录",
                     subtitle = "查看逐请求过滤结果和 HTTPS 解密失败直连记录；不保存路径、请求头或正文",
                     onClick = onNavigateToRequestLogs
                 )

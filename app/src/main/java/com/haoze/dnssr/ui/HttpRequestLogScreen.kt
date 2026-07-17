@@ -82,7 +82,7 @@ fun HttpRequestLogScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("HTTP/HTTPS 请求记录") },
+                title = { Text("HTTP(S) 请求记录") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
