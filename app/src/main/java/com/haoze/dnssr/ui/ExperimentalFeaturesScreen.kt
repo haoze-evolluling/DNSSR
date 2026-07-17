@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Construction
+import androidx.compose.material.icons.filled.Http
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,7 @@ import com.haoze.dnssr.ui.components.SettingsSwitchItem
 fun ExperimentalFeaturesScreen(
     onBack: () -> Unit,
     onNavigateToDoh3Service: () -> Unit,
+    onNavigateToHttpInspection: () -> Unit,
     title: String = "实验功能"
 ) {
     val context = LocalContext.current
@@ -66,6 +68,13 @@ fun ExperimentalFeaturesScreen(
 
             SettingsGroupTitle("服务")
             SettingsGroup {
+                SettingsNavigationItem(
+                    title = "HTTP 流量过滤",
+                    subtitle = "按应用配置明文 HTTP 与 HTTPS 域名过滤",
+                    leadingIcon = Icons.Filled.Http,
+                    onClick = onNavigateToHttpInspection
+                )
+                com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
                     title = "DOH3 服务",
                     subtitle = "查看开发进度",

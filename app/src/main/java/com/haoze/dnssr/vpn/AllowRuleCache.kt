@@ -20,16 +20,20 @@ class AllowRuleCache {
     }
 
     fun isAllowed(qname: String): Boolean {
+        return findMatch(qname) != null
+    }
+
+    fun findMatch(qname: String): String? {
         val domain = qname.lowercase().trimEnd('.')
         synchronized(this) {
-            if (ruleSet.contains(domain)) return true
+            if (ruleSet.contains(domain)) return domain
             var pos = domain.indexOf('.')
             while (pos >= 0 && pos < domain.length - 1) {
                 val suffix = domain.substring(pos + 1)
-                if (ruleSet.contains(suffix)) return true
+                if (ruleSet.contains(suffix)) return suffix
                 pos = domain.indexOf('.', pos + 1)
             }
-            return false
+            return null
         }
     }
 

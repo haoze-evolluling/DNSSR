@@ -87,6 +87,8 @@ object Routes {
     const val CUSTOM_BACKGROUND_SETTINGS = "custom_background_settings"
     const val SERVICE_LIGHT_EFFECT_SETTINGS = "service_light_effect_settings"
     const val EXPERIMENTAL_FEATURES = "experimental_features"
+    const val HTTP_INSPECTION_SETTINGS = "http_inspection_settings"
+    const val HTTP_REQUEST_LOGS = "http_request_logs"
     const val DOH3_SERVICE = "doh3_service"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
@@ -375,8 +377,18 @@ fun AppNavHost(
             ExperimentalFeaturesScreen(
                 onBack = { navController.popWhenResumed() },
                 onNavigateToDoh3Service = { navController.navigateWhenResumed(Routes.DOH3_SERVICE) },
+                onNavigateToHttpInspection = { navController.navigateWhenResumed(Routes.HTTP_INSPECTION_SETTINGS) },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
             )
+        }
+        composable(Routes.HTTP_INSPECTION_SETTINGS) {
+            HttpInspectionSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                onNavigateToRequestLogs = { navController.navigateWhenResumed(Routes.HTTP_REQUEST_LOGS) }
+            )
+        }
+        composable(Routes.HTTP_REQUEST_LOGS) {
+            HttpRequestLogScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.DOH3_SERVICE) {
             Doh3ServiceScreen(onBack = { navController.popWhenResumed() })

@@ -11,6 +11,7 @@ import com.haoze.dnssr.data.dao.BlockRuleDao
 import com.haoze.dnssr.data.dao.BootstrapLogDao
 import com.haoze.dnssr.data.dao.DnsCacheDao
 import com.haoze.dnssr.data.dao.DnsLogDao
+import com.haoze.dnssr.data.dao.HttpRequestLogDao
 import com.haoze.dnssr.data.dao.RaceLogDao
 import com.haoze.dnssr.data.dao.SubscriptionDao
 import com.haoze.dnssr.data.dao.SubscriptionAutoUpdateDao
@@ -21,6 +22,7 @@ import com.haoze.dnssr.data.entity.BlockRuleSourceEntity
 import com.haoze.dnssr.data.entity.BootstrapLogEntity
 import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.data.entity.DnsLogEntity
+import com.haoze.dnssr.data.entity.HttpRequestLogEntity
 import com.haoze.dnssr.data.entity.RaceLogEntity
 import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
@@ -36,14 +38,16 @@ import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
         AllowRuleEntity::class,
         AllowRuleSourceEntity::class,
         SubscriptionEntity::class,
-        SubscriptionAutoUpdateItemEntity::class
+        SubscriptionAutoUpdateItemEntity::class,
+        HttpRequestLogEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dnsCacheDao(): DnsCacheDao
     abstract fun dnsLogDao(): DnsLogDao
+    abstract fun httpRequestLogDao(): HttpRequestLogDao
     abstract fun raceLogDao(): RaceLogDao
     abstract fun bootstrapLogDao(): BootstrapLogDao
     abstract fun blockRuleDao(): BlockRuleDao
@@ -69,7 +73,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_13_14,
                         MIGRATION_14_15,
                         MIGRATION_15_16,
-                        MIGRATION_16_17
+                        MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -238,6 +243,24 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_subscription_auto_update_item_batchId_status` " +
                         "ON `subscription_auto_update_item` (`batchId`, `status`)"
                 )
+            }
+        }
+
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `http_request_log` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`timestamp` INTEGER NOT NULL, `packageName` TEXT NOT NULL, " +
+                        "`authority` TEXT, `protocol` TEXT NOT NULL, `outcome` TEXT NOT NULL, " +
+                        "`matchedRule` TEXT)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_http_request_log_timestamp` ON `http_request_log` (`timestamp`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_http_request_log_outcome_timestamp` " +
+                        "ON `http_request_log` (`outcome`, `timestamp`)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_http_request_log_authority` ON `http_request_log` (`authority`)")
             }
         }
     }

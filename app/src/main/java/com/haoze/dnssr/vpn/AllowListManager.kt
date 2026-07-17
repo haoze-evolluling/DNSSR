@@ -20,6 +20,8 @@ class AllowListManager(private val dao: AllowRuleDao) {
         return cache.isAllowed(qname)
     }
 
+    fun findMatch(qname: String): String? = cache.findMatch(qname)
+
     suspend fun allRules(): List<AllowRuleEntity> = dao.all()
 
     suspend fun addRule(pattern: String): Boolean {

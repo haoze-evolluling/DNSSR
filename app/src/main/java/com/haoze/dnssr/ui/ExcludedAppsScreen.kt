@@ -200,6 +200,8 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
             Button(
                 onClick = {
                     AppSettings.setExcludedAppPackages(context, selectedPackages)
+                    val inspectionPackages = AppSettings.getHttpInspectionAppPackages(context)
+                    AppSettings.setHttpInspectionAppPackages(context, inspectionPackages - selectedPackages)
                     RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
                     val vpnRunning = com.haoze.dnssr.vpn.DnsVpnService.isRunning(context)
                     Toast.makeText(

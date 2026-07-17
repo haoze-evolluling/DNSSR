@@ -7,14 +7,17 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.net.ConnectivityManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.system.Os
 import android.system.OsConstants
 import android.system.StructPollfd
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.annotation.Keep
 import com.haoze.dnssr.MainActivity
 import com.haoze.dnssr.R
 import com.haoze.dnssr.data.AppDatabase
@@ -48,8 +51,12 @@ import kotlinx.coroutines.sync.withLock
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
 import kotlin.math.max
 
@@ -74,6 +81,11 @@ class DnsVpnService : VpnService() {
     private val refreshMutex = Mutex()
     private var vpnInterface: ParcelFileDescriptor? = null
     private var readJob: Job? = null
+    private var inspectionDataPlaneActive = false
+    private var inspectionFallbackActive = false
+    private var localInspectionProxy: LocalInspectionProxy? = null
+    @Volatile
+    private var activeInspectionPackages: Set<String> = emptySet()
     @Volatile
     private var resolvers: List<ActiveDnsResolver> = emptyList()
     private var startIntent: Intent? = null
@@ -83,6 +95,8 @@ class DnsVpnService : VpnService() {
     private lateinit var blockListManager: BlockListManager
     private lateinit var allowListManager: AllowListManager
     private lateinit var dnsLogger: DnsLogger
+    private lateinit var httpRequestLogger: HttpRequestLogger
+    private lateinit var http1RequestInspector: Http1RequestInspector
     private lateinit var raceLogger: RaceLogger
     private lateinit var bootstrapLogger: BootstrapLogger
     private lateinit var providerHealthEngine: ProviderHealthEngine
@@ -99,6 +113,9 @@ class DnsVpnService : VpnService() {
     @Volatile
     private var activeDynamicBlockResponseConfig = DynamicBlockResponseConfig()
     private val dynamicBlockResponseTracker = DynamicBlockResponseTracker()
+    private val nextInspectionConnectionId = AtomicInteger(1)
+    private val pendingInspectionOwners = ConcurrentHashMap<Int, String>()
+    private val httpsBypassUntil = ConcurrentHashMap<String, Long>()
 
     override fun onCreate() {
         super.onCreate()
@@ -115,6 +132,11 @@ class DnsVpnService : VpnService() {
         blockListManager = BlockListManager(db.blockRuleDao())
         allowListManager = AllowListManager(db.allowRuleDao())
         dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope)
+        httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope)
+        http1RequestInspector = Http1RequestInspector(
+            HttpDomainPolicy(allowListManager, blockListManager),
+            httpRequestLogger
+        )
         raceLogger = RaceLogger(db.raceLogDao(), logRetentionDays, serviceScope)
         bootstrapLogger = BootstrapLogger(db.bootstrapLogDao(), logRetentionDays, serviceScope)
         providerHealthEngine = ProviderHealthEngine(this, serviceScope)
@@ -166,17 +188,32 @@ class DnsVpnService : VpnService() {
             )
         }
 
+        val inspectionRequested = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            AppSettings.isHttpInspectionEnabled(this) &&
+            AppSettings.getHttpInspectionAppPackages(this).isNotEmpty() &&
+            !inspectionFallbackActive
+        activeInspectionPackages = if (inspectionRequested) {
+            AppSettings.getHttpInspectionAppPackages(this)
+        } else {
+            emptySet()
+        }
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .addAddress(VPN_ADDRESS_V4, 30)
             .addAddress(VPN_ADDRESS_V6, 128)
             .addDnsServer(DNS_SERVER_V4)
             .addDnsServer(DNS_SERVER_V6)
-            .addRoute(DNS_SERVER_V4, 32)
-            .addRoute(DNS_SERVER_V6, 128)
             .allowFamily(android.system.OsConstants.AF_INET)
             .allowFamily(android.system.OsConstants.AF_INET6)
             .setMtu(1500)
+
+        if (inspectionRequested) {
+            builder.addRoute("0.0.0.0", 0)
+            builder.addRoute("::", 0)
+        } else {
+            builder.addRoute(DNS_SERVER_V4, 32)
+            builder.addRoute(DNS_SERVER_V6, 128)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             builder.setBlocking(true)
@@ -198,6 +235,42 @@ class DnsVpnService : VpnService() {
             return
         }
         configureLegacyBlockingMode(vpnInterface!!)
+
+        if (inspectionRequested) {
+            val proxy = LocalInspectionProxy(
+                this,
+                serviceScope,
+                http1RequestInspector,
+                onHttpsDecryptionFailure = ::rememberHttpsBypass,
+                onSustainedResourceExhaustion = {
+                    triggerInspectionFallback("sustained local proxy resource exhaustion")
+                }
+            )
+            if (!proxy.start()) {
+                Log.e(TAG, "Local inspection proxy failed to start; falling back to DNS-only mode")
+                runCatching { vpnInterface?.close() }
+                vpnInterface = null
+                inspectionFallbackActive = true
+                startVpn(intent)
+                return
+            }
+            localInspectionProxy = proxy
+            inspectionDataPlaneActive = NativeTrafficForwarder.start(
+                vpnInterface!!.fd,
+                this,
+                proxy.port
+            )
+            if (!inspectionDataPlaneActive) {
+                Log.e(TAG, "Traffic forwarder failed to start; falling back to DNS-only mode")
+                proxy.stop()
+                localInspectionProxy = null
+                runCatching { vpnInterface?.close() }
+                vpnInterface = null
+                inspectionFallbackActive = true
+                startVpn(intent)
+                return
+            }
+        }
 
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
@@ -317,8 +390,10 @@ class DnsVpnService : VpnService() {
 
         serviceScope.launch {
             refreshMutex.withLock {
+                inspectionFallbackActive = false
                 readJob?.cancel()
                 readJob = null
+                stopInspectionDataPlane()
                 closeResolvers()
                 runCatching { vpnInterface?.close() }
                 vpnInterface = null
@@ -413,6 +488,7 @@ class DnsVpnService : VpnService() {
         setRunningFlag(this, false)
         readJob?.cancel()
         readJob = null
+        stopInspectionDataPlane()
         closeResolvers()
         if (::providerHealthEngine.isInitialized) {
             providerHealthEngine.close()
@@ -443,6 +519,7 @@ class DnsVpnService : VpnService() {
         isServiceAlive = false
         setRunningFlag(this, false)
         readJob?.cancel()
+        stopInspectionDataPlane()
         closeResolvers()
         try {
             vpnInterface?.close()
@@ -499,7 +576,19 @@ class DnsVpnService : VpnService() {
                 }
 
                 val dnsInfo = IpUdpPacket.parseDnsPacket(buffer.array(), 0, length)
-                if (dnsInfo == null || dnsInfo.destPort != 53) continue
+                if (dnsInfo == null || dnsInfo.destPort != 53) {
+                    if (inspectionDataPlaneActive) {
+                        when (NativeTrafficForwarder.forward(buffer.array(), length)) {
+                            ForwardResult.FORWARDED -> Unit
+                            ForwardResult.REJECTED -> Log.d(TAG, "Native forwarder rejected one packet")
+                            ForwardResult.FAILED -> {
+                                triggerInspectionFallback("native forwarder unavailable")
+                                break
+                            }
+                        }
+                    }
+                    continue
+                }
 
                 val currentResolvers = resolvers
                 if (currentResolvers.isEmpty()) {
@@ -526,6 +615,88 @@ class DnsVpnService : VpnService() {
             Os.poll(arrayOf(pollFd), TUN_POLL_TIMEOUT_MS)
         } catch (_: Exception) {
             if (vpnInterface != null) delay(READ_ERROR_RETRY_DELAY_MS)
+        }
+    }
+
+    private fun stopInspectionDataPlane() {
+        if (inspectionDataPlaneActive) {
+            inspectionDataPlaneActive = false
+            NativeTrafficForwarder.stop()
+        }
+        localInspectionProxy?.stop()
+        localInspectionProxy = null
+        pendingInspectionOwners.clear()
+        httpsBypassUntil.clear()
+        activeInspectionPackages = emptySet()
+    }
+
+    @Keep
+    fun classifyNativeConnection(
+        ipVersion: Int,
+        protocol: Int,
+        sourceAddress: ByteArray,
+        sourcePort: Int,
+        destinationAddress: ByteArray,
+        destinationPort: Int
+    ): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            protocol != OsConstants.IPPROTO_TCP ||
+            destinationPort !in INSPECTION_TCP_PORTS ||
+            destinationPort == 443 && !AppSettings.isHttpsInspectionReady(this) ||
+            activeInspectionPackages.isEmpty()
+        ) return CONNECTION_DIRECT
+
+        val uid = runCatching {
+            val local = InetSocketAddress(InetAddress.getByAddress(sourceAddress), sourcePort)
+            val remote = InetSocketAddress(InetAddress.getByAddress(destinationAddress), destinationPort)
+            getSystemService(ConnectivityManager::class.java)
+                ?.getConnectionOwnerUid(protocol, local, remote)
+                ?: Process.INVALID_UID
+        }.getOrElse { error ->
+            Log.w(TAG, "Unable to identify connection owner for IPv$ipVersion", error)
+            Process.INVALID_UID
+        }
+        if (uid == Process.INVALID_UID) return CONNECTION_DIRECT
+        val ownerPackages = packageManager.getPackagesForUid(uid).orEmpty()
+        val ownerPackage = ownerPackages.firstOrNull(activeInspectionPackages::contains)
+            ?: return CONNECTION_DIRECT
+        if (destinationPort == 443 &&
+            httpsBypassUntil[ownerPackage]?.let { it > System.currentTimeMillis() } == true
+        ) return CONNECTION_DIRECT
+        val connectionId = nextInspectionConnectionId.getAndIncrement()
+        pendingInspectionOwners[connectionId] = ownerPackage
+        return connectionId
+    }
+
+    @Keep
+    fun registerNativeProxyConnection(connectionId: Int, proxySourcePort: Int) {
+        val packageName = pendingInspectionOwners.remove(connectionId) ?: return
+        localInspectionProxy?.registerConnectionOwner(proxySourcePort, packageName)
+    }
+
+    @Keep
+    fun releaseNativeConnection(connectionId: Int) {
+        pendingInspectionOwners.remove(connectionId)
+    }
+
+    private fun rememberHttpsBypass(packageName: String) {
+        httpsBypassUntil[packageName] = System.currentTimeMillis() + HTTPS_FAILURE_BYPASS_MS
+    }
+
+    private fun triggerInspectionFallback(reason: String) {
+        if (inspectionFallbackActive) return
+        inspectionFallbackActive = true
+        Log.e(TAG, "HTTP inspection data plane failed: $reason")
+        serviceScope.launch {
+            refreshMutex.withLock {
+                readJob?.cancel()
+                readJob = null
+                stopInspectionDataPlane()
+                closeResolvers()
+                runCatching { vpnInterface?.close() }
+                vpnInterface = null
+                startVpn(startIntent)
+            }
         }
     }
 
@@ -1062,6 +1233,9 @@ class DnsVpnService : VpnService() {
         if (::dnsLogger.isInitialized) {
             dnsLogger.flush()
         }
+        if (::httpRequestLogger.isInitialized) {
+            httpRequestLogger.flush()
+        }
         if (::raceLogger.isInitialized) {
             raceLogger.flush()
         }
@@ -1097,12 +1271,15 @@ class DnsVpnService : VpnService() {
         private const val DNS_SERVER_V4 = "10.0.0.1"
         private const val VPN_ADDRESS_V6 = "fd00:abcd::2"
         private const val DNS_SERVER_V6 = "fd00:abcd::1"
-        private const val BUFFER_SIZE = 32767
+        private const val BUFFER_SIZE = 65535
         private const val TUN_POLL_TIMEOUT_MS = 1_000
         private const val READ_ERROR_RETRY_DELAY_MS = 50L
         private const val OLD_RESOLVER_CLOSE_DELAY_MS = 2_000L
         private const val MAX_CONCURRENT_DNS_QUERIES = 64
         private const val MAX_QUEUED_DNS_PACKETS = 128
+        private const val CONNECTION_DIRECT = 0
+        private val INSPECTION_TCP_PORTS = setOf(80, 443)
+        private const val HTTPS_FAILURE_BYPASS_MS = 10 * 60 * 1_000L
         private const val PREFS_NAME = "dns_vpn_prefs"
         private const val KEY_VPN_RUNNING = "vpn_running"
 

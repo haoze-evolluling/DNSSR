@@ -34,6 +34,7 @@ import com.haoze.dnssr.vpn.BootstrapHealthEngine
 import com.haoze.dnssr.vpn.BootstrapHealthStore
 import com.haoze.dnssr.vpn.BootstrapLogger
 import com.haoze.dnssr.vpn.DnsLogger
+import com.haoze.dnssr.vpn.HttpRequestLogger
 import com.haoze.dnssr.vpn.ProviderHealthEngine
 import com.haoze.dnssr.vpn.ProviderHealthStore
 import com.haoze.dnssr.vpn.RaceLogger
@@ -72,8 +73,8 @@ fun DataCleanupScreen(
             SettingsGroupTitle("运行数据")
             SettingsGroup {
                 SettingsTextItem(
-                    title = "删除 DNS 日志",
-                    subtitle = "清除日志页中的历史请求记录",
+                    title = "删除请求日志",
+                    subtitle = "清除 DNS 和 HTTP 的历史请求记录",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.LOG }
                 )
@@ -128,6 +129,7 @@ fun DataCleanupScreen(
                         }
                         CleanupAction.LOG -> {
                             DnsLogger(db.dnsLogDao(), AppSettings.logRetentionDays(context)).clearAll()
+                            HttpRequestLogger(db.httpRequestLogDao(), AppSettings.logRetentionDays(context)).clearAll()
                             RaceLogger(db.raceLogDao(), AppSettings.logRetentionDays(context)).clearAll()
                             BootstrapLogger(db.bootstrapLogDao(), AppSettings.logRetentionDays(context)).clearAll()
                         }
@@ -171,7 +173,7 @@ private enum class CleanupAction(
     val message: String
 ) {
     CACHE("删除 DNS 缓存", "确定要删除所有本地 DNS 缓存吗？下次访问域名时会重新查询。"),
-    LOG("删除 DNS 请求日志", "确定要删除所有 DNS 请求日志、竞速统计和 Bootstrap DNS 解析统计吗？"),
+    LOG("删除请求日志", "确定要删除所有 DNS、HTTP 请求日志、竞速统计和 Bootstrap DNS 解析统计吗？"),
     PROVIDER_WEIGHT("恢复竞速模式默认权重", "确定要清除所有服务商健康样本并恢复竞速模式默认权重吗？"),
     BOOTSTRAP_WEIGHT("恢复 Bootstrap IP 默认权重", "确定要清除 Bootstrap DNS 解析健康样本并恢复默认权重吗？"),
     RULE("删除全部规则", "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。")

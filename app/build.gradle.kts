@@ -23,6 +23,11 @@ android {
         ndk {
             abiFilters += "arm64-v8a"
         }
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=none"
+            }
+        }
     }
 
     signingConfigs {
@@ -53,7 +58,17 @@ android {
     buildFeatures {
         compose = true
     }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
     packaging {
+        resources {
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
         jniLibs {
             useLegacyPackaging = true
         }
@@ -104,6 +119,9 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.bouncycastle.pkix)
+    implementation(libs.bouncycastle.provider)
+    implementation(libs.netty.codec.http2)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)

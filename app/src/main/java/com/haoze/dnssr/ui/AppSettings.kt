@@ -152,6 +152,9 @@ object AppSettings {
     private const val KEY_CUSTOM_BACKGROUND_URI = "custom_background_uri"
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
     private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
+    private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
+    private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
+    private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -307,6 +310,44 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_EXCLUDED_APP_PACKAGES, packageNames.filter { it.isNotBlank() }.toSet())
+            .apply()
+    }
+
+    fun isHttpInspectionEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HTTP_INSPECTION_ENABLED, false)
+    }
+
+    fun setHttpInspectionEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HTTP_INSPECTION_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getHttpInspectionAppPackages(context: Context): Set<String> {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_HTTP_INSPECTION_APP_PACKAGES, emptySet())
+            .orEmpty()
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
+
+    fun setHttpInspectionAppPackages(context: Context, packageNames: Set<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(KEY_HTTP_INSPECTION_APP_PACKAGES, packageNames.filter { it.isNotBlank() }.toSet())
+            .apply()
+    }
+
+    fun isHttpsInspectionReady(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HTTPS_INSPECTION_READY, false)
+
+    fun setHttpsInspectionReady(context: Context, ready: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HTTPS_INSPECTION_READY, ready)
             .apply()
     }
 
