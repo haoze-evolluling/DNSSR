@@ -114,7 +114,7 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
         }
     }) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SettingsInfoText("仅所选应用的 HTTP(S) 流量会按现有域名规则过滤。选择应用会取消其“排除应用”状态。", Modifier.padding(top = 8.dp))
+            SettingsInfoText("Go 全隧道仅检查所选应用的 HTTP(S) 请求，其他应用透明转发。选择应用会取消其“排除应用”状态。", Modifier.padding(top = 8.dp))
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), label = { Text("搜索应用或包名") }, singleLine = true)
             SettingsInfoText("已显示 ${visibleApps.size} 个应用，已选择 ${selectedPackages.size} 个")
             Card(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), SettingsCornerShape, CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer)) {

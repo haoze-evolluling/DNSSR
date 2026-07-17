@@ -115,7 +115,7 @@ internal fun AppListDisclosureDialog(state: AppListAccessState<*>) {
         onDismissRequest = state.dismissDisclosure,
         title = { Text("应用列表访问") },
         text = {
-            Text("为了让你选择需要排除或进行 HTTP(S) 过滤的应用，DNSSR 需要读取设备上的应用列表。不会读取应用数据，也不会上传应用列表。")
+            Text("为了让你选择需要排除或进行 HTTP(S) 检查的应用，DNSSR 需要读取设备上的应用列表。不会读取应用数据，也不会上传应用列表。")
         },
         confirmButton = {
             TextButton(onClick = state.allowAccess) { Text("继续") }

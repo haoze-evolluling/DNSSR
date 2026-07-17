@@ -127,7 +127,7 @@ fun HttpRequestLogScreen(onBack: () -> Unit) {
             text = {
                 Text(
                     "“已放行/已拦截”表示 DNSSR 已读取 HTTP 请求的 authority，并已按现有域名规则完成匹配。\n\n" +
-                        "“解密失败 · 直连”表示应用不信任用户 CA、使用证书固定或自定义证书校验，或 TLS 协议不兼容。为避免应用断网，该连接会直接转发，未完成 HTTPS 域名过滤。\n\n" +
+                        "“HTTPS 自动旁路”表示 Go 隧道因证书固定、双向 TLS、EV 证书、安全域名策略或握手失败而直接转发连接，未读取其中的 HTTP 请求。\n\n" +
                         "请求记录只保存应用、authority、协议、结果、匹配规则和时间，不保存路径、请求头或正文。"
                 )
             },
@@ -238,7 +238,7 @@ private fun httpOutcomePresentation(outcome: String): HttpOutcomePresentation = 
     "allowed" -> HttpOutcomePresentation("已放行", AllowedColor)
     "blocked" -> HttpOutcomePresentation("已拦截", BlockedColor)
     "invalid" -> HttpOutcomePresentation("无效请求", BlockedColor)
-    "decryption_failed" -> HttpOutcomePresentation("解密失败 · 直连", BypassedColor)
+    "decryption_failed" -> HttpOutcomePresentation("HTTPS 自动旁路", BypassedColor)
     "unsupported_protocol" -> HttpOutcomePresentation("协议不支持 · 直连", BypassedColor)
     "resource_bypass" -> HttpOutcomePresentation("资源保护 · 直连", BypassedColor)
     else -> HttpOutcomePresentation(outcome, BypassedColor)

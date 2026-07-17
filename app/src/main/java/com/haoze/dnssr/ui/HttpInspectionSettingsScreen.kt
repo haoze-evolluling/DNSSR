@@ -34,7 +34,7 @@ import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import com.haoze.dnssr.ui.components.SettingsTextItem
-import com.haoze.dnssr.vpn.HttpsInspectionCaManager
+import com.haoze.dnssr.vpn.GoInspectionCaManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -49,6 +49,7 @@ fun HttpInspectionSettingsScreen(
     val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     var enabled by remember { mutableStateOf(AppSettings.isHttpInspectionEnabled(context) && supported) }
     var httpsReady by remember { mutableStateOf(AppSettings.isHttpsInspectionReady(context)) }
+    var filterHttp3 by remember { mutableStateOf(AppSettings.isHttp3InspectionEnabled(context)) }
     var caFingerprint by remember { mutableStateOf<String?>(null) }
     var caBusy by remember { mutableStateOf(false) }
     var showInstallConfirmation by remember { mutableStateOf(false) }
@@ -64,13 +65,19 @@ fun HttpInspectionSettingsScreen(
     val securitySettingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        caBusy = false
-        showInstallConfirmation = true
+        scope.launch {
+            httpsReady = withContext(Dispatchers.IO) {
+                runCatching { GoInspectionCaManager.isInstalled(context) }.getOrDefault(false)
+            }
+            AppSettings.setHttpsInspectionReady(context, httpsReady)
+            caBusy = false
+            showInstallConfirmation = !httpsReady
+        }
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         caFingerprint = withContext(Dispatchers.IO) {
-            runCatching { HttpsInspectionCaManager.fingerprintSha256() }.getOrNull()
+            runCatching { GoInspectionCaManager.fingerprintSha256(context) }.getOrNull()
         }
     }
 
@@ -80,16 +87,16 @@ fun HttpInspectionSettingsScreen(
             val exportedCertificate = withContext(Dispatchers.IO) {
                 runCatching {
                     if (replaceExisting) {
-                        HttpsInspectionCaManager.deleteExportedCertificatesInDownloads(context)
+                        GoInspectionCaManager.deleteExportedCertificatesInDownloads(context)
                     }
-                    HttpsInspectionCaManager.exportCertificateToDownloads(context)
+                    GoInspectionCaManager.exportCertificateToDownloads(context)
                 }
             }
             exportedCertificate.fold(
                 onSuccess = {
                     Toast.makeText(
                         context,
-                        "CA 已保存到下载/${HttpsInspectionCaManager.EXPORTED_CERTIFICATE_NAME}，请在系统设置中手动安装",
+                        "CA 已保存到下载/${GoInspectionCaManager.EXPORTED_CERTIFICATE_NAME}，请在系统设置中手动安装",
                         Toast.LENGTH_LONG
                     ).show()
                     runCatching { securitySettingsLauncher.launch(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
@@ -102,7 +109,7 @@ fun HttpInspectionSettingsScreen(
                     caBusy = false
                     Toast.makeText(
                         context,
-                        "导出用户 CA 失败：${error.message ?: "未知错误"}",
+                        "导出 HTTPS 根证书失败：${error.message ?: "未知错误"}",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -132,8 +139,8 @@ fun HttpInspectionSettingsScreen(
             SettingsGroup {
                 val selectedCount = AppSettings.getHttpInspectionAppPackages(context).size
                 SettingsSwitchItem(
-                    title = "启用所选应用的流量过滤",
-                    subtitle = if (selectedCount == 0) "尚未选择应用；开启后也不会接管任何应用流量" else "已选择 $selectedCount 个应用；其他应用不受影响",
+                    title = "启用所选应用的 HTTP(S) 检查",
+                    subtitle = if (selectedCount == 0) "尚未选择应用；开启后只保留 DNS 过滤" else "已选择 $selectedCount 个应用；其他应用透明转发",
                     checked = enabled,
                     enabled = supported,
                     onCheckedChange = { checked ->
@@ -149,24 +156,36 @@ fun HttpInspectionSettingsScreen(
                     onClick = { if (supported) onNavigateToApps() }
                 )
                 com.haoze.dnssr.ui.components.SettingsDivider()
+                SettingsSwitchItem(
+                    title = "尝试检查 HTTP/3",
+                    subtitle = "阻断所选应用的 QUIC，促使其回退到可检查的 TCP；部分站点可能加载失败",
+                    checked = filterHttp3,
+                    enabled = supported,
+                    onCheckedChange = { checked ->
+                        filterHttp3 = checked
+                        AppSettings.setHttp3InspectionEnabled(context, checked)
+                        RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
+                    }
+                )
+                com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
                     title = "HTTP(S) 请求记录",
-                    subtitle = "查看逐请求过滤结果和 HTTPS 解密失败直连记录；不保存路径、请求头或正文",
+                    subtitle = "查看 Go 隧道产生的逐请求结果和 HTTPS 自动旁路记录",
                     onClick = onNavigateToRequestLogs
                 )
             }
             SettingsGroupTitle("HTTPS 解密")
             SettingsGroup {
                 SettingsNavigationItem(
-                    title = "安装用户 CA",
-                    subtitle = "导出 CA 到下载目录，并前往系统设置完成安装",
+                    title = "安装 HTTPS 根证书",
+                    subtitle = "导出 DNSSR 根证书，并前往系统设置完成安装",
                     value = if (httpsReady) "已安装" else "未安装",
                     onClick = {
                         if (!supported || caBusy) return@SettingsNavigationItem
                         caBusy = true
                         scope.launch {
                             val existingFile = withContext(Dispatchers.IO) {
-                                runCatching { HttpsInspectionCaManager.hasExportedCertificateInDownloads(context) }
+                                runCatching { GoInspectionCaManager.hasExportedCertificateInDownloads(context) }
                             }
                             caBusy = false
                             existingFile.fold(
@@ -186,14 +205,14 @@ fun HttpInspectionSettingsScreen(
                 )
                 com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
-                    title = "查看用户 CA",
-                    subtitle = "查看当前 DNSSR 用户 CA 的 SHA-256 指纹",
+                    title = "查看 HTTPS 根证书",
+                    subtitle = "查看 Go 隧道当前根证书的 SHA-256 指纹",
                     onClick = { showCaDetails = true }
                 )
                 com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsTextItem(
-                    title = "重置 DNSSR 用户 CA",
-                    subtitle = "废止当前 CA 并生成新 CA；之后必须移除旧证书并重新安装",
+                    title = "重置 HTTPS 根证书",
+                    subtitle = "废止 Go 隧道当前证书并生成新证书；之后需要重新安装",
                     enabled = supported && !caBusy,
                     textColor = androidx.compose.material3.MaterialTheme.colorScheme.error,
                     onClick = { showResetConfirmation = true }
@@ -207,14 +226,14 @@ fun HttpInspectionSettingsScreen(
             onDismissRequest = {
                 if (!noticeRequiresDecision) showUsageNotice = false
             },
-            title = { Text("HTTP(S) 流量过滤说明") },
+            title = { Text("HTTP(S) 流量检查说明") },
             text = {
                 Text(
                     if (supported) {
-                        "这是实验功能，默认关闭且仅处理明确选择的应用。明文 HTTP 会按每个请求的 Host 精确匹配现有黑白名单和订阅规则。HTTPS 只有在目标应用信任 DNSSR 用户 CA、且未使用证书固定或自定义证书校验时，才能解密并按 Host/:authority 逐请求过滤。\n\n" +
-                            "Android 7 及以上版本的现代应用通常默认不信任用户安装的 CA；采用证书固定、私有信任库或自定义校验的应用也会拒绝解密。系统中能看到 DNSSR CA，只代表证书已安装，不代表所选应用一定信任它。解密失败时 DNSSR 默认直连以避免应用断网，该 HTTPS 请求将无法按解密后的 authority 过滤。HTTP/3（QUIC）等不支持的协议也会直连。"
+                        "开启后，Go 用户态网络栈接管 VPN 流量，仅对明确选择的应用进行 HTTP(S) 检查；其他应用透明转发。HTTP 请求按 authority 匹配现有黑白名单和订阅规则。HTTPS 只有在目标应用信任 DNSSR 根证书，且未使用证书固定或自定义校验时才能解密。\n\n" +
+                            "证书固定、双向 TLS、EV 证书、安全敏感域名或握手失败的连接会自动加入旁路并直接转发，避免应用持续断网。HTTP/3（QUIC）默认直连；开启“尝试检查 HTTP/3”后，DNSSR 会阻断所选应用的 UDP 443，促使支持回退的客户端改用 TCP。"
                     } else {
-                        "HTTP(S) 流量过滤需要 Android 10 或更高版本。当前设备不支持此实验功能，将继续使用 DNS-only 模式。"
+                        "HTTP(S) 流量检查需要 Android 10 或更高版本。当前设备将继续使用 DNS-only 模式。"
                     }
                 )
             },
@@ -241,11 +260,11 @@ fun HttpInspectionSettingsScreen(
     if (showCaDetails) {
         AlertDialog(
             onDismissRequest = { showCaDetails = false },
-            title = { Text("用户 CA") },
+            title = { Text("HTTPS 根证书") },
             text = {
                 Text(
                     caFingerprint?.let { "SHA-256 指纹：\n$it" }
-                        ?: "正在读取当前用户 CA 的 SHA-256 指纹…"
+                        ?: "正在读取 Go 隧道根证书的 SHA-256 指纹…"
                 )
             },
             confirmButton = {
@@ -257,21 +276,25 @@ fun HttpInspectionSettingsScreen(
     if (showInstallConfirmation) {
         AlertDialog(
             onDismissRequest = { showInstallConfirmation = false },
-            title = { Text("确认用户 CA 安装") },
+            title = { Text("验证 HTTPS 根证书") },
             text = {
                 Text(
                     "请在系统设置中选择“从存储设备安装 CA 证书”，然后选择下载目录中的 " +
-                        HttpsInspectionCaManager.EXPORTED_CERTIFICATE_NAME +
-                        "。系统不会向 DNSSR 返回真实安装状态，请仅在系统证书页面确认看到 DNSSR User CA 后点击“已完成安装”。\n\n" +
-                        "请注意：用户 CA 不会被所有应用信任。Android 7 及以上版本的现代应用通常默认只信任系统 CA，使用证书固定或自定义证书校验的应用也可能拒绝。安装成功不代表所有 HTTPS 都能解密；不兼容的连接将记录为“HTTPS 解密失败，已直连”。"
+                        GoInspectionCaManager.EXPORTED_CERTIFICATE_NAME +
+                        "。返回后 DNSSR 会通过系统 CA 存储按 SHA-256 指纹验证安装状态；若系统限制读取证书库，状态会保持未验证。\n\n" +
+                        "安装成功只表示证书已进入系统用户凭据库，不代表所有应用都会信任它。证书固定、自定义校验、双向 TLS 等不兼容连接会由 Go 隧道自动旁路，并记录为“HTTPS 自动旁路”。"
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
-                    httpsReady = true
-                    AppSettings.setHttpsInspectionReady(context, true)
-                    showInstallConfirmation = false
-                }) { Text("已完成安装") }
+                    scope.launch {
+                        httpsReady = withContext(Dispatchers.IO) {
+                            runCatching { GoInspectionCaManager.isInstalled(context) }.getOrDefault(false)
+                        }
+                        AppSettings.setHttpsInspectionReady(context, httpsReady)
+                        showInstallConfirmation = !httpsReady
+                    }
+                }) { Text("重新验证") }
             },
             dismissButton = {
                 TextButton(onClick = { showInstallConfirmation = false }) { Text("尚未完成") }
@@ -285,7 +308,7 @@ fun HttpInspectionSettingsScreen(
             title = { Text("覆盖现有 CA 文件？") },
             text = {
                 Text(
-                    "下载目录中已有 ${HttpsInspectionCaManager.EXPORTED_CERTIFICATE_NAME}。继续将删除现有同名文件并导出新的 CA 文件。"
+                    "下载目录中已有 ${GoInspectionCaManager.EXPORTED_CERTIFICATE_NAME}。继续将删除现有同名文件并导出新的 CA 文件。"
                 )
             },
             confirmButton = {
@@ -303,10 +326,10 @@ fun HttpInspectionSettingsScreen(
     if (showResetConfirmation) {
         AlertDialog(
             onDismissRequest = { showResetConfirmation = false },
-            title = { Text("重置 DNSSR 用户 CA") },
+            title = { Text("重置 HTTPS 根证书") },
             text = {
                 Text(
-                    "重置会立即废止 DNSSR 当前使用的 CA，并生成新的私钥和证书。已安装在系统中的旧 CA 不会被自动删除，请稍后到系统凭据设置中手动移除；新 CA 必须重新导出并安装后，兼容应用才能继续进行 HTTPS 解密。"
+                    "重置会删除 Go 隧道当前私有 CA 并生成新的私钥和根证书。系统中已安装的旧证书不会自动删除，请到系统凭据设置中手动移除；新证书重新安装并验证后，兼容应用才能继续进行 HTTPS 检查。"
                 )
             },
             confirmButton = {
@@ -316,8 +339,8 @@ fun HttpInspectionSettingsScreen(
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
                             runCatching {
-                                HttpsInspectionCaManager.reset()
-                                HttpsInspectionCaManager.fingerprintSha256()
+                                GoInspectionCaManager.reset(context)
+                                GoInspectionCaManager.fingerprintSha256(context)
                             }
                         }
                         caBusy = false
@@ -328,7 +351,7 @@ fun HttpInspectionSettingsScreen(
                         }
                         Toast.makeText(
                             context,
-                            if (result.isSuccess) "用户 CA 已重置" else "重置用户 CA 失败",
+                            if (result.isSuccess) "HTTPS 根证书已重置" else "重置 HTTPS 根证书失败",
                             Toast.LENGTH_SHORT
                         ).show()
                     }

@@ -69,8 +69,8 @@ fun ExperimentalFeaturesScreen(
             SettingsGroupTitle("服务")
             SettingsGroup {
                 SettingsNavigationItem(
-                    title = "HTTP(S) 流量过滤（实验）",
-                    subtitle = "明文 HTTP 可逐请求过滤；HTTPS 解密仅兼容信任用户 CA 的应用",
+                    title = "HTTP(S) 流量过滤",
+                    subtitle = "Go 全隧道按应用检查请求；不兼容的 HTTPS 连接自动旁路",
                     leadingIcon = Icons.Filled.Http,
                     onClick = onNavigateToHttpInspection
                 )

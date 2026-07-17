@@ -13,8 +13,6 @@ navigation = "2.8.4"
 paging = "3.3.6"
 work = "2.10.1"
 junit = "4.13.2"
-bouncycastle = "1.78.1"
-netty = "4.1.118.Final"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,9 +39,6 @@ androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime-kt
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-bouncycastle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
-bouncycastle-provider = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
-netty-codec-http2 = { group = "io.netty", name = "netty-codec-http2", version.ref = "netty" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -14,9 +14,7 @@ enum class HttpRequestOutcome(val storageValue: String) {
     ALLOWED("allowed"),
     BLOCKED("blocked"),
     INVALID("invalid"),
-    DECRYPTION_FAILED("decryption_failed"),
-    UNSUPPORTED_PROTOCOL("unsupported_protocol"),
-    RESOURCE_BYPASS("resource_bypass")
+    DECRYPTION_FAILED("decryption_failed")
 }
 
 class HttpRequestLogger(

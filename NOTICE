@@ -1,0 +1,9 @@
+DNSSR includes the BlockAds userspace tunnel in HTTPS inspection mode.
+
+Copyright (C) the BlockAds contributors.
+Source: blockads-android-main/tunnel
+License: GNU General Public License, version 3 or later. See LICENSE.
+
+The corresponding Go source, module definition, and dependency lock files are
+included in tunnel/. The prebuilt Android archive at app/libs/tunnel.aar is
+generated from that source with gomobile.

@@ -169,6 +169,8 @@ object AppSettings {
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
     private const val KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED = "http_inspection_notice_acknowledged"
     private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
+    private const val KEY_HTTPS_INSPECTION_CA_BACKEND = "https_inspection_ca_backend"
+    private const val KEY_HTTP3_INSPECTION_ENABLED = "http3_inspection_enabled"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -178,6 +180,7 @@ object AppSettings {
     private const val DEFAULT_CACHE_MIN_TTL_SECONDS = 60L
     private const val DEFAULT_CACHE_STALE_FALLBACK_SECONDS = 300L
     private const val DEFAULT_LOG_RETENTION_DAYS = 7
+    private const val GO_CA_BACKEND = "go-v1"
     private const val DEFAULT_RACE_MODE_ENABLED = false
     private val DEFAULT_RACE_PROVIDER_IDS = setOf(
         "preset_alidns_dns",
@@ -380,12 +383,27 @@ object AppSettings {
 
     fun isHttpsInspectionReady(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HTTPS_INSPECTION_READY, false)
+            .let { preferences ->
+                preferences.getBoolean(KEY_HTTPS_INSPECTION_READY, false) &&
+                    preferences.getString(KEY_HTTPS_INSPECTION_CA_BACKEND, null) == GO_CA_BACKEND
+            }
 
     fun setHttpsInspectionReady(context: Context, ready: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_HTTPS_INSPECTION_READY, ready)
+            .putString(KEY_HTTPS_INSPECTION_CA_BACKEND, GO_CA_BACKEND)
+            .apply()
+    }
+
+    fun isHttp3InspectionEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HTTP3_INSPECTION_ENABLED, false)
+
+    fun setHttp3InspectionEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HTTP3_INSPECTION_ENABLED, enabled)
             .apply()
     }
 
