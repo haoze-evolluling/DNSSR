@@ -86,24 +86,38 @@ class ConfigTransferManager(private val context: Context) {
         return root.toString(2)
     }
 
-    suspend fun exportRules(): RuleExportResult {
+    suspend fun exportRules(onProgress: (Float, String) -> Unit = { _, _ -> }): RuleExportResult {
+        onProgress(0f, "正在读取白名单规则")
         val allowPatterns = database.allowRuleDao().enabledPatterns()
             .mapNotNull(AdGuardRuleParser::parseAllowLine)
             .mapTo(sortedSetOf()) { it.pattern }
+        onProgress(0.2f, "正在读取拦截规则")
         val blockPatterns = database.blockRuleDao().enabledPatterns()
             .mapNotNull(AdGuardRuleParser::parseLine)
             .mapTo(sortedSetOf()) { it.pattern }
             .apply { removeAll(allowPatterns) }
+        onProgress(0.4f, "正在生成导出文件")
         val exportedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
             .format(java.util.Date())
+        val totalRules = blockPatterns.size + allowPatterns.size
+        var generatedRules = 0
         val content = buildString {
             appendLine("! DNSSR rules export")
             appendLine("! Exported at: $exportedAt")
             appendLine("! Block rules: ${blockPatterns.size}; allow rules: ${allowPatterns.size}")
             appendLine()
-            blockPatterns.forEach { appendLine("||$it^") }
-            allowPatterns.forEach { appendLine("@@||$it^") }
+            blockPatterns.forEach {
+                appendLine("||$it^")
+                generatedRules++
+                onProgress(0.4f + 0.2f * generatedRules / totalRules.coerceAtLeast(1), "正在生成导出文件")
+            }
+            allowPatterns.forEach {
+                appendLine("@@||$it^")
+                generatedRules++
+                onProgress(0.4f + 0.2f * generatedRules / totalRules.coerceAtLeast(1), "正在生成导出文件")
+            }
         }
+        onProgress(0.6f, "正在写入文件")
         return RuleExportResult(content, blockPatterns.size, allowPatterns.size)
     }
 

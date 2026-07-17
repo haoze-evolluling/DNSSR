@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.haoze.dnssr.ui.components.SettingsGroup
-import com.haoze.dnssr.ui.components.SettingsDivider
+import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 
@@ -27,13 +27,16 @@ fun ConfigTransferScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
+            SettingsGroupTitle("配置")
             SettingsGroup {
                 SettingsNavigationItem(
                     title = "设置配置",
                     subtitle = "备份或恢复自定义服务与规则订阅",
                     onClick = onNavigateToConfigImportExport
                 )
-                SettingsDivider()
+            }
+            SettingsGroupTitle("规则")
+            SettingsGroup {
                 SettingsNavigationItem(
                     title = "规则导出",
                     subtitle = "将当前生效规则导出为可订阅的 TXT 文件",

@@ -31,6 +31,12 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
     private val _importProgress = MutableStateFlow(ConfigImportProgress(0, 0, "正在读取配置文件"))
     val importProgress: StateFlow<ConfigImportProgress> = _importProgress.asStateFlow()
 
+    private val _ruleExportProgress = MutableStateFlow(0f)
+    val ruleExportProgress: StateFlow<Float> = _ruleExportProgress.asStateFlow()
+
+    private val _ruleExportProgressText = MutableStateFlow("正在准备导出")
+    val ruleExportProgressText: StateFlow<String> = _ruleExportProgressText.asStateFlow()
+
     fun export(uri: Uri, selection: ConfigExportSelection) {
         runOperation(ConfigTransferOperation.EXPORTING) {
             val context = getApplication<Application>()
@@ -44,12 +50,24 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun exportRules(uri: Uri) {
+        _ruleExportProgress.value = 0f
+        _ruleExportProgressText.value = "正在准备导出"
         runOperation(ConfigTransferOperation.EXPORTING) {
             val context = getApplication<Application>()
-            val result = manager.exportRules()
+            val result = manager.exportRules { progress, text ->
+                _ruleExportProgress.value = progress
+                _ruleExportProgressText.value = text
+            }
             context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter().use { writer ->
                 requireNotNull(writer) { "无法打开导出文件" }
-                writer.write(result.content)
+                val chunkSize = 8 * 1024
+                val totalLength = result.content.length.coerceAtLeast(1)
+                result.content.chunked(chunkSize).forEachIndexed { index, chunk ->
+                    writer.write(chunk)
+                    val writtenLength = minOf((index + 1) * chunkSize, result.content.length)
+                    _ruleExportProgress.value = 0.6f + 0.4f * writtenLength / totalLength
+                    _ruleExportProgressText.value = "正在写入文件"
+                }
             }
             "规则已导出：拦截 ${result.blockRuleCount} 条，白名单 ${result.allowRuleCount} 条"
         }

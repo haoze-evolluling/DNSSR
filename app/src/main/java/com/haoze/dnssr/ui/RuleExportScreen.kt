@@ -5,9 +5,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +36,8 @@ fun RuleExportScreen(
 ) {
     val context = LocalContext.current
     val operation by viewModel.operation.collectAsState()
+    val exportProgress by viewModel.ruleExportProgress.collectAsState()
+    val exportProgressText by viewModel.ruleExportProgressText.collectAsState()
     val message by viewModel.message.collectAsState()
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
@@ -56,6 +62,22 @@ fun RuleExportScreen(
                 SettingsTextItem(
                     title = "导出规则",
                     subtitle = "去重、过滤无效规则，并由白名单解决同域名冲突",
+                    subtitleContent = {
+                        if (operation == ConfigTransferOperation.EXPORTING) {
+                            LinearProgressIndicator(
+                                progress = { exportProgress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                            Text(
+                                text = exportProgressText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
+                    },
                     enabled = operation == ConfigTransferOperation.IDLE,
                     onClick = {
                         val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())

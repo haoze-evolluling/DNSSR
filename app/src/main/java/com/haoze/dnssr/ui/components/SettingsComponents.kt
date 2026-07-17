@@ -173,6 +173,7 @@ fun SettingsItem(
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
+    subtitleContent: @Composable ColumnScope.() -> Unit = {},
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
     val rowModifier = if (onClick != null) {
@@ -216,6 +217,7 @@ fun SettingsItem(
                     )
                 )
             }
+            subtitleContent()
         }
 
         trailing()
@@ -333,6 +335,7 @@ fun SettingsTextItem(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleContent: @Composable ColumnScope.() -> Unit = {},
     textColor: Color = MaterialTheme.colorScheme.onSurface,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -341,6 +344,7 @@ fun SettingsTextItem(
     SettingsItem(
         title = title,
         subtitle = subtitle,
+        subtitleContent = subtitleContent,
         titleColor = textColor,
         modifier = modifier,
         enabled = enabled,
