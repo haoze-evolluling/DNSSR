@@ -65,6 +65,26 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private data class PresetSubscription(
+    val name: String,
+    val url: String
+)
+
+private val presetSubscriptions = listOf(
+    PresetSubscription(
+        name = "AdGuard DNS filter",
+        url = "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt"
+    ),
+    PresetSubscription(
+        name = "1Hosts (Lite)",
+        url = "https://adguardteam.github.io/HostlistsRegistry/assets/filter_24.txt"
+    ),
+    PresetSubscription(
+        name = "AdRules DNS List",
+        url = "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt"
+    )
+)
+
 @Composable
 fun SubscriptionScreen(
     onBack: () -> Unit,
@@ -82,6 +102,7 @@ fun SubscriptionScreen(
 
     var showAddChoiceDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showPresetImportDialog by remember { mutableStateOf(false) }
     var localImportUri by remember { mutableStateOf<Uri?>(null) }
     var showActionDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
     var showDeleteDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
@@ -205,6 +226,10 @@ fun SubscriptionScreen(
                 showAddChoiceDialog = false
                 showAddDialog = true
             },
+            onAddPreset = {
+                showAddChoiceDialog = false
+                showPresetImportDialog = true
+            },
             onAddLocal = {
                 showAddChoiceDialog = false
                 localImportLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
@@ -218,6 +243,16 @@ fun SubscriptionScreen(
             onConfirm = { url, name ->
                 viewModel.addSubscription(url, name)
                 showAddDialog = false
+            }
+        )
+    }
+
+    if (showPresetImportDialog) {
+        PresetSubscriptionImportDialog(
+            onDismiss = { showPresetImportDialog = false },
+            onSelect = { preset ->
+                viewModel.addSubscription(preset.url, preset.name)
+                showPresetImportDialog = false
             }
         )
     }
@@ -586,6 +621,7 @@ private fun AddSubscriptionDialog(
 private fun AddSubscriptionChoiceDialog(
     onDismiss: () -> Unit,
     onAddRemote: () -> Unit,
+    onAddPreset: () -> Unit,
     onAddLocal: () -> Unit
 ) {
     AlertDialog(
@@ -596,8 +632,44 @@ private fun AddSubscriptionChoiceDialog(
                 OutlinedButton(onClick = onAddRemote, modifier = Modifier.fillMaxWidth()) {
                     Text("从网络地址导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
+                OutlinedButton(onClick = onAddPreset, modifier = Modifier.fillMaxWidth()) {
+                    Text("从预设导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
                 OutlinedButton(onClick = onAddLocal, modifier = Modifier.fillMaxWidth()) {
                     Text("从本地文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+@Composable
+private fun PresetSubscriptionImportDialog(
+    onDismiss: () -> Unit,
+    onSelect: (PresetSubscription) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("从预设导入") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                presetSubscriptions.forEach { preset ->
+                    OutlinedButton(
+                        onClick = { onSelect(preset) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(text = preset.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = preset.url,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         },
