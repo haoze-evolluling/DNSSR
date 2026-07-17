@@ -111,7 +111,7 @@ fun HttpInspectionSettingsScreen(
     }
 
     SettingsScaffold(
-        title = "HTTP/HTTPS 流量过滤",
+        title = "HTTP(S) 流量过滤",
         onBack = onBack,
         actions = {
             IconButton(onClick = {
@@ -207,14 +207,14 @@ fun HttpInspectionSettingsScreen(
             onDismissRequest = {
                 if (!noticeRequiresDecision) showUsageNotice = false
             },
-            title = { Text("HTTP/HTTPS 流量过滤说明") },
+            title = { Text("HTTP(S) 流量过滤说明") },
             text = {
                 Text(
                     if (supported) {
                         "这是实验功能，默认关闭且仅处理明确选择的应用。明文 HTTP 会按每个请求的 Host 精确匹配现有黑白名单和订阅规则。HTTPS 只有在目标应用信任 DNSSR 用户 CA、且未使用证书固定或自定义证书校验时，才能解密并按 Host/:authority 逐请求过滤。\n\n" +
                             "Android 7 及以上版本的现代应用通常默认不信任用户安装的 CA；采用证书固定、私有信任库或自定义校验的应用也会拒绝解密。系统中能看到 DNSSR CA，只代表证书已安装，不代表所选应用一定信任它。解密失败时 DNSSR 默认直连以避免应用断网，该 HTTPS 请求将无法按解密后的 authority 过滤。HTTP/3（QUIC）等不支持的协议也会直连。"
                     } else {
-                        "HTTP/HTTPS 流量过滤需要 Android 10 或更高版本。当前设备不支持此实验功能，将继续使用 DNS-only 模式。"
+                        "HTTP(S) 流量过滤需要 Android 10 或更高版本。当前设备不支持此实验功能，将继续使用 DNS-only 模式。"
                     }
                 )
             },
