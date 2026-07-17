@@ -96,10 +96,10 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = raceModeSettingsTitle,
-                        subtitle = "选择省电、均衡、极速或主备解析策略",
-                        leadingIcon = Icons.AutoMirrored.Filled.AltRoute,
-                        onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
+                        title = latencySettingsTitle,
+                        subtitle = "选择服务商并测试指定域名的实际解析耗时",
+                        leadingIcon = Icons.Filled.Speed,
+                        onClick = { onNavigateToRaceModeLatency(latencySettingsTitle) }
                     )
                 }
             }
@@ -115,29 +115,17 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = latencySettingsTitle,
-                        subtitle = "选择服务商并测试指定域名的实际解析耗时",
-                        leadingIcon = Icons.Filled.Speed,
-                        onClick = { onNavigateToRaceModeLatency(latencySettingsTitle) }
-                    )
-                }
-            }
-
-            item { SettingsGroupTitle("规则管理") }
-            item {
-                SettingsGroup {
-                    SettingsNavigationItem(
-                        title = ruleManagementTitle,
-                        subtitle = "添加屏蔽或白名单规则，导入规则订阅",
-                        leadingIcon = Icons.AutoMirrored.Filled.Rule,
-                        onClick = { onNavigateToRuleManagement(ruleManagementTitle) }
+                        title = raceModeSettingsTitle,
+                        subtitle = "选择省电、均衡、极速或主备解析策略",
+                        leadingIcon = Icons.AutoMirrored.Filled.AltRoute,
+                        onClick = { onNavigateToRaceModeProviders(raceModeSettingsTitle) }
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = excludedAppsTitle,
-                        subtitle = "指定使用系统 DNS 的应用",
-                        leadingIcon = Icons.Filled.Apps,
-                        onClick = { onNavigateToExcludedApps(excludedAppsTitle) }
+                        title = logRetentionTitle,
+                        subtitle = "选择 DNS 请求日志的记录范围",
+                        leadingIcon = Icons.Filled.History,
+                        onClick = { onNavigateToLogRetentionSettings(logRetentionTitle) }
                     )
                 }
             }
@@ -153,10 +141,10 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = logRetentionTitle,
-                        subtitle = "设置请求日志自动清理时间",
-                        leadingIcon = Icons.Filled.History,
-                        onClick = { onNavigateToLogRetentionSettings(logRetentionTitle) }
+                        title = ruleManagementTitle,
+                        subtitle = "添加屏蔽或白名单规则，导入规则订阅",
+                        leadingIcon = Icons.AutoMirrored.Filled.Rule,
+                        onClick = { onNavigateToRuleManagement(ruleManagementTitle) }
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
@@ -195,6 +183,13 @@ fun SettingsScreen(
                         subtitle = "后台隐藏、通知常驻",
                         leadingIcon = Icons.Filled.FlipToBack,
                         onClick = { onNavigateToForegroundBackgroundSettings(foregroundBackgroundTitle) }
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = excludedAppsTitle,
+                        subtitle = "指定使用系统 DNS 的应用",
+                        leadingIcon = Icons.Filled.Apps,
+                        onClick = { onNavigateToExcludedApps(excludedAppsTitle) }
                     )
                 }
             }
