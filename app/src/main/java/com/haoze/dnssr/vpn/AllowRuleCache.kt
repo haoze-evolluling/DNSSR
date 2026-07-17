@@ -9,14 +9,15 @@ import com.haoze.dnssr.data.dao.AllowRuleDao
  */
 class AllowRuleCache {
 
-    private val ruleSet = HashSet<String>()
+    @Volatile
+    private var ruleSet: Set<String> = emptySet()
 
     suspend fun reload(dao: AllowRuleDao) {
         val rules = dao.enabledRules()
-        synchronized(this) {
-            ruleSet.clear()
-            ruleSet.addAll(rules.map { it.pattern })
+        val updatedRules = HashSet<String>(rules.size).apply {
+            rules.forEach { rule -> add(rule.pattern) }
         }
+        synchronized(this) { ruleSet = updatedRules }
     }
 
     fun isAllowed(qname: String): Boolean {
@@ -25,27 +26,31 @@ class AllowRuleCache {
 
     fun findMatch(qname: String): String? {
         val domain = qname.lowercase().trimEnd('.')
-        synchronized(this) {
-            if (ruleSet.contains(domain)) return domain
-            var pos = domain.indexOf('.')
-            while (pos >= 0 && pos < domain.length - 1) {
-                val suffix = domain.substring(pos + 1)
-                if (ruleSet.contains(suffix)) return suffix
-                pos = domain.indexOf('.', pos + 1)
-            }
-            return null
+        val rules = ruleSet
+        if (rules.contains(domain)) return domain
+        var pos = domain.indexOf('.')
+        while (pos >= 0 && pos < domain.length - 1) {
+            val suffix = domain.substring(pos + 1)
+            if (rules.contains(suffix)) return suffix
+            pos = domain.indexOf('.', pos + 1)
         }
+        return null
     }
 
     fun addPattern(pattern: String) {
-        synchronized(this) { ruleSet.add(pattern) }
+        synchronized(this) {
+            ruleSet = HashSet(ruleSet).apply { add(pattern) }
+        }
     }
 
     fun removePattern(pattern: String) {
-        synchronized(this) { ruleSet.remove(pattern) }
+        synchronized(this) {
+            if (pattern !in ruleSet) return
+            ruleSet = HashSet(ruleSet).apply { remove(pattern) }
+        }
     }
 
     fun clear() {
-        synchronized(this) { ruleSet.clear() }
+        synchronized(this) { ruleSet = emptySet() }
     }
 }

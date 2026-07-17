@@ -20,17 +20,17 @@ data class BlockRuleMatch(
 
 class BlockRuleCache {
 
-    private val rulesByPattern = HashMap<String, String>()
+    @Volatile
+    private var rulesByPattern: Map<String, String> = emptyMap()
 
     /**
      * 从数据库全量重载已启用规则到内存。
      */
     suspend fun reload(dao: BlockRuleDao) {
         val rules = dao.enabledRules()
-        synchronized(this) {
-            rulesByPattern.clear()
-            rules.forEach { rule -> rulesByPattern[rule.pattern] = rule.source }
-        }
+        val updatedRules = HashMap<String, String>(rules.size)
+        rules.forEach { rule -> updatedRules[rule.pattern] = rule.source }
+        synchronized(this) { rulesByPattern = updatedRules }
     }
 
     /**
@@ -40,35 +40,37 @@ class BlockRuleCache {
      */
     fun findMatch(qname: String): BlockRuleMatch? {
         val domain = qname.lowercase().trimEnd('.')
-        synchronized(this) {
-            rulesByPattern[domain]?.let { source ->
-                return BlockRuleMatch(pattern = domain, source = source)
-            }
-            var pos = domain.indexOf('.')
-            while (pos >= 0 && pos < domain.length - 1) {
-                val suffix = domain.substring(pos + 1)
-                rulesByPattern[suffix]?.let { source ->
-                    return BlockRuleMatch(pattern = suffix, source = source)
-                }
-                pos = domain.indexOf('.', pos + 1)
-            }
-            return null
+        val rules = rulesByPattern
+        rules[domain]?.let { source ->
+            return BlockRuleMatch(pattern = domain, source = source)
         }
+        var pos = domain.indexOf('.')
+        while (pos >= 0 && pos < domain.length - 1) {
+            val suffix = domain.substring(pos + 1)
+            rules[suffix]?.let { source ->
+                return BlockRuleMatch(pattern = suffix, source = source)
+            }
+            pos = domain.indexOf('.', pos + 1)
+        }
+        return null
     }
 
     fun addPattern(pattern: String, source: String) {
-        synchronized(this) { rulesByPattern[pattern] = source }
+        synchronized(this) {
+            rulesByPattern = HashMap(rulesByPattern).apply { put(pattern, source) }
+        }
     }
 
     fun removePattern(pattern: String) {
-        synchronized(this) { rulesByPattern.remove(pattern) }
+        synchronized(this) {
+            if (pattern !in rulesByPattern) return
+            rulesByPattern = HashMap(rulesByPattern).apply { remove(pattern) }
+        }
     }
 
     fun clear() {
-        synchronized(this) { rulesByPattern.clear() }
+        synchronized(this) { rulesByPattern = emptyMap() }
     }
 
-    fun size(): Int {
-        synchronized(this) { return rulesByPattern.size }
-    }
+    fun size(): Int = rulesByPattern.size
 }
