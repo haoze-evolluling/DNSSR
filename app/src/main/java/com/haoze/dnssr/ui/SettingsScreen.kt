@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FlipToBack
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Http
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Info
@@ -44,6 +45,7 @@ fun SettingsScreen(
     onNavigateToBootstrapSettings: (String) -> Unit,
     onNavigateToLogRetentionSettings: (String) -> Unit,
     onNavigateToForegroundBackgroundSettings: (String) -> Unit,
+    onNavigateToHttpInspection: (String) -> Unit,
     onNavigateToAppearanceSettings: (String) -> Unit,
     onNavigateToExperimentalFeatures: (String) -> Unit,
     onNavigateToAbout: (String) -> Unit,
@@ -63,6 +65,7 @@ fun SettingsScreen(
     val dataCleanupTitle = "数据清理"
     val configTransferTitle = "导入与导出"
     val foregroundBackgroundTitle = "前后台行为"
+    val httpInspectionTitle = "HTTP(S) 流量过滤"
     val appearanceSettingsTitle = "外观设置"
     val experimentalFeaturesTitle = "实验功能"
     val aboutTitle = "应用信息"
@@ -190,6 +193,13 @@ fun SettingsScreen(
                         subtitle = "指定使用系统 DNS 的应用",
                         leadingIcon = Icons.Filled.Apps,
                         onClick = { onNavigateToExcludedApps(excludedAppsTitle) }
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = httpInspectionTitle,
+                        subtitle = "按应用检查 HTTP(S) 请求并应用现有域名规则",
+                        leadingIcon = Icons.Filled.Http,
+                        onClick = { onNavigateToHttpInspection(httpInspectionTitle) }
                     )
                 }
             }

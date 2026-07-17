@@ -186,6 +186,9 @@ fun AppNavHost(
                 onNavigateToForegroundBackgroundSettings = { title ->
                     navController.navigateToTitledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS, title)
                 },
+                onNavigateToHttpInspection = {
+                    navController.navigateWhenResumed(Routes.HTTP_INSPECTION_SETTINGS)
+                },
                 onNavigateToAppearanceSettings = { title ->
                     navController.navigateToTitledRoute(Routes.APPEARANCE_SETTINGS, title)
                 },
@@ -379,7 +382,6 @@ fun AppNavHost(
             ExperimentalFeaturesScreen(
                 onBack = { navController.popWhenResumed() },
                 onNavigateToDoh3Service = { navController.navigateWhenResumed(Routes.DOH3_SERVICE) },
-                onNavigateToHttpInspection = { navController.navigateWhenResumed(Routes.HTTP_INSPECTION_SETTINGS) },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
             )
         }

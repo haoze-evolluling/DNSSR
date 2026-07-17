@@ -2,7 +2,6 @@ package com.haoze.dnssr.vpn
 
 import android.content.ContentValues
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import tunnel.Engine
@@ -40,21 +39,23 @@ object GoInspectionCaManager {
 
     fun exportCertificateToDownloads(context: Context) {
         val resolver = context.contentResolver
-        resolver.delete(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            "${MediaStore.Downloads.DISPLAY_NAME} = ?",
-            arrayOf(EXPORTED_CERTIFICATE_NAME)
-        )
         val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, EXPORTED_CERTIFICATE_NAME)
-            put(MediaStore.Downloads.MIME_TYPE, "application/x-x509-ca-cert")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-            }
+            put(MediaStore.MediaColumns.DISPLAY_NAME, EXPORTED_CERTIFICATE_NAME)
+            put(MediaStore.MediaColumns.MIME_TYPE, "application/x-x509-ca-cert")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
-        resolver.openOutputStream(uri)?.use { it.write(certificatePem(context).toByteArray()) }
-            ?: error("Unable to open exported certificate")
+        try {
+            resolver.openOutputStream(uri, "w")?.use { it.write(certificatePem(context).toByteArray()) }
+                ?: error("Unable to open exported certificate")
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        } catch (error: Throwable) {
+            resolver.delete(uri, null, null)
+            throw error
+        }
     }
 
     fun hasExportedCertificateInDownloads(context: Context): Boolean {
@@ -62,8 +63,8 @@ object GoInspectionCaManager {
         context.contentResolver.query(
             MediaStore.Downloads.EXTERNAL_CONTENT_URI,
             projection,
-            "${MediaStore.Downloads.DISPLAY_NAME} = ?",
-            arrayOf(EXPORTED_CERTIFICATE_NAME),
+            downloadCertificateSelection,
+            downloadCertificateSelectionArgs,
             null
         )?.use { return it.moveToFirst() }
         return false
@@ -72,8 +73,8 @@ object GoInspectionCaManager {
     fun deleteExportedCertificatesInDownloads(context: Context) {
         context.contentResolver.delete(
             MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            "${MediaStore.Downloads.DISPLAY_NAME} = ?",
-            arrayOf(EXPORTED_CERTIFICATE_NAME)
+            downloadCertificateSelection,
+            downloadCertificateSelectionArgs
         )
     }
 
@@ -92,4 +93,11 @@ object GoInspectionCaManager {
     private fun fingerprint(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes)
         .joinToString(":") { "%02X".format(it) }
+
+    private val downloadCertificateSelection =
+        "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+    private val downloadCertificateSelectionArgs = arrayOf(
+        "${Environment.DIRECTORY_DOWNLOADS}/",
+        "$EXPORTED_CERTIFICATE_NAME%"
+    )
 }
