@@ -26,7 +26,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -646,20 +649,33 @@ private fun AddSubscriptionChoiceDialog(
         title = { Text("添加规则订阅") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("DNS 过滤规则", style = MaterialTheme.typography.labelLarge)
                 OutlinedButton(onClick = onAddRemote, modifier = Modifier.fillMaxWidth()) {
-                    Text("从网络地址导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("网络 DNS 过滤订阅")
                 }
                 OutlinedButton(onClick = onAddPreset, modifier = Modifier.fillMaxWidth()) {
-                    Text("从预设导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("预设 DNS 过滤订阅")
                 }
                 OutlinedButton(onClick = onAddLocal, modifier = Modifier.fillMaxWidth()) {
-                    Text("从本地 DNS 过滤文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("本地 DNS 过滤文件")
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Text("hosts 重写规则", style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = onAddRewriteRemote, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("网络 hosts 重写订阅")
                 }
                 OutlinedButton(onClick = onAddRewriteLocal, modifier = Modifier.fillMaxWidth()) {
-                    Text("从本地 hosts 文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                }
-                OutlinedButton(onClick = onAddRewriteRemote, modifier = Modifier.fillMaxWidth()) {
-                    Text("添加 hosts 重写订阅", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("本地 hosts 文件订阅")
                 }
             }
         },
