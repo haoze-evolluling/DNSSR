@@ -95,9 +95,11 @@ object GoInspectionCaManager {
         .joinToString(":") { "%02X".format(it) }
 
     private val downloadCertificateSelection =
-        "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+        "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND " +
+            "(${MediaStore.MediaColumns.DISPLAY_NAME} = ? OR ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?)"
     private val downloadCertificateSelectionArgs = arrayOf(
         "${Environment.DIRECTORY_DOWNLOADS}/",
-        "$EXPORTED_CERTIFICATE_NAME%"
+        EXPORTED_CERTIFICATE_NAME,
+        "DNSSR-Go-HTTPS-CA (%).crt"
     )
 }
