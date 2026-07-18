@@ -1,6 +1,5 @@
 package com.haoze.dnssr.ui
 
-import android.content.pm.ApplicationInfo
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.haoze.dnssr.ui.components.SettingsCheckboxItem
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsInfoText
@@ -45,14 +43,6 @@ private enum class InspectionAppFilter(val label: String) {
     USER("用户应用"), SYSTEM("系统应用"), ALL("全部应用"), SELECTED("已选中")
 }
 
-private data class InspectionInstalledApp(
-    val label: String,
-    val packageName: String,
-    val isSystem: Boolean,
-    val normalizedLabel: String,
-    val normalizedPackageName: String
-)
-
 @Composable
 fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -60,19 +50,7 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(InspectionAppFilter.USER) }
 
-    val appListAccess = rememberAppListAccessState {
-        withContext(Dispatchers.IO) {
-            @Suppress("DEPRECATION")
-            context.packageManager.getInstalledApplications(0).asSequence()
-                .filter { it.packageName != context.packageName }
-                .map { info ->
-                    val label = info.loadLabel(context.packageManager).toString()
-                    InspectionInstalledApp(label, info.packageName, info.flags and ApplicationInfo.FLAG_SYSTEM != 0, label.lowercase(Locale.ROOT), info.packageName.lowercase(Locale.ROOT))
-                }
-                .sortedWith(compareBy<InspectionInstalledApp> { it.normalizedLabel }.thenBy { it.packageName })
-                .toList()
-        }
-    }
+    val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
     val loadedApps = appListAccess.apps
     if (loadedApps == null) {
@@ -86,7 +64,7 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
         return
     }
     var debouncedQuery by remember { mutableStateOf("") }
-    var visibleApps by remember { mutableStateOf(emptyList<InspectionInstalledApp>()) }
+    var visibleApps by remember { mutableStateOf(emptyList<InstalledApp>()) }
     var showFilterMenu by remember { mutableStateOf(false) }
     LaunchedEffect(query) { delay(250); debouncedQuery = query }
     LaunchedEffect(loadedApps, filter, debouncedQuery, selectedPackages) {
@@ -120,9 +98,8 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
             Card(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), SettingsCornerShape, CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer)) {
                 LazyColumn(Modifier.fillMaxSize()) {
                     itemsIndexed(visibleApps, key = { _, app -> app.packageName }) { index, app ->
-                        SettingsCheckboxItem(
-                            title = app.label,
-                            subtitle = app.packageName,
+                        InstalledAppCheckboxItem(
+                            app = app,
                             checked = app.packageName in selectedPackages,
                             onCheckedChange = { checked ->
                             selectedPackages = if (checked) selectedPackages + app.packageName else selectedPackages - app.packageName

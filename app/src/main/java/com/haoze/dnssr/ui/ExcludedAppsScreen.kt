@@ -1,6 +1,5 @@
 package com.haoze.dnssr.ui
 
-import android.content.pm.ApplicationInfo
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.haoze.dnssr.ui.components.SettingsCheckboxItem
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsInfoText
@@ -48,14 +46,6 @@ private enum class AppFilter(val label: String) {
     SELECTED("已选中")
 }
 
-private data class InstalledApp(
-    val label: String,
-    val packageName: String,
-    val isSystem: Boolean,
-    val normalizedLabel: String,
-    val normalizedPackageName: String
-)
-
 @Composable
 fun ExcludedAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -69,26 +59,7 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
         )
     }
 
-    val appListAccess = rememberAppListAccessState {
-        withContext(Dispatchers.IO) {
-            @Suppress("DEPRECATION")
-            context.packageManager.getInstalledApplications(0)
-                .asSequence()
-                .filter { it.packageName != context.packageName }
-                .map { info ->
-                    val label = info.loadLabel(context.packageManager).toString()
-                    InstalledApp(
-                        label = label,
-                        packageName = info.packageName,
-                        isSystem = info.flags and ApplicationInfo.FLAG_SYSTEM != 0,
-                        normalizedLabel = label.lowercase(Locale.ROOT),
-                        normalizedPackageName = info.packageName.lowercase(Locale.ROOT)
-                    )
-                }
-                .toList()
-                .sortedWith(compareBy<InstalledApp> { it.normalizedLabel }.thenBy { it.packageName })
-        }
-    }
+    val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
 
     val loadedApps = appListAccess.apps
@@ -196,9 +167,8 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
             ) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(visibleApps, key = { _, app -> app.packageName }) { index, app ->
-                        SettingsCheckboxItem(
-                            title = app.label,
-                            subtitle = app.packageName,
+                        InstalledAppCheckboxItem(
+                            app = app,
                             checked = app.packageName in selectedPackages,
                             onCheckedChange = { checked ->
                                 selectedPackages = if (checked) {

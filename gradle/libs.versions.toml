@@ -12,6 +12,7 @@ lifecycle = "2.8.7"
 navigation = "2.8.4"
 paging = "3.3.6"
 work = "2.10.1"
+accompanist = "0.37.3"
 junit = "4.13.2"
 
 [libraries]
@@ -38,6 +39,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+accompanist-drawablepainter = { group = "com.google.accompanist", name = "accompanist-drawablepainter", version.ref = "accompanist" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
