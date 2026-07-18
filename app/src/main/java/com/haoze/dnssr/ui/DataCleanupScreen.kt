@@ -187,7 +187,7 @@ private enum class CleanupAction(
     PROVIDER_WEIGHT("恢复竞速模式默认权重", "确定要清除所有服务商健康样本并恢复竞速模式默认权重吗？"),
     BOOTSTRAP_WEIGHT("恢复 Bootstrap IP 默认权重", "确定要清除 Bootstrap DNS 解析健康样本并恢复默认权重吗？"),
     RULE("删除全部规则", "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。"),
-    SETTINGS_GUIDES("重置所有新手引导", "确定要重置所有应用设置新手引导吗？这包括 HTTP(S) 流量过滤，且不会删除任何配置、规则、缓存、日志或证书。")
+    SETTINGS_GUIDES("重置所有新手引导", "确定要重置所有应用设置新手引导吗？这不会删除任何配置、规则、缓存、日志或证书。重置后，所有新手引导将会再次显示")
 }
 
 @Composable
