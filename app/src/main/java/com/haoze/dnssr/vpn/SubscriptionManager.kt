@@ -652,8 +652,9 @@ class SubscriptionManager(
     }
 
     private suspend fun importRewriteRules(rules: List<RewriteRule>, subscriptionId: Long, enabled: Boolean): RuleImportSummary {
-        val inserted = rewriteRuleManager.addRules(rules, sourceTag(subscriptionId), enabled)
-        _importProgress.value = rules.size to rules.size
+        val inserted = rewriteRuleManager.addRules(rules, sourceTag(subscriptionId), enabled, CHUNK_SIZE) { imported ->
+            _importProgress.value = imported to rules.size
+        }
         return RuleImportSummary(0, 0, inserted, (rules.size - inserted).coerceAtLeast(0), 0, 0)
     }
 
@@ -662,7 +663,9 @@ class SubscriptionManager(
         val source = sourceTag(subscriptionId)
         val old = rewriteRuleManager.rulesBySource(source)
         return try {
-            rewriteRuleManager.replaceRulesBySource(rules.rewriteRules, source, enabled)
+            rewriteRuleManager.replaceRulesBySource(rules.rewriteRules, source, enabled, CHUNK_SIZE) { imported ->
+                _importProgress.value = imported to rules.rewriteRules.size
+            }
             RuleImportSummary(0, 0, rules.rewriteRules.size, 0, rules.invalidCount, rules.unsupportedCount)
         } catch (e: Exception) { rewriteRuleManager.replaceRulesBySource(old, source, enabled); throw e }
     }

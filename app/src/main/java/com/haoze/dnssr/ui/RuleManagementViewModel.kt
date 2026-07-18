@@ -108,15 +108,18 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun importHostsRules(uri: Uri, onResult: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                ?: run { withContext(Dispatchers.Main) { onResult("无法读取所选 hosts 文件") }; return@launch }
-            val rules = com.haoze.dnssr.vpn.AdGuardRuleParser.parseHostsRewrite(content)
-            val inserted = rewriteRuleManager.addRules(rules, "local_hosts", true)
-            if (inserted > 0) RuntimeDnsSettingsRefresher.refreshIfRunning(context, "hosts_rules_imported")
-            withContext(Dispatchers.Main) { onResult(if (rules.isEmpty()) "文件中没有可导入的真实 IP hosts 规则" else "hosts 导入完成：新增 $inserted 条，重复 ${rules.size - inserted} 条"); loadRuleCount() }
+        runCatching {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
         }
+        observeResult(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.IMPORT_HOSTS_RULES, uri = uri
+            ).id,
+            onResult
+        )
     }
 
     private fun observeResult(workId: java.util.UUID, onResult: (String) -> Unit) {

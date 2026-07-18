@@ -163,14 +163,27 @@ object AdGuardRuleParser {
 
     fun normalizeDomainForRewrite(value: String): String? = normalizeDomain(value)
 
-    fun parseHostsRewrite(text: String): List<RewriteRule> = text.lineSequence().flatMap { line ->
-        val fields = line.substringBefore('#').trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        if (fields.size < 2) emptySequence() else {
+    fun parseHostsRewrite(text: String): List<RewriteRule> {
+        val rules = LinkedHashMap<String, RewriteRule>()
+        text.lineSequence().forEach { line ->
+            val fields = line.substringBefore('#').trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            if (fields.size < 2) return@forEach
             val address = runCatching { InetAddress.getByName(fields.first()) }.getOrNull()
-            if (address == null || fields.first().lowercase() in SINKHOLE_ADDRESSES) emptySequence()
-            else fields.drop(1).asSequence().mapNotNull { host -> normalizeDomain(host)?.let { RewriteRule(it, if (address.address.size == 4) com.haoze.dnssr.data.entity.RewriteTargetType.IPV4 else com.haoze.dnssr.data.entity.RewriteTargetType.IPV6, address.hostAddress, line) } }
+            if (address == null || fields.first().lowercase() in SINKHOLE_ADDRESSES) return@forEach
+            val targetType = if (address.address.size == 4) {
+                com.haoze.dnssr.data.entity.RewriteTargetType.IPV4
+            } else {
+                com.haoze.dnssr.data.entity.RewriteTargetType.IPV6
+            }
+            val targetValue = address.hostAddress ?: return@forEach
+            fields.drop(1).forEach { host ->
+                normalizeDomain(host)?.let { domain ->
+                    rules.putIfAbsent(domain, RewriteRule(domain, targetType, targetValue, line))
+                }
+            }
         }
-    }.distinctBy { Triple(it.pattern, it.targetType, it.targetValue) }.toList()
+        return rules.values.toList()
+    }
 
     private sealed interface LineResult {
         data class Valid(val rule: ParsedRule) : LineResult

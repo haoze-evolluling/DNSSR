@@ -19,6 +19,11 @@ interface RewriteRuleDao {
         val id = insertRule(rule).let { if (it == -1L) idByKey(rule.pattern, rule.targetType, rule.targetValue) else it }
         return insertSource(RewriteRuleSourceEntity(id, source, enabled)) != -1L
     }
+    @Transaction suspend fun insertAllForSource(
+        rules: List<RewriteRuleEntity>,
+        source: String,
+        enabled: Boolean
+    ): Int = rules.count { insertForSource(it, source, enabled) }
     @Query("SELECT r.pattern, r.targetType, r.targetValue FROM rewrite_rule r JOIN rewrite_rule_source s ON s.ruleId=r.id WHERE r.enabled=1 AND s.enabled=1 GROUP BY r.id") suspend fun enabledRules(): List<EnabledRewriteRule>
     @Query("SELECT * FROM rewrite_rule ORDER BY id DESC LIMIT :limit OFFSET :offset") suspend fun paged(limit: Int, offset: Int): List<RewriteRuleEntity>
     @Query("SELECT * FROM rewrite_rule WHERE pattern LIKE :query OR targetValue LIKE :query OR rawLine LIKE :query ORDER BY id DESC LIMIT :limit OFFSET :offset") suspend fun searchPaged(query: String, limit: Int, offset: Int): List<RewriteRuleEntity>
@@ -37,6 +42,20 @@ interface RewriteRuleDao {
     @Query("DELETE FROM rewrite_rule_source WHERE source=:source") suspend fun deleteSource(source: String)
     @Query("DELETE FROM rewrite_rule WHERE NOT EXISTS (SELECT 1 FROM rewrite_rule_source s WHERE s.ruleId=rewrite_rule.id)") suspend fun deleteOrphans()
     @Transaction suspend fun deleteBySource(source: String) { deleteSource(source); deleteOrphans() }
-    @Transaction suspend fun replaceBySource(source: String, rules: List<RewriteRuleEntity>, enabled: Boolean) { deleteBySource(source); rules.forEach { insertForSource(it, source, enabled) } }
+    suspend fun replaceBySource(
+        source: String,
+        rules: List<RewriteRuleEntity>,
+        enabled: Boolean,
+        chunkSize: Int = 500,
+        onProgress: ((Int) -> Unit)? = null
+    ) {
+        deleteBySource(source)
+        var imported = 0
+        rules.chunked(chunkSize).forEach { chunk ->
+            insertAllForSource(chunk, source, enabled)
+            imported += chunk.size
+            onProgress?.invoke(imported)
+        }
+    }
     @Query("UPDATE rewrite_rule_source SET enabled=:enabled WHERE source=:source") suspend fun setEnabledBySource(source: String, enabled: Boolean)
 }

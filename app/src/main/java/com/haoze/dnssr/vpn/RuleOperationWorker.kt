@@ -43,6 +43,7 @@ enum class RuleOperationType {
     UPDATE_SUBSCRIPTION,
     UPDATE_ALL_SUBSCRIPTIONS,
     IMPORT_RULES,
+    IMPORT_HOSTS_RULES,
     ADD_BLOCK_RULE,
     ADD_ALLOW_RULE
 }
@@ -134,6 +135,7 @@ class RuleOperationWorker(
             allowManager,
             RewriteRuleManager(database.rewriteRuleDao())
         )
+        val rewriteManager = RewriteRuleManager(database.rewriteRuleDao())
         var activeSubscriptionId = subscriptionId
         var latestCurrent = -1
         var latestTotal = 0
@@ -161,7 +163,7 @@ class RuleOperationWorker(
 
         try {
             val message = SubscriptionUpdateCoordinator.runManual {
-                execute(type, subscriptionId, blockManager, allowManager, subscriptionManager)
+                execute(type, subscriptionId, blockManager, allowManager, rewriteManager, subscriptionManager)
             }
             RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "rule_operation_completed")
             showFinishedNotification("$title 已完成", message)
@@ -193,6 +195,7 @@ class RuleOperationWorker(
         subscriptionId: Long,
         blockManager: BlockListManager,
         allowManager: AllowListManager,
+        rewriteManager: RewriteRuleManager,
         subscriptionManager: SubscriptionManager
     ): String = when (type) {
         RuleOperationType.ADD_SUBSCRIPTION -> {
@@ -265,6 +268,16 @@ class RuleOperationWorker(
             "导入完成：黑名单 $insertedBlock 条，白名单 $insertedAllow 条，重复 $duplicates 条，" +
                 "无效/不支持 ${rules.invalidCount + rules.unsupportedCount} 条"
         }
+        RuleOperationType.IMPORT_HOSTS_RULES -> {
+            val rules = AdGuardRuleParser.parseHostsRewrite(readUri(requiredUri()))
+            require(rules.isNotEmpty()) { "文件中没有可导入的真实 IP hosts 规则" }
+            val total = rules.size
+            val inserted = rewriteManager.addRules(rules, LOCAL_HOSTS_SOURCE, true) { current ->
+                setProgressAsync(progressData(type, -1, current, total))
+                notifyProgress(titleFor(type), current, total)
+            }
+            "hosts 导入完成：新增 $inserted 条，跳过 ${total - inserted} 条"
+        }
         RuleOperationType.ADD_BLOCK_RULE -> {
             check(blockManager.addRule(inputData.getString(RuleOperationScheduler.KEY_PATTERN).orEmpty())) {
                 "规则格式无效或规则已存在"
@@ -304,6 +317,7 @@ class RuleOperationWorker(
         RuleOperationType.UPDATE_SUBSCRIPTION -> "正在更新规则订阅"
         RuleOperationType.UPDATE_ALL_SUBSCRIPTIONS -> "正在更新所有规则订阅"
         RuleOperationType.IMPORT_RULES -> "正在导入规则"
+        RuleOperationType.IMPORT_HOSTS_RULES -> "正在导入 hosts 规则"
         RuleOperationType.ADD_BLOCK_RULE -> "正在添加屏蔽规则"
         RuleOperationType.ADD_ALLOW_RULE -> "正在添加白名单规则"
     }
@@ -366,6 +380,7 @@ class RuleOperationWorker(
     private companion object {
         const val CHANNEL_ID = "rule_operations"
         const val LOCAL_IMPORT_SOURCE = "local_import"
+        const val LOCAL_HOSTS_SOURCE = "local_hosts"
         const val COMPLETION_ID_MASK = 0x40000000
     }
 }
