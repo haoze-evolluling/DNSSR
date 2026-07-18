@@ -1,7 +1,6 @@
 package com.haoze.dnssr.ui
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,16 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,13 +31,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private enum class AppFilter(val label: String) {
-    USER("用户应用"),
-    SYSTEM("系统应用"),
-    ALL("全部应用"),
-    SELECTED("已选中")
-}
-
 @Composable
 fun ExcludedAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -53,11 +38,12 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var filter by remember {
         mutableStateOf(
-            AppFilter.entries.firstOrNull {
+            AppListFilter.entries.firstOrNull {
                 it.name == AppSettings.getExcludedAppsFilter(context)
-            } ?: AppFilter.USER
+            } ?: AppListFilter.USER
         )
     }
+    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
 
     val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
@@ -81,24 +67,23 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
 
     var debouncedQuery by remember { mutableStateOf("") }
     var visibleApps by remember { mutableStateOf(emptyList<InstalledApp>()) }
-    var showFilterMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(query) {
         delay(250)
         debouncedQuery = query
     }
 
-    LaunchedEffect(loadedApps, filter, debouncedQuery, selectedPackages) {
+    LaunchedEffect(loadedApps, filter, sort, debouncedQuery, selectedPackages) {
         val normalizedQuery = debouncedQuery.trim().lowercase(Locale.ROOT)
         visibleApps = withContext(Dispatchers.Default) {
             loadedApps.filter { app ->
-                (filter == AppFilter.ALL ||
-                    (filter == AppFilter.USER && !app.isSystem) ||
-                    (filter == AppFilter.SYSTEM && app.isSystem) ||
-                    (filter == AppFilter.SELECTED && app.packageName in selectedPackages)) &&
+                (filter == AppListFilter.ALL ||
+                    (filter == AppListFilter.USER && !app.isSystem) ||
+                    (filter == AppListFilter.SYSTEM && app.isSystem) ||
+                    (filter == AppListFilter.SELECTED && app.packageName in selectedPackages)) &&
                     (normalizedQuery.isEmpty() || app.normalizedLabel.contains(normalizedQuery) ||
                         app.normalizedPackageName.contains(normalizedQuery))
-            }
+            }.sortedWith(sort.comparator)
         }
     }
 
@@ -106,37 +91,19 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
         title = "排除应用",
         onBack = onBack,
         actions = {
-            Box {
-                IconButton(onClick = { showFilterMenu = true }) {
-                    Icon(
-                        imageVector = Icons.Default.FilterList,
-                        contentDescription = "筛选应用"
-                    )
-                }
-                DropdownMenu(
-                    expanded = showFilterMenu,
-                    onDismissRequest = { showFilterMenu = false }
-                ) {
-                    AppFilter.entries.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.label) },
-                            onClick = {
-                                filter = option
-                                AppSettings.setExcludedAppsFilter(context, option.name)
-                                showFilterMenu = false
-                            },
-                            leadingIcon = {
-                                if (filter == option) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null
-                                    )
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            val loadedPackageNames = loadedApps.mapTo(mutableSetOf()) { it.packageName }
+            AppListOverflowMenu(
+                filter = filter,
+                sort = sort,
+                onSelectAll = { selectedPackages = selectedPackages + loadedPackageNames },
+                onClear = { selectedPackages = emptySet() },
+                onInvert = { selectedPackages = selectedPackages - loadedPackageNames + (loadedPackageNames - selectedPackages) },
+                onFilterChange = {
+                    filter = it
+                    AppSettings.setExcludedAppsFilter(context, it.name)
+                },
+                onSortChange = { sort = it }
+            )
         }
     ) { innerPadding ->
         Column(

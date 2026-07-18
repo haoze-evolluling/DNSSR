@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -24,6 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +64,95 @@ internal data class InstalledApp(
     val normalizedLabel: String,
     val normalizedPackageName: String
 )
+
+internal enum class AppListFilter(val label: String) {
+    ALL("全部应用"),
+    SYSTEM("系统应用"),
+    USER("用户应用"),
+    SELECTED("已勾选应用")
+}
+
+internal enum class AppListSort(val label: String, val comparator: Comparator<InstalledApp>) {
+    LABEL_ASC("应用名称 A-Z", compareBy<InstalledApp> { it.normalizedLabel }.thenBy { it.packageName }),
+    LABEL_DESC("应用名称 Z-A", compareByDescending<InstalledApp> { it.normalizedLabel }.thenBy { it.packageName }),
+    PACKAGE_ASC("包名 A-Z", compareBy<InstalledApp> { it.normalizedPackageName }),
+    PACKAGE_DESC("包名 Z-A", compareByDescending<InstalledApp> { it.normalizedPackageName })
+}
+
+@Composable
+internal fun AppListOverflowMenu(
+    filter: AppListFilter,
+    sort: AppListSort,
+    onSelectAll: () -> Unit,
+    onClear: () -> Unit,
+    onInvert: () -> Unit,
+    onFilterChange: (AppListFilter) -> Unit,
+    onSortChange: (AppListSort) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var submenu by remember { mutableStateOf<AppListSubmenu?>(null) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "应用列表菜单")
+        }
+        DropdownMenu(
+            expanded = expanded && submenu == null,
+            onDismissRequest = {
+                expanded = false
+                submenu = null
+            },
+            modifier = Modifier.width(180.dp)
+        ) {
+            DropdownMenuItem(text = { Text("全选") }, onClick = { onSelectAll(); expanded = false })
+            DropdownMenuItem(text = { Text("清除") }, onClick = { onClear(); expanded = false })
+            DropdownMenuItem(text = { Text("反选") }, onClick = { onInvert(); expanded = false })
+            DropdownMenuItem(
+                text = { Text("过滤") },
+                trailingIcon = { Icon(Icons.Default.KeyboardArrowRight, null) },
+                onClick = { submenu = AppListSubmenu.FILTER }
+            )
+            DropdownMenuItem(
+                text = { Text("排序") },
+                trailingIcon = { Icon(Icons.Default.KeyboardArrowRight, null) },
+                onClick = { submenu = AppListSubmenu.SORT }
+            )
+        }
+        DropdownMenu(
+            expanded = expanded && submenu != null,
+            onDismissRequest = { submenu = null },
+            modifier = Modifier.width(220.dp)
+        ) {
+            when (submenu) {
+                AppListSubmenu.FILTER -> AppListFilter.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label) },
+                        leadingIcon = { if (filter == option) Icon(Icons.Default.Check, null) },
+                        onClick = {
+                            onFilterChange(option)
+                            submenu = null
+                            expanded = false
+                        }
+                    )
+                }
+                AppListSubmenu.SORT -> AppListSort.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label) },
+                        leadingIcon = { if (sort == option) Icon(Icons.Default.Check, null) },
+                        onClick = {
+                            onSortChange(option)
+                            submenu = null
+                            expanded = false
+                        }
+                    )
+                }
+                null -> Unit
+            }
+        }
+    }
+}
+
+private enum class AppListSubmenu { FILTER, SORT }
 
 private val AppIconShape = RoundedCornerShape(14.dp)
 

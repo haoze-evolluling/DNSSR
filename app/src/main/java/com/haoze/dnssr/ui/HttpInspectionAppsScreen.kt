@@ -2,23 +2,15 @@ package com.haoze.dnssr.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,16 +31,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private enum class InspectionAppFilter(val label: String) {
-    USER("用户应用"), SYSTEM("系统应用"), ALL("全部应用"), SELECTED("已选中")
-}
-
 @Composable
 fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var selectedPackages by remember { mutableStateOf(AppSettings.getHttpInspectionAppPackages(context)) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(InspectionAppFilter.USER) }
+    var filter by remember { mutableStateOf(AppListFilter.USER) }
+    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
 
     val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
@@ -65,31 +54,30 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     }
     var debouncedQuery by remember { mutableStateOf("") }
     var visibleApps by remember { mutableStateOf(emptyList<InstalledApp>()) }
-    var showFilterMenu by remember { mutableStateOf(false) }
     LaunchedEffect(query) { delay(250); debouncedQuery = query }
-    LaunchedEffect(loadedApps, filter, debouncedQuery, selectedPackages) {
+    LaunchedEffect(loadedApps, filter, sort, debouncedQuery, selectedPackages) {
         val normalizedQuery = debouncedQuery.trim().lowercase(Locale.ROOT)
         visibleApps = withContext(Dispatchers.Default) {
             loadedApps.filter { app ->
-                (filter == InspectionAppFilter.ALL ||
-                    filter == InspectionAppFilter.USER && !app.isSystem ||
-                    filter == InspectionAppFilter.SYSTEM && app.isSystem ||
-                    filter == InspectionAppFilter.SELECTED && app.packageName in selectedPackages) &&
+                (filter == AppListFilter.ALL ||
+                    filter == AppListFilter.USER && !app.isSystem ||
+                    filter == AppListFilter.SYSTEM && app.isSystem ||
+                    filter == AppListFilter.SELECTED && app.packageName in selectedPackages) &&
                     (normalizedQuery.isEmpty() || app.normalizedLabel.contains(normalizedQuery) || app.normalizedPackageName.contains(normalizedQuery))
-            }
+            }.sortedWith(sort.comparator)
         }
     }
     SettingsScaffold(title = "选择过滤应用", onBack = onBack, actions = {
-        Box {
-            IconButton(onClick = { showFilterMenu = true }) { Icon(Icons.Default.FilterList, "筛选应用") }
-            DropdownMenu(expanded = showFilterMenu, onDismissRequest = { showFilterMenu = false }) {
-                InspectionAppFilter.entries.forEach { option ->
-                    DropdownMenuItem(text = { Text(option.label) }, onClick = { filter = option; showFilterMenu = false }, leadingIcon = {
-                        if (filter == option) Icon(Icons.Default.Check, null)
-                    })
-                }
-            }
-        }
+        val loadedPackageNames = loadedApps.mapTo(mutableSetOf()) { it.packageName }
+        AppListOverflowMenu(
+            filter = filter,
+            sort = sort,
+            onSelectAll = { selectedPackages = selectedPackages + loadedPackageNames },
+            onClear = { selectedPackages = emptySet() },
+            onInvert = { selectedPackages = selectedPackages - loadedPackageNames + (loadedPackageNames - selectedPackages) },
+            onFilterChange = { filter = it },
+            onSortChange = { sort = it }
+        )
     }) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingsInfoText("Go 全隧道仅检查所选应用的 HTTP(S) 请求，其他应用透明转发。选择应用会取消其“排除应用”状态。", Modifier.padding(top = 8.dp))
