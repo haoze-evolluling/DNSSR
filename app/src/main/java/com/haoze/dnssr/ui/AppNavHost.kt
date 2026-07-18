@@ -255,7 +255,8 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.RULE_MANAGEMENT), arguments = listOf(screenTitleArgument("域名规则"))) { entry ->
-            RuleManagementScreen(
+            SettingsGuideHost(SettingsGuides.DOMAIN_RULES) {
+                RuleManagementScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "域名规则",
                 onNavigateToRuleList = { navController.navigateWhenResumed(Routes.RULE_LIST) },
@@ -267,11 +268,14 @@ fun AppNavHost(
                 onNavigateToBlockResponseSettings = {
                     navController.navigateWhenResumed(Routes.BLOCK_RESPONSE_SETTINGS)
                 },
-                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
-            )
+                    onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+                )
+            }
         }
         composable(Routes.EXCLUDED_APPS) {
-            ExcludedAppsScreen(onBack = { navController.popWhenResumed() })
+            SettingsGuideHost(SettingsGuides.EXCLUDED_APPS) {
+                ExcludedAppsScreen(onBack = { navController.popWhenResumed() })
+            }
         }
         composable(Routes.BLOCK_RESPONSE_SETTINGS) {
             BlockResponseSettingsScreen(
@@ -286,23 +290,27 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.DATA_CLEANUP), arguments = listOf(screenTitleArgument("数据清理"))) { entry ->
-            DataCleanupScreen(
+            SettingsGuideHost(SettingsGuides.DATA_CLEANUP) {
+                DataCleanupScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "数据清理",
-                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
-            )
+                    onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+                )
+            }
         }
         composable(titledRoute(Routes.CONFIG_TRANSFER), arguments = listOf(screenTitleArgument("导入与导出"))) { entry ->
-            ConfigTransferScreen(
+            SettingsGuideHost(SettingsGuides.CONFIG_TRANSFER) {
+                ConfigTransferScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "导入与导出",
                 onNavigateToConfigImportExport = {
                     navController.navigateToTitledRoute(Routes.CONFIG_IMPORT_EXPORT, "设置配置")
                 },
-                onNavigateToRuleExport = {
-                    navController.navigateToTitledRoute(Routes.RULE_EXPORT, "规则导出")
-                }
-            )
+                    onNavigateToRuleExport = {
+                        navController.navigateToTitledRoute(Routes.RULE_EXPORT, "规则导出")
+                    }
+                )
+            }
         }
         composable(titledRoute(Routes.CONFIG_IMPORT_EXPORT), arguments = listOf(screenTitleArgument("设置配置"))) { entry ->
             ConfigImportExportScreen(
@@ -317,16 +325,20 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.PROVIDER_MANAGEMENT), arguments = listOf(screenTitleArgument("服务商管理"))) { entry ->
-            ProviderManagementScreen(
+            SettingsGuideHost(SettingsGuides.PROVIDER_MANAGEMENT) {
+                ProviderManagementScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "服务商管理"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "服务商管理"
+                )
+            }
         }
         composable(titledRoute(Routes.HOME_PROVIDER_VISIBILITY), arguments = listOf(screenTitleArgument(""))) { entry ->
-            HomeProviderVisibilityScreen(
+            SettingsGuideHost(SettingsGuides.SERVICE_DISPLAY) {
+                HomeProviderVisibilityScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG).orEmpty()
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG).orEmpty()
+                )
+            }
         }
         composable(Routes.ALLOW_RULE_LIST) {
             RuleListScreen(
@@ -336,54 +348,68 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.BOOTSTRAP_SETTINGS), arguments = listOf(screenTitleArgument("Bootstrap 设置"))) { entry ->
-            BootstrapSettingsScreen(
+            SettingsGuideHost(SettingsGuides.BOOTSTRAP) {
+                BootstrapSettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap 设置"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "Bootstrap 设置"
+                )
+            }
         }
         composable(titledRoute(Routes.RACE_MODE_LATENCY), arguments = listOf(screenTitleArgument("查询测速"))) { entry ->
-            RaceModeLatencySettingsScreen(
+            SettingsGuideHost(SettingsGuides.LATENCY_TEST) {
+                RaceModeLatencySettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "查询测速"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "查询测速"
+                )
+            }
         }
         composable(titledRoute(Routes.RACE_MODE_PROVIDERS), arguments = listOf(screenTitleArgument("解析模式"))) { entry ->
-            ResolutionModeHomeScreen(
+            SettingsGuideHost(SettingsGuides.RESOLUTION_MODE) {
+                ResolutionModeHomeScreen(
                 onBack = { navController.popWhenResumed() },
-                onOpenMode = { mode -> navController.navigateWhenResumed(mode.route) }
-            )
+                    onOpenMode = { mode -> navController.navigateWhenResumed(mode.route) }
+                )
+            }
         }
         composable(Routes.RESOLUTION_SINGLE) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popWhenResumed() }) }
         composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popWhenResumed() }) }
         composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popWhenResumed() }) }
         composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popWhenResumed() }) }
         composable(titledRoute(Routes.CACHE_SETTINGS), arguments = listOf(screenTitleArgument("缓存设置"))) { entry ->
-            CacheSettingsScreen(
+            SettingsGuideHost(SettingsGuides.CACHE) {
+                CacheSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "缓存设置",
-                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
-            )
+                    onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+                )
+            }
         }
         composable(titledRoute(Routes.LOG_RETENTION_SETTINGS), arguments = listOf(screenTitleArgument("日志模式"))) { entry ->
-            LogRetentionSettingsScreen(
+            SettingsGuideHost(SettingsGuides.LOG_MODE) {
+                LogRetentionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged,
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日志模式"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "日志模式"
+                )
+            }
         }
         composable(titledRoute(Routes.FOREGROUND_BACKGROUND_SETTINGS), arguments = listOf(screenTitleArgument("前后台行为"))) { entry ->
-            ForegroundBackgroundSettingsScreen(
+            SettingsGuideHost(SettingsGuides.FOREGROUND_BACKGROUND) {
+                ForegroundBackgroundSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "前后台行为",
-                onHideFromRecentsChanged = onHideFromRecentsChanged
-            )
+                    onHideFromRecentsChanged = onHideFromRecentsChanged
+                )
+            }
         }
         composable(titledRoute(Routes.EXPERIMENTAL_FEATURES), arguments = listOf(screenTitleArgument("实验功能"))) { entry ->
-            ExperimentalFeaturesScreen(
+            SettingsGuideHost(SettingsGuides.EXPERIMENTAL_FEATURES) {
+                ExperimentalFeaturesScreen(
                 onBack = { navController.popWhenResumed() },
                 onNavigateToDoh3Service = { navController.navigateWhenResumed(Routes.DOH3_SERVICE) },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
+                )
+            }
         }
         composable(Routes.HTTP_INSPECTION_SETTINGS) {
             HttpInspectionSettingsScreen(
@@ -413,19 +439,24 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.ABOUT), arguments = listOf(screenTitleArgument("应用信息"))) { entry ->
-            AboutScreen(
+            SettingsGuideHost(SettingsGuides.ABOUT) {
+                AboutScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "应用信息"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "应用信息"
+                )
+            }
         }
         composable(titledRoute(Routes.SPONSOR), arguments = listOf(screenTitleArgument("赞助"))) { entry ->
-            SponsorScreen(
+            SettingsGuideHost(SettingsGuides.SPONSOR) {
+                SponsorScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助"
+                )
+            }
         }
         composable(titledRoute(Routes.APPEARANCE_SETTINGS), arguments = listOf(screenTitleArgument("外观设置"))) { entry ->
-            AppearanceSettingsScreen(
+            SettingsGuideHost(SettingsGuides.APPEARANCE) {
+                AppearanceSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "外观设置",
                 onNavigateToDayNightMode = { title ->
@@ -446,10 +477,11 @@ fun AppNavHost(
                 onNavigateToCustomBackground = { title ->
                     navController.navigateToTitledRoute(Routes.CUSTOM_BACKGROUND_SETTINGS, title)
                 },
-                onNavigateToServiceLightEffect = { title ->
-                    navController.navigateToTitledRoute(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, title)
-                }
-            )
+                    onNavigateToServiceLightEffect = { title ->
+                        navController.navigateToTitledRoute(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, title)
+                    }
+                )
+            }
         }
         composable(titledRoute(Routes.DAY_NIGHT_MODE), arguments = listOf(screenTitleArgument("日夜模式"))) { entry ->
             DayNightModeScreen(
@@ -497,16 +529,20 @@ fun AppNavHost(
             )
         }
         composable(titledRoute(Routes.SPONSOR_LIST), arguments = listOf(screenTitleArgument("赞助者名单"))) { entry ->
-            SponsorListScreen(
+            SettingsGuideHost(SettingsGuides.SPONSOR_LIST) {
+                SponsorListScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助者名单"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "赞助者名单"
+                )
+            }
         }
         composable(titledRoute(Routes.CO_BUILDER_LIST), arguments = listOf(screenTitleArgument("共建者名单"))) { entry ->
-            CoBuilderListScreen(
+            SettingsGuideHost(SettingsGuides.CO_BUILDER_LIST) {
+                CoBuilderListScreen(
                 onBack = { navController.popWhenResumed() },
-                title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "共建者名单"
-            )
+                    title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "共建者名单"
+                )
+            }
         }
     }
 }

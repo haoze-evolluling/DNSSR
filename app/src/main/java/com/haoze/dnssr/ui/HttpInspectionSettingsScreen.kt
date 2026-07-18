@@ -5,6 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -56,10 +60,9 @@ fun HttpInspectionSettingsScreen(
     var showOverwriteConfirmation by remember { mutableStateOf(false) }
     var showResetConfirmation by remember { mutableStateOf(false) }
     var showCaDetails by remember { mutableStateOf(false) }
-    var noticeRequiresDecision by remember {
-        mutableStateOf(!AppSettings.isHttpInspectionNoticeAcknowledged(context))
+    var showUsageNotice by remember {
+        mutableStateOf(!AppSettings.isSettingsGuideAcknowledged(context, SettingsGuides.HTTP_INSPECTION.id))
     }
-    var showUsageNotice by remember { mutableStateOf(noticeRequiresDecision) }
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val securitySettingsLauncher = rememberLauncherForActivityResult(
@@ -122,7 +125,6 @@ fun HttpInspectionSettingsScreen(
         onBack = onBack,
         actions = {
             IconButton(onClick = {
-                noticeRequiresDecision = false
                 showUsageNotice = true
             }) {
                 Icon(Icons.Outlined.ErrorOutline, contentDescription = "使用前说明")
@@ -222,37 +224,38 @@ fun HttpInspectionSettingsScreen(
     }
 
     if (showUsageNotice) {
+        BackHandler(enabled = true) {}
         AlertDialog(
-            onDismissRequest = {
-                if (!noticeRequiresDecision) showUsageNotice = false
-            },
-            title = { Text("HTTP(S) 流量检查说明") },
+            onDismissRequest = {},
+            title = { Text(SettingsGuides.HTTP_INSPECTION.title) },
             text = {
-                Text(
-                    if (supported) {
-                        "开启后，Go 用户态网络栈接管 VPN 流量，仅对明确选择的应用进行 HTTP(S) 检查；其他应用透明转发。HTTP 请求按 authority 匹配现有黑白名单和订阅规则。HTTPS 只有在目标应用信任 DNSSR 根证书，且未使用证书固定或自定义校验时才能解密。\n\n" +
-                            "证书固定、双向 TLS、EV 证书、安全敏感域名或握手失败的连接会自动加入旁路并直接转发，避免应用持续断网。HTTP/3（QUIC）默认直连；开启“尝试检查 HTTP/3”后，DNSSR 会阻断所选应用的 UDP 443，促使支持回退的客户端改用 TCP。"
-                    } else {
-                        "HTTP(S) 流量检查需要 Android 10 或更高版本。当前设备将继续使用 DNS-only 模式。"
-                    }
-                )
+                if (supported) {
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = androidx.compose.material3.MaterialTheme.colorScheme.error)) {
+                                append(
+                                    "此功能不适合没有相关经验的用户。安装、卸载或重新安装 CA 证书需要一定操作能力，操作不当可能导致部分应用无法联网；仅在你能自行处理这些问题时使用。"
+                                )
+                            }
+                            append("\n\n")
+                            append(
+                                "开启后，仅对明确选择的应用进行 HTTP(S) 流量检查，其他应用透明转发。HTTPS 仅在应用信任 DNSSR 根证书且未使用证书固定或自定义校验时才能解密。"
+                            )
+                            append("\n\n")
+                            append(
+                                "不兼容的连接会自动旁路并直接转发。HTTP/3（QUIC）默认直连；开启“尝试检查 HTTP/3”后，会阻断所选应用的 UDP 443，促使支持回退的客户端改用 TCP。"
+                            )
+                        }
+                    )
+                } else {
+                    Text("HTTP(S) 流量检查需要 Android 10 或更高版本。当前设备将继续使用 DNS-only 模式。")
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    AppSettings.setHttpInspectionNoticeAcknowledged(context, true)
-                    noticeRequiresDecision = false
+                    AppSettings.acknowledgeSettingsGuide(context, SettingsGuides.HTTP_INSPECTION.id)
                     showUsageNotice = false
-                }) { Text("我已知晓") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    if (noticeRequiresDecision) {
-                        showUsageNotice = false
-                        onBack()
-                    } else {
-                        showUsageNotice = false
-                    }
-                }) { Text(if (noticeRequiresDecision) "暂不使用" else "关闭") }
+                }) { Text("我知道了") }
             }
         )
     }

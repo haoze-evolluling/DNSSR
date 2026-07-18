@@ -112,6 +112,13 @@ fun DataCleanupScreen(
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.RULE }
                 )
+                SettingsDivider()
+                SettingsTextItem(
+                    title = "重置所有新手引导",
+                    subtitle = "让所有首次进入说明再次显示",
+                    textColor = MaterialTheme.colorScheme.error,
+                    onClick = { pendingAction = CleanupAction.SETTINGS_GUIDES }
+                )
             }
         }
     }
@@ -147,6 +154,9 @@ fun DataCleanupScreen(
                         CleanupAction.RULE -> {
                             clearAllDomainRules(context)
                         }
+                        CleanupAction.SETTINGS_GUIDES -> {
+                            AppSettings.resetAllSettingsGuides(context)
+                        }
                     }
                     withContext(Dispatchers.Main) {
                         if (action == CleanupAction.RULE) {
@@ -176,7 +186,8 @@ private enum class CleanupAction(
     LOG("删除请求日志", "确定要删除所有 DNS、HTTP 请求日志、竞速统计和 Bootstrap DNS 解析统计吗？"),
     PROVIDER_WEIGHT("恢复竞速模式默认权重", "确定要清除所有服务商健康样本并恢复竞速模式默认权重吗？"),
     BOOTSTRAP_WEIGHT("恢复 Bootstrap IP 默认权重", "确定要清除 Bootstrap DNS 解析健康样本并恢复默认权重吗？"),
-    RULE("删除全部规则", "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。")
+    RULE("删除全部规则", "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。"),
+    SETTINGS_GUIDES("重置所有新手引导", "确定要重置所有应用设置新手引导吗？这包括 HTTP(S) 流量过滤，且不会删除任何配置、规则、缓存、日志或证书。")
 }
 
 @Composable

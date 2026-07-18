@@ -167,7 +167,7 @@ object AppSettings {
     private const val KEY_EXCLUDED_APPS_FILTER = "excluded_apps_filter"
     private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
-    private const val KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED = "http_inspection_notice_acknowledged"
+    private const val KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS = "settings_guide_acknowledged_ids"
     private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
     private const val KEY_HTTPS_INSPECTION_CA_BACKEND = "https_inspection_ca_backend"
     private const val KEY_HTTP3_INSPECTION_ENABLED = "http3_inspection_enabled"
@@ -370,14 +370,28 @@ object AppSettings {
             .apply()
     }
 
-    fun isHttpInspectionNoticeAcknowledged(context: Context): Boolean =
+    fun isSettingsGuideAcknowledged(context: Context, guideId: String): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED, false)
+            .getStringSet(KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS, emptySet())
+            .orEmpty()
+            .contains(guideId)
 
-    fun setHttpInspectionNoticeAcknowledged(context: Context, acknowledged: Boolean) {
+    fun acknowledgeSettingsGuide(context: Context, guideId: String) {
+        val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val acknowledgedIds = preferences
+            .getStringSet(KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS, emptySet())
+            .orEmpty()
+            .toMutableSet()
+        acknowledgedIds += guideId
+        preferences.edit()
+            .putStringSet(KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS, acknowledgedIds)
+            .apply()
+    }
+
+    fun resetAllSettingsGuides(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(KEY_HTTP_INSPECTION_NOTICE_ACKNOWLEDGED, acknowledged)
+            .remove(KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS)
             .apply()
     }
 
