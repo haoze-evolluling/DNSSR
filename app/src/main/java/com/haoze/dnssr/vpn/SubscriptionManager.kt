@@ -23,15 +23,16 @@ import java.util.concurrent.TimeUnit
 data class RuleImportSummary(
     val blockCount: Int,
     val allowCount: Int,
+    val rewriteCount: Int = 0,
     val duplicateCount: Int,
     val invalidCount: Int,
     val unsupportedCount: Int
 ) {
-    val importedCount: Int get() = blockCount + allowCount
+    val importedCount: Int get() = blockCount + allowCount + rewriteCount
     val skippedCount: Int get() = duplicateCount + invalidCount + unsupportedCount
 
     fun displayMessage(prefix: String): String =
-        "$prefix：黑名单 $blockCount 条，白名单 $allowCount 条，重复 $duplicateCount 条，" +
+        "$prefix：黑名单 $blockCount 条，白名单 $allowCount 条，重写 $rewriteCount 条，重复 $duplicateCount 条，" +
             "无效/不支持 ${invalidCount + unsupportedCount} 条"
 }
 
@@ -73,7 +74,8 @@ private data class InitialImportResult(
 class SubscriptionManager(
     private val subscriptionDao: SubscriptionDao,
     private val blockListManager: BlockListManager,
-    private val allowListManager: AllowListManager
+    private val allowListManager: AllowListManager,
+    private val rewriteRuleManager: RewriteRuleManager
 ) {
     companion object {
         private const val TAG = "SubscriptionManager"
@@ -104,7 +106,8 @@ class SubscriptionManager(
      */
     suspend fun addSubscription(
         url: String,
-        name: String? = null
+        name: String? = null,
+        kind: String = SubscriptionKind.BLOCK
     ): Result<SubscriptionEntity> = withContext(Dispatchers.IO) {
         if (_importing.value) return@withContext Result.failure(IllegalStateException("正在导入中"))
         val trimmedUrl = url.trim()
@@ -114,7 +117,7 @@ class SubscriptionManager(
         if (subscriptionDao.byUrl(trimmedUrl) != null) {
             return@withContext Result.failure(IllegalArgumentException("该订阅链接已存在"))
         }
-        val normalizedKind = SubscriptionKind.BLOCK
+        val normalizedKind = kind
 
         _importing.value = true
         var saved: SubscriptionEntity? = null
@@ -212,6 +215,7 @@ class SubscriptionManager(
     suspend fun addLocalSubscription(
         sourceRef: String,
         name: String,
+        kind: String = SubscriptionKind.BLOCK,
         contentLoader: () -> String
     ): Result<SubscriptionEntity> = withContext(Dispatchers.IO) {
         if (_importing.value) return@withContext Result.failure(IllegalStateException("正在导入中"))
@@ -220,7 +224,7 @@ class SubscriptionManager(
         if (trimmedName.isEmpty()) {
             return@withContext Result.failure(IllegalArgumentException("订阅名称不能为空"))
         }
-        val normalizedKind = SubscriptionKind.BLOCK
+        val normalizedKind = kind
         if (subscriptionDao.byUrl(sourceRef) != null) {
             return@withContext Result.failure(IllegalArgumentException("该文件已作为订阅导入"))
         }
@@ -244,12 +248,13 @@ class SubscriptionManager(
             _importingSubscriptionId.value = id
 
             val content = contentLoader()
-            val rules = AdGuardRuleParser.parseCategorized(content)
-            if (rules.isEmpty()) {
+            val rules = if (kind == SubscriptionKind.REWRITE) AdGuardRuleParser.parseHostsRewrite(content) else emptyList()
+            val categorized = if (kind == SubscriptionKind.REWRITE) null else AdGuardRuleParser.parseCategorized(content)
+            if (rules.isEmpty() && categorized?.isEmpty() != false) {
                 throw IllegalArgumentException("文件中没有可导入的有效 DNS 规则")
             }
-            _importProgress.value = 0 to rules.size
-            val summary = importPreparedRules(rules, id, enabled = true)
+            _importProgress.value = 0 to (categorized?.size ?: rules.size)
+            val summary = if (kind == SubscriptionKind.REWRITE) importRewriteRules(rules, id, true) else importPreparedRules(categorized!!, id, enabled = true)
             lastImportSummary = summary
 
             val importedAt = System.currentTimeMillis()
@@ -339,7 +344,7 @@ class SubscriptionManager(
                 )) as DownloadResult.Content
                 val rules = download.rules
                 _importProgress.value = 0 to rules.size
-                val summary = replacePreparedRules(rules, id, subscription.enabled)
+                val summary = replaceDownloadedRules(rules, id, subscription.enabled, subscription.kind)
                 lastImportSummary = summary
 
                 val updatedAt = System.currentTimeMillis()
@@ -412,9 +417,9 @@ class SubscriptionManager(
                     }
                     val rules = download.rules
                     _importProgress.value = 0 to rules.size
-                    replacePreparedRules(rules, id, subscription.enabled)
-                    val ruleCount = rules.size
-                    lastImportSummary = rules.toSummary(rules.blockRules.size, rules.allowRules.size)
+                    val summary = replaceDownloadedRules(rules, id, subscription.enabled, subscription.kind)
+                    val ruleCount = summary.importedCount
+                    lastImportSummary = summary
                     val now = System.currentTimeMillis()
                     subscriptionDao.update(
                         subscription.copy(
@@ -477,6 +482,7 @@ class SubscriptionManager(
                 val source = sourceTag(id)
                 blockListManager.setRulesEnabledBySource(source, enabled)
                 allowListManager.setRulesEnabledBySource(source, enabled)
+                rewriteRuleManager.setRulesEnabledBySource(source, enabled)
                 subscriptionDao.setEnabled(id, enabled)
                 Result.success(Unit)
             } catch (e: Exception) {
@@ -500,7 +506,8 @@ class SubscriptionManager(
     ): Result<InitialImportResult> =
         withContext(Dispatchers.IO) {
             try {
-                val download = downloadRules(SubscriptionEntity(url = url, name = url)) as DownloadResult.Content
+                val subscription = subscriptionDao.byId(subscriptionId) ?: SubscriptionEntity(url = url, name = url)
+                val download = downloadRules(subscription) as DownloadResult.Content
                 val rules = download.rules
                 val total = rules.size
                 _importProgress.value = 0 to total
@@ -510,7 +517,7 @@ class SubscriptionManager(
                 }
 
                 // 分块批量导入
-                val summary = importPreparedRules(rules, subscriptionId, enabled)
+                val summary = if (subscription.kind == SubscriptionKind.REWRITE) importRewriteRules(rules.rewriteRules, subscriptionId, enabled) else importPreparedRules(rules, subscriptionId, enabled)
                 lastImportSummary = summary
 
                 Result.success(
@@ -557,7 +564,10 @@ class SubscriptionManager(
             if (!response.isSuccessful) throw httpFailure(response)
             val body = response.body?.string()
                 ?: throw SubscriptionUpdateException("订阅响应为空", retryable = false)
-            val rules = AdGuardRuleParser.parseCategorized(body)
+            val rules = if (subscription.kind == SubscriptionKind.REWRITE) {
+                val rewrites = AdGuardRuleParser.parseHostsRewrite(body)
+                AdGuardRuleParser.CategorizedRules(rewriteRules = rewrites)
+            } else AdGuardRuleParser.parseCategorized(body)
             if (rules.isEmpty()) {
                 throw SubscriptionUpdateException(
                     "订阅中没有可导入的有效 DNS 规则，已保留原规则",
@@ -586,6 +596,7 @@ class SubscriptionManager(
         rules.allowRules.map { it.pattern }.sorted().forEach {
             digest.update("A\u0000$it\n".toByteArray(Charsets.UTF_8))
         }
+        rules.rewriteRules.sortedBy { it.pattern + it.targetValue }.forEach { digest.update("R\u0000${it.pattern}\u0000${it.targetType}\u0000${it.targetValue}\n".toByteArray()) }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
@@ -640,12 +651,29 @@ class SubscriptionManager(
         }
     }
 
+    private suspend fun importRewriteRules(rules: List<RewriteRule>, subscriptionId: Long, enabled: Boolean): RuleImportSummary {
+        val inserted = rewriteRuleManager.addRules(rules, sourceTag(subscriptionId), enabled)
+        _importProgress.value = rules.size to rules.size
+        return RuleImportSummary(0, 0, inserted, (rules.size - inserted).coerceAtLeast(0), 0, 0)
+    }
+
+    private suspend fun replaceDownloadedRules(rules: AdGuardRuleParser.CategorizedRules, subscriptionId: Long, enabled: Boolean, kind: String): RuleImportSummary {
+        if (kind != SubscriptionKind.REWRITE) return replacePreparedRules(rules, subscriptionId, enabled)
+        val source = sourceTag(subscriptionId)
+        val old = rewriteRuleManager.rulesBySource(source)
+        return try {
+            rewriteRuleManager.replaceRulesBySource(rules.rewriteRules, source, enabled)
+            RuleImportSummary(0, 0, rules.rewriteRules.size, 0, rules.invalidCount, rules.unsupportedCount)
+        } catch (e: Exception) { rewriteRuleManager.replaceRulesBySource(old, source, enabled); throw e }
+    }
+
     private fun AdGuardRuleParser.CategorizedRules.toSummary(
         insertedBlock: Int,
         insertedAllow: Int
     ): RuleImportSummary = RuleImportSummary(
         blockCount = insertedBlock,
         allowCount = insertedAllow,
+        rewriteCount = 0,
         duplicateCount = duplicateCount + (size - insertedBlock - insertedAllow).coerceAtLeast(0),
         invalidCount = invalidCount,
         unsupportedCount = unsupportedCount
@@ -654,6 +682,7 @@ class SubscriptionManager(
     private suspend fun removeRulesBySource(source: String) {
         blockListManager.removeRulesBySource(source)
         allowListManager.removeRulesBySource(source)
+        rewriteRuleManager.removeRulesBySource(source)
     }
 
     private fun extractNameFromUrl(url: String): String {

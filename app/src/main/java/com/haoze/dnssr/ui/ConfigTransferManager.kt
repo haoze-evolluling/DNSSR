@@ -9,6 +9,7 @@ import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.DnsProtocol
 import com.haoze.dnssr.vpn.DnsProvider
 import com.haoze.dnssr.vpn.SubscriptionManager
+import com.haoze.dnssr.vpn.RewriteRuleManager
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -39,7 +40,8 @@ class ConfigTransferManager(private val context: Context) {
     private val subscriptionManager = SubscriptionManager(
         database.subscriptionDao(),
         BlockListManager(database.blockRuleDao()),
-        AllowListManager(database.allowRuleDao())
+        AllowListManager(database.allowRuleDao()),
+        RewriteRuleManager(database.rewriteRuleDao())
     )
 
     suspend fun export(selection: ConfigExportSelection): String {

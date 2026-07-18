@@ -107,7 +107,8 @@ class SubscriptionAutoUpdateWorker(
         val manager = SubscriptionManager(
             database.subscriptionDao(),
             BlockListManager(database.blockRuleDao()),
-            AllowListManager(database.allowRuleDao())
+            AllowListManager(database.allowRuleDao()),
+            RewriteRuleManager(database.rewriteRuleDao())
         )
         val batchDao = database.subscriptionAutoUpdateDao()
         val batchId = UUID.randomUUID().toString()
@@ -188,7 +189,8 @@ class SubscriptionAutoUpdateRetryWorker(
         val manager = SubscriptionManager(
             database.subscriptionDao(),
             BlockListManager(database.blockRuleDao()),
-            AllowListManager(database.allowRuleDao())
+            AllowListManager(database.allowRuleDao()),
+            RewriteRuleManager(database.rewriteRuleDao())
         )
         val pendingItems = batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY)
         val notifier = RuleUpdateNotifier(applicationContext, AUTO_UPDATE_RETRY_PROGRESS_NOTIFICATION_ID)

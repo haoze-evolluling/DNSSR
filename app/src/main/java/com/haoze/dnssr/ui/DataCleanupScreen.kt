@@ -30,6 +30,7 @@ import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsTextItem
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
+import com.haoze.dnssr.vpn.RewriteRuleManager
 import com.haoze.dnssr.vpn.BootstrapHealthEngine
 import com.haoze.dnssr.vpn.BootstrapHealthStore
 import com.haoze.dnssr.vpn.BootstrapLogger
@@ -176,6 +177,7 @@ suspend fun clearAllDomainRules(context: Context) {
     val database = AppDatabase.getInstance(context)
     BlockListManager(database.blockRuleDao()).clearAll()
     AllowListManager(database.allowRuleDao()).clearAll()
+    RewriteRuleManager(database.rewriteRuleDao()).clearAll()
     database.subscriptionDao().resetAfterRuleCleanup()
 }
 

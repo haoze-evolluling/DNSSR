@@ -11,6 +11,7 @@ import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.RuleOperationScheduler
 import com.haoze.dnssr.vpn.RuleOperationType
+import com.haoze.dnssr.vpn.RewriteRuleManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,12 +29,17 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
     private val allowListManager: AllowListManager by lazy {
         AllowListManager(AppDatabase.getInstance(application).allowRuleDao())
     }
+    private val rewriteRuleManager: RewriteRuleManager by lazy {
+        RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao())
+    }
 
     private val _ruleCount = MutableStateFlow(0)
     val ruleCount: StateFlow<Int> = _ruleCount.asStateFlow()
 
     private val _allowRuleCount = MutableStateFlow(0)
     val allowRuleCount: StateFlow<Int> = _allowRuleCount.asStateFlow()
+    private val _rewriteRuleCount = MutableStateFlow(0)
+    val rewriteRuleCount: StateFlow<Int> = _rewriteRuleCount.asStateFlow()
 
     private var activated = false
 
@@ -48,9 +54,11 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch(Dispatchers.IO) {
             val count = blockListManager.count()
             val allowCount = allowListManager.count()
+            val rewriteCount = rewriteRuleManager.count()
             withContext(Dispatchers.Main) {
                 _ruleCount.value = count
                 _allowRuleCount.value = allowCount
+                _rewriteRuleCount.value = rewriteCount
             }
         }
     }
@@ -86,6 +94,29 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
             ).id,
             onResult
         )
+    }
+
+    fun addRewriteRule(domain: String, targetType: String, targetValue: String, onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val success = rewriteRuleManager.addRule(domain, targetType, targetValue)
+            if (success) RuntimeDnsSettingsRefresher.refreshIfRunning(getApplication(), "rewrite_rule_added")
+            withContext(Dispatchers.Main) {
+                onResult(if (success) "已添加重写域名" else "域名、目标格式无效、规则冲突或已存在")
+                loadRuleCount()
+            }
+        }
+    }
+
+    fun importHostsRules(uri: Uri, onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: run { withContext(Dispatchers.Main) { onResult("无法读取所选 hosts 文件") }; return@launch }
+            val rules = com.haoze.dnssr.vpn.AdGuardRuleParser.parseHostsRewrite(content)
+            val inserted = rewriteRuleManager.addRules(rules, "local_hosts", true)
+            if (inserted > 0) RuntimeDnsSettingsRefresher.refreshIfRunning(context, "hosts_rules_imported")
+            withContext(Dispatchers.Main) { onResult(if (rules.isEmpty()) "文件中没有可导入的真实 IP hosts 规则" else "hosts 导入完成：新增 $inserted 条，重复 ${rules.size - inserted} 条"); loadRuleCount() }
+        }
     }
 
     private fun observeResult(workId: java.util.UUID, onResult: (String) -> Unit) {

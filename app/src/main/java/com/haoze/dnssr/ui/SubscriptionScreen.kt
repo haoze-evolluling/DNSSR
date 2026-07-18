@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.data.entity.SubscriptionImportState
 import com.haoze.dnssr.data.entity.SubscriptionSourceType
 import com.haoze.dnssr.ui.components.SettingsCornerShape
@@ -102,6 +103,7 @@ fun SubscriptionScreen(
 
     var showAddChoiceDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var pendingKind by remember { mutableStateOf(SubscriptionKind.BLOCK) }
     var showPresetImportDialog by remember { mutableStateOf(false) }
     var localImportUri by remember { mutableStateOf<Uri?>(null) }
     var showActionDialog by remember { mutableStateOf<SubscriptionEntity?>(null) }
@@ -223,6 +225,7 @@ fun SubscriptionScreen(
         AddSubscriptionChoiceDialog(
             onDismiss = { showAddChoiceDialog = false },
             onAddRemote = {
+                pendingKind = SubscriptionKind.BLOCK
                 showAddChoiceDialog = false
                 showAddDialog = true
             },
@@ -231,6 +234,17 @@ fun SubscriptionScreen(
                 showPresetImportDialog = true
             },
             onAddLocal = {
+                pendingKind = SubscriptionKind.BLOCK
+                showAddChoiceDialog = false
+                localImportLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
+            },
+            onAddRewriteRemote = {
+                pendingKind = SubscriptionKind.REWRITE
+                showAddChoiceDialog = false
+                showAddDialog = true
+            },
+            onAddRewriteLocal = {
+                pendingKind = SubscriptionKind.REWRITE
                 showAddChoiceDialog = false
                 localImportLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
             }
@@ -241,7 +255,7 @@ fun SubscriptionScreen(
         AddSubscriptionDialog(
             onDismiss = { showAddDialog = false },
             onConfirm = { url, name ->
-                viewModel.addSubscription(url, name)
+                viewModel.addSubscription(url, name, pendingKind)
                 showAddDialog = false
             }
         )
@@ -262,7 +276,7 @@ fun SubscriptionScreen(
             initialName = remember(uri) { context.displayNameFor(uri) },
             onDismiss = { localImportUri = null },
             onConfirm = { name ->
-                viewModel.addLocalSubscription(uri, name)
+                viewModel.addLocalSubscription(uri, name, pendingKind)
                 localImportUri = null
             }
         )
@@ -390,6 +404,7 @@ private fun SubscriptionItem(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
+                Text(if (subscription.kind == SubscriptionKind.REWRITE) "hosts 重写" else "DNS 过滤", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) "本地文件" else subscription.url,
@@ -622,7 +637,9 @@ private fun AddSubscriptionChoiceDialog(
     onDismiss: () -> Unit,
     onAddRemote: () -> Unit,
     onAddPreset: () -> Unit,
-    onAddLocal: () -> Unit
+    onAddLocal: () -> Unit,
+    onAddRewriteRemote: () -> Unit,
+    onAddRewriteLocal: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -636,7 +653,13 @@ private fun AddSubscriptionChoiceDialog(
                     Text("从预设导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
                 OutlinedButton(onClick = onAddLocal, modifier = Modifier.fillMaxWidth()) {
-                    Text("从本地文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    Text("从本地 DNS 过滤文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
+                OutlinedButton(onClick = onAddRewriteLocal, modifier = Modifier.fillMaxWidth()) {
+                    Text("从本地 hosts 文件导入", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                }
+                OutlinedButton(onClick = onAddRewriteRemote, modifier = Modifier.fillMaxWidth()) {
+                    Text("添加 hosts 重写订阅", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
             }
         },

@@ -327,6 +327,7 @@ private fun RuleCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                rule.targetType?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 if (rule.rawLine != rule.pattern) {
                     Text(
                         text = rule.rawLine,

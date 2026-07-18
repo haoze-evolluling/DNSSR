@@ -60,6 +60,7 @@ object Routes {
     const val RULE_MANAGEMENT = "rule_management"
     const val RULE_LIST = "rule_list"
     const val ALLOW_RULE_LIST = "allow_rule_list"
+    const val REWRITE_RULE_LIST = "rewrite_rule_list"
     const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
     const val EXCLUDED_APPS = "excluded_apps"
     const val DATA_CLEANUP = "data_cleanup"
@@ -260,6 +261,7 @@ fun AppNavHost(
                 title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "域名规则",
                 onNavigateToRuleList = { navController.navigateWhenResumed(Routes.RULE_LIST) },
                 onNavigateToAllowRuleList = { navController.navigateWhenResumed(Routes.ALLOW_RULE_LIST) },
+                onNavigateToRewriteRuleList = { navController.navigateWhenResumed(Routes.REWRITE_RULE_LIST) },
                 onNavigateToSubscription = { navController.navigateWhenResumed(Routes.SUBSCRIPTION_MANAGEMENT) },
                 onNavigateToAutoUpdateInterval = {
                     navController.navigateWhenResumed(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL)
@@ -345,6 +347,9 @@ fun AppNavHost(
                 ruleKind = ManagedRuleKind.ALLOW,
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
+        }
+        composable(Routes.REWRITE_RULE_LIST) {
+            RuleListScreen(onBack = { navController.popWhenResumed() }, ruleKind = ManagedRuleKind.REWRITE, onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged)
         }
         composable(titledRoute(Routes.BOOTSTRAP_SETTINGS), arguments = listOf(screenTitleArgument("Bootstrap 设置"))) { entry ->
             SettingsGuideHost(SettingsGuides.BOOTSTRAP) {

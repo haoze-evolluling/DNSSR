@@ -9,17 +9,18 @@ object AdGuardRuleParser {
     data class ParsedRule(val pattern: String, val rawLine: String)
 
     data class CategorizedRules(
-        val blockRules: List<ParsedRule>,
-        val allowRules: List<ParsedRule>,
+        val blockRules: List<ParsedRule> = emptyList(),
+        val allowRules: List<ParsedRule> = emptyList(),
+        val rewriteRules: List<RewriteRule> = emptyList(),
         val duplicateCount: Int = 0,
         val invalidCount: Int = 0,
         val unsupportedCount: Int = 0,
         val ignoredCount: Int = 0,
         val totalLines: Int = 0
     ) {
-        val size: Int get() = blockRules.size + allowRules.size
+        val size: Int get() = blockRules.size + allowRules.size + rewriteRules.size
         val skippedCount: Int get() = invalidCount + unsupportedCount
-        fun isEmpty(): Boolean = blockRules.isEmpty() && allowRules.isEmpty()
+        fun isEmpty(): Boolean = blockRules.isEmpty() && allowRules.isEmpty() && rewriteRules.isEmpty()
     }
 
     private val SINKHOLE_ADDRESSES = setOf("0", "0.0.0.0", "127.0.0.1", "::", "::1")
@@ -159,6 +160,17 @@ object AdGuardRuleParser {
         if (labels.any { it.length !in 1..63 || !DOMAIN_LABEL.matches(it) }) return null
         return ascii
     }
+
+    fun normalizeDomainForRewrite(value: String): String? = normalizeDomain(value)
+
+    fun parseHostsRewrite(text: String): List<RewriteRule> = text.lineSequence().flatMap { line ->
+        val fields = line.substringBefore('#').trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (fields.size < 2) emptySequence() else {
+            val address = runCatching { InetAddress.getByName(fields.first()) }.getOrNull()
+            if (address == null || fields.first().lowercase() in SINKHOLE_ADDRESSES) emptySequence()
+            else fields.drop(1).asSequence().mapNotNull { host -> normalizeDomain(host)?.let { RewriteRule(it, if (address.address.size == 4) com.haoze.dnssr.data.entity.RewriteTargetType.IPV4 else com.haoze.dnssr.data.entity.RewriteTargetType.IPV6, address.hostAddress, line) } }
+        }
+    }.distinctBy { Triple(it.pattern, it.targetType, it.targetValue) }.toList()
 
     private sealed interface LineResult {
         data class Valid(val rule: ParsedRule) : LineResult

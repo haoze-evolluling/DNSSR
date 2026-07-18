@@ -1,6 +1,8 @@
 package com.haoze.dnssr.ui
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +41,7 @@ import com.haoze.dnssr.ui.components.SettingsScaffold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.haoze.dnssr.data.entity.RewriteTargetType
 
 @Composable
 fun RuleManagementScreen(
@@ -45,6 +49,7 @@ fun RuleManagementScreen(
     title: String = "域名规则",
     onNavigateToRuleList: () -> Unit,
     onNavigateToAllowRuleList: () -> Unit,
+    onNavigateToRewriteRuleList: () -> Unit,
     onNavigateToSubscription: () -> Unit,
     onNavigateToAutoUpdateInterval: () -> Unit,
     onNavigateToBlockResponseSettings: () -> Unit,
@@ -56,13 +61,18 @@ fun RuleManagementScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val ruleCount by viewModel.ruleCount.collectAsStateWithLifecycle()
     val allowRuleCount by viewModel.allowRuleCount.collectAsStateWithLifecycle()
+    val rewriteRuleCount by viewModel.rewriteRuleCount.collectAsStateWithLifecycle()
 
     var newRule by remember { mutableStateOf("") }
     var newAllowRule by remember { mutableStateOf("") }
+    var rewriteDomain by remember { mutableStateOf("") }
+    var rewriteAddress by remember { mutableStateOf("") }
+    var rewriteTargetType by remember { mutableStateOf(RewriteTargetType.IPV4) }
     var addResult by remember { mutableStateOf<String?>(null) }
     var addAllowResult by remember { mutableStateOf<String?>(null) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
     var showAddAllowRuleDialog by remember { mutableStateOf(false) }
+    var showAddRewriteRuleDialog by remember { mutableStateOf(false) }
     var showClearAllRulesDialog by remember { mutableStateOf(false) }
     var addRuleError by remember { mutableStateOf<String?>(null) }
     var addAllowRuleError by remember { mutableStateOf<String?>(null) }
@@ -117,7 +127,7 @@ fun RuleManagementScreen(
         ) {
             item {
                 SettingsInfoText(
-                    text = "当前共有 $ruleCount 条屏蔽规则，$allowRuleCount 条白名单规则。白名单命中时会绕过本应用屏蔽规则。",
+                    text = "当前共有 $ruleCount 条屏蔽规则，$allowRuleCount 条白名单规则，$rewriteRuleCount 条重写规则。重写规则优先于黑白名单。",
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
@@ -155,6 +165,12 @@ fun RuleManagementScreen(
                         title = "添加白名单域名",
                         subtitle = "输入要放行的域名，如 example.com",
                         onClick = ::openAddAllowRuleDialog
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = "添加重写域名",
+                        subtitle = "将域名重写为 IPv4、IPv6 或 CNAME",
+                        onClick = { rewriteDomain = ""; rewriteAddress = ""; rewriteTargetType = RewriteTargetType.IPV4; showAddRewriteRuleDialog = true }
                     )
                 }
             }
@@ -201,9 +217,11 @@ fun RuleManagementScreen(
                         onClick = onNavigateToAllowRuleList
                     )
                     SettingsDivider()
+                    SettingsNavigationItem(title = "重写域名规则", subtitle = "查看、启用、停用或删除重写规则", value = "$rewriteRuleCount 条", onClick = onNavigateToRewriteRuleList)
+                    SettingsDivider()
                     SettingsNavigationItem(
                         title = "规则订阅",
-                        subtitle = "从 AdGuard DNS 过滤规则订阅导入屏蔽/放行域名",
+                        subtitle = "管理 DNS 过滤与 hosts 重写订阅",
                         onClick = onNavigateToSubscription
                     )
                 }
@@ -227,7 +245,7 @@ fun RuleManagementScreen(
     if (showClearAllRulesDialog) {
         ConfirmDialog(
             title = "删除全部规则",
-            text = "确定要删除全部域名规则吗？屏蔽和白名单规则都会被移除。",
+            text = "确定要删除全部域名规则吗？屏蔽、白名单和重写规则都会被移除。",
             onConfirm = {
                 showClearAllRulesDialog = false
                 scope.launch(Dispatchers.IO) {
@@ -344,6 +362,24 @@ fun RuleManagementScreen(
                     Text("取消")
                 }
             }
+        )
+    }
+
+    if (showAddRewriteRuleDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddRewriteRuleDialog = false },
+            title = { Text("添加重写域名") },
+            text = {
+                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = rewriteDomain, onValueChange = { rewriteDomain = it }, label = { Text("域名，如 example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(RewriteTargetType.IPV4, RewriteTargetType.IPV6, RewriteTargetType.CNAME).forEach { type -> FilterChip(selected = rewriteTargetType == type, onClick = { rewriteTargetType = type; rewriteAddress = "" }, label = { Text(type) }) }
+                    }
+                    OutlinedTextField(value = rewriteAddress, onValueChange = { rewriteAddress = it }, label = { Text(if (rewriteTargetType == RewriteTargetType.CNAME) "目标域名" else "$rewriteTargetType 地址") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.addRewriteRule(rewriteDomain, rewriteTargetType, rewriteAddress) { message -> addResult = message; if (message == "已添加重写域名") showAddRewriteRuleDialog = false } }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = { showAddRewriteRuleDialog = false }) { Text("取消") } }
         )
     }
 }

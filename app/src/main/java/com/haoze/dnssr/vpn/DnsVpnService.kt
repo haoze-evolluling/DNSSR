@@ -92,6 +92,7 @@ class DnsVpnService : VpnService() {
     private lateinit var dnsCache: DnsResponseCache
     private lateinit var blockListManager: BlockListManager
     private lateinit var allowListManager: AllowListManager
+    private lateinit var rewriteRuleManager: RewriteRuleManager
     private lateinit var dnsLogger: DnsLogger
     private lateinit var httpRequestLogger: HttpRequestLogger
     private lateinit var raceLogger: RaceLogger
@@ -129,6 +130,7 @@ class DnsVpnService : VpnService() {
         val ruleIndexDirectory = File(filesDir, "rule-index")
         blockListManager = BlockListManager(db.blockRuleDao(), ruleIndexDirectory)
         allowListManager = AllowListManager(db.allowRuleDao(), ruleIndexDirectory)
+        rewriteRuleManager = RewriteRuleManager(db.rewriteRuleDao())
         dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope)
         raceLogger = RaceLogger(db.raceLogDao(), logRetentionDays, serviceScope)
@@ -145,6 +147,7 @@ class DnsVpnService : VpnService() {
         // 启动时全量加载屏蔽规则到内存缓存
         serviceScope.launch { blockListManager.refreshCache() }
         serviceScope.launch { allowListManager.refreshCache() }
+        serviceScope.launch { rewriteRuleManager.refreshCache() }
         serviceScope.launch {
             DnsCacheController.register(dnsCache)
             dnsCache.warmUp()
@@ -614,6 +617,15 @@ class DnsVpnService : VpnService() {
         val qtype = question?.type ?: DnsMessageUtils.extractQueryType(query)
 
         try {
+            val rewriteAnswers = qname?.let(rewriteRuleManager::findAnswers).orEmpty()
+            if (qname != null && rewriteAnswers.isNotEmpty()) {
+                val cname = rewriteAnswers.firstOrNull { it.targetType == com.haoze.dnssr.data.entity.RewriteTargetType.CNAME }
+                val response = if (cname != null) DnsMessageUtils.buildCnameRewriteResponse(query, cname.targetValue)
+                    else DnsMessageUtils.buildRewriteResponse(query, rewriteAnswers.map { it.targetValue })
+                writeResponse(dnsInfo, response, output)
+                dnsLogger.log(qname, qtype, LogResult.PASSED, "matched rewrite rule; local response")
+                return
+            }
             val allowListed = qname != null && allowListManager.isAllowed(qname)
             val blockMatch = qname?.takeIf { !allowListed }?.let(blockListManager::findMatch)
             if (qname != null && blockMatch != null) {

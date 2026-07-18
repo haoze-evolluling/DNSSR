@@ -39,7 +39,8 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         SubscriptionManager(
             AppDatabase.getInstance(application).subscriptionDao(),
             blockListManager,
-            allowListManager
+            allowListManager,
+            com.haoze.dnssr.vpn.RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao())
         )
     }
 
@@ -88,15 +89,15 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun addSubscription(url: String, name: String? = null) {
+    fun addSubscription(url: String, name: String? = null, kind: String = com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK) {
         enqueueAndObserve(
             RuleOperationScheduler.enqueue(
-                getApplication(), RuleOperationType.ADD_SUBSCRIPTION, url = url, name = name
+                getApplication(), RuleOperationType.ADD_SUBSCRIPTION, url = url, name = name, kind = kind
             ).id
         )
     }
 
-    fun addLocalSubscription(uri: Uri, name: String) {
+    fun addLocalSubscription(uri: Uri, name: String, kind: String = com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK) {
         runCatching {
             getApplication<Application>().contentResolver.takePersistableUriPermission(
                 uri,
@@ -105,7 +106,7 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
         enqueueAndObserve(
             RuleOperationScheduler.enqueue(
-                getApplication(), RuleOperationType.ADD_LOCAL_SUBSCRIPTION, name = name, uri = uri
+                getApplication(), RuleOperationType.ADD_LOCAL_SUBSCRIPTION, name = name, uri = uri, kind = kind
             ).id
         )
     }

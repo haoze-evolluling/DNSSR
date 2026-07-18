@@ -38,6 +38,7 @@ object SubscriptionSourceType {
 object SubscriptionKind {
     const val BLOCK = "block"
     const val ALLOW = "allow"
+    const val REWRITE = "rewrite"
 }
 
 object SubscriptionImportState {

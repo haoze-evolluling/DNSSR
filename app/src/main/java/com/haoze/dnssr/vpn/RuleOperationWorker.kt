@@ -59,6 +59,7 @@ object RuleOperationScheduler {
     const val KEY_TOTAL = "total"
     const val KEY_MESSAGE = "message"
     const val KEY_SUCCESS = "success"
+    const val KEY_KIND = "kind"
 
     private const val UNIQUE_WORK_NAME = "manual_rule_operation_queue"
 
@@ -69,7 +70,8 @@ object RuleOperationScheduler {
         url: String? = null,
         name: String? = null,
         uri: Uri? = null,
-        pattern: String? = null
+        pattern: String? = null,
+        kind: String? = null
     ): OneTimeWorkRequest {
         val input = Data.Builder()
             .putString(KEY_TYPE, type.name)
@@ -78,6 +80,7 @@ object RuleOperationScheduler {
             .putString(KEY_NAME, name)
             .putString(KEY_URI, uri?.toString())
             .putString(KEY_PATTERN, pattern)
+            .putString(KEY_KIND, kind)
             .build()
         val builder = OneTimeWorkRequestBuilder<RuleOperationWorker>()
             .setInputData(input)
@@ -128,7 +131,8 @@ class RuleOperationWorker(
         val subscriptionManager = SubscriptionManager(
             database.subscriptionDao(),
             blockManager,
-            allowManager
+            allowManager,
+            RewriteRuleManager(database.rewriteRuleDao())
         )
         var activeSubscriptionId = subscriptionId
         var latestCurrent = -1
@@ -194,7 +198,8 @@ class RuleOperationWorker(
         RuleOperationType.ADD_SUBSCRIPTION -> {
             val result = subscriptionManager.addSubscription(
                 inputData.getString(RuleOperationScheduler.KEY_URL).orEmpty(),
-                inputData.getString(RuleOperationScheduler.KEY_NAME)
+                inputData.getString(RuleOperationScheduler.KEY_NAME),
+                inputData.getString(RuleOperationScheduler.KEY_KIND) ?: com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK
             )
             result.getOrThrow()
             subscriptionManager.latestImportSummary()?.displayMessage("导入成功") ?: "导入成功"
@@ -203,7 +208,8 @@ class RuleOperationWorker(
             val uri = requiredUri()
             val result = subscriptionManager.addLocalSubscription(
                 uri.toString(),
-                inputData.getString(RuleOperationScheduler.KEY_NAME).orEmpty()
+                inputData.getString(RuleOperationScheduler.KEY_NAME).orEmpty(),
+                inputData.getString(RuleOperationScheduler.KEY_KIND) ?: com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK
             ) { readUri(uri) }
             result.getOrThrow()
             subscriptionManager.latestImportSummary()?.displayMessage("导入成功") ?: "导入成功"

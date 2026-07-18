@@ -12,6 +12,7 @@ object DnsMessageUtils {
     private const val HEADER_LEN = 12
     const val TYPE_A = 1
     const val TYPE_AAAA = 28
+    const val TYPE_CNAME = 5
     private const val TYPE_SOA = 6
     private const val TYPE_OPT = 41
     private const val CLASS_IN = 1
@@ -147,6 +148,43 @@ object DnsMessageUtils {
 
     fun buildNxDomainResponse(query: ByteArray): ByteArray {
         return buildBlockedResponse(query, BlockResponseMode.NXDOMAIN)
+    }
+
+    fun buildRewriteResponse(query: ByteArray, addresses: Collection<String>, ttlSeconds: Long = 300): ByteArray {
+        val question = extractQuestion(query) ?: return buildErrorResponse(query, RCODE_SERVFAIL)
+        if (question.qclass != CLASS_IN || question.type !in setOf(TYPE_A, TYPE_AAAA)) return buildNegativeResponse(query, RCODE_NOERROR)
+        val bytes = addresses.mapNotNull { runCatching { InetAddress.getByName(it).address }.getOrNull() }
+            .filter { (question.type == TYPE_A && it.size == 4) || (question.type == TYPE_AAAA && it.size == 16) }
+        if (bytes.isEmpty()) return buildNegativeResponse(query, RCODE_NOERROR)
+        val end = questionEnd(query) ?: return buildErrorResponse(query, RCODE_SERVFAIL)
+        val response = createResponse(query, end, RCODE_NOERROR, answerCount = bytes.size, extraSize = bytes.sumOf { RESOURCE_RECORD_HEADER_SIZE + it.size })
+        var offset = end
+        bytes.forEach { address -> writeNamePointer(response, offset); offset += 2; writeShort(response, offset, question.type); writeShort(response, offset + 2, CLASS_IN); writeInt(response, offset + 4, ttlSeconds); writeShort(response, offset + 8, address.size); address.copyInto(response, offset + 10); offset += 10 + address.size }
+        return response
+    }
+
+    fun buildCnameRewriteResponse(query: ByteArray, target: String, ttlSeconds: Long = 300): ByteArray {
+        val question = extractQuestion(query) ?: return buildErrorResponse(query, RCODE_SERVFAIL)
+        if (question.qclass != CLASS_IN) return buildNegativeResponse(query, RCODE_NOERROR)
+        val labels = target.trim().trimEnd('.').split('.').filter { it.isNotEmpty() }
+        if (labels.isEmpty() || labels.any { it.length > 63 }) return buildErrorResponse(query, RCODE_SERVFAIL)
+        val rdata = ByteArray(labels.sumOf { it.length + 1 } + 1)
+        var rdataOffset = 0
+        labels.forEach { label ->
+            val bytes = label.toByteArray(Charsets.US_ASCII)
+            rdata[rdataOffset++] = bytes.size.toByte()
+            bytes.copyInto(rdata, rdataOffset)
+            rdataOffset += bytes.size
+        }
+        val end = questionEnd(query) ?: return buildErrorResponse(query, RCODE_SERVFAIL)
+        val response = createResponse(query, end, RCODE_NOERROR, 1, RESOURCE_RECORD_HEADER_SIZE + rdata.size)
+        writeNamePointer(response, end)
+        writeShort(response, end + 2, TYPE_CNAME)
+        writeShort(response, end + 4, CLASS_IN)
+        writeInt(response, end + 6, ttlSeconds)
+        writeShort(response, end + 10, rdata.size)
+        rdata.copyInto(response, end + 12)
+        return response
     }
 
     private fun buildZeroAddressResponse(query: ByteArray): ByteArray {

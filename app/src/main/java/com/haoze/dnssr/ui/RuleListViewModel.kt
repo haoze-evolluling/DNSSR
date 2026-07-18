@@ -7,6 +7,7 @@ import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
+import com.haoze.dnssr.vpn.RewriteRuleManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,8 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     private val blockRuleDao = db.blockRuleDao()
     private val allowRuleDao = db.allowRuleDao()
     private val subscriptionDao = db.subscriptionDao()
+    private val rewriteRuleDao = db.rewriteRuleDao()
+    private val rewriteRuleManager by lazy { RewriteRuleManager(rewriteRuleDao) }
     private val blockListManager: BlockListManager by lazy {
         BlockListManager(blockRuleDao)
     }
@@ -102,7 +105,10 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     fun deleteRule(id: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
-            if (ruleKind == ManagedRuleKind.ALLOW) {
+            if (ruleKind == ManagedRuleKind.REWRITE) {
+                rewriteRuleManager.deleteRule(id)
+                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "rewrite_rule_deleted")
+            } else if (ruleKind == ManagedRuleKind.ALLOW) {
                 allowListManager.deleteRule(id)
                 RuntimeDnsSettingsRefresher.refreshIfRunning(context, "allow_rule_deleted")
             } else {
@@ -116,7 +122,10 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     fun toggleRule(id: Long, enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
-            if (ruleKind == ManagedRuleKind.ALLOW) {
+            if (ruleKind == ManagedRuleKind.REWRITE) {
+                rewriteRuleManager.toggleRule(id, enabled)
+                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "rewrite_rule_toggled")
+            } else if (ruleKind == ManagedRuleKind.ALLOW) {
                 allowListManager.toggleRule(id, enabled)
                 RuntimeDnsSettingsRefresher.refreshIfRunning(context, "allow_rule_toggled")
             } else {
@@ -129,7 +138,14 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
 
     private suspend fun loadRules(query: String, limit: Int, offset: Int): List<RuleListItem> {
         val source = _sourceFilter.value.source
-        return if (ruleKind == ManagedRuleKind.ALLOW) {
+        return if (ruleKind == ManagedRuleKind.REWRITE) {
+            val rules = if (source == null) {
+                if (query.isEmpty()) rewriteRuleDao.paged(limit, offset) else rewriteRuleDao.searchPaged("%$query%", limit, offset)
+            } else {
+                if (query.isEmpty()) rewriteRuleDao.pagedBySource(source, limit, offset) else rewriteRuleDao.searchPagedBySource(source, "%$query%", limit, offset)
+            }
+            rules.map { RuleListItem(it.id, it.pattern, "${it.pattern} -> ${it.targetValue}", it.enabled, it.targetType) }
+        } else if (ruleKind == ManagedRuleKind.ALLOW) {
             val rules = if (source == null) {
                 if (query.isEmpty()) allowRuleDao.paged(limit, offset)
                 else allowRuleDao.searchPaged("%$query%", limit, offset)
@@ -152,7 +168,10 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
 
     private suspend fun countRules(query: String): Int {
         val source = _sourceFilter.value.source
-        return if (ruleKind == ManagedRuleKind.ALLOW) {
+        return if (ruleKind == ManagedRuleKind.REWRITE) {
+            if (source == null) { if (query.isEmpty()) rewriteRuleDao.count() else rewriteRuleDao.searchCount("%$query%") }
+            else { if (query.isEmpty()) rewriteRuleDao.countBySourceForList(source) else rewriteRuleDao.searchCountBySource(source, "%$query%") }
+        } else if (ruleKind == ManagedRuleKind.ALLOW) {
             if (source == null) {
                 if (query.isEmpty()) allowRuleDao.count() else allowRuleDao.searchCount("%$query%")
             } else {
@@ -171,7 +190,9 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
 
     private fun loadSourceSubscriptions() {
         viewModelScope.launch(Dispatchers.IO) {
-            val subscriptions = if (ruleKind == ManagedRuleKind.ALLOW) {
+            val subscriptions = if (ruleKind == ManagedRuleKind.REWRITE) {
+                subscriptionDao.allByKind(com.haoze.dnssr.data.entity.SubscriptionKind.REWRITE)
+            } else if (ruleKind == ManagedRuleKind.ALLOW) {
                 subscriptionDao.withAllowRules()
             } else {
                 subscriptionDao.withBlockRules()
@@ -204,12 +225,14 @@ enum class ManagedRuleKind(
     val countLabel: String
 ) {
     BLOCK("屏蔽规则", "屏蔽规则"),
-    ALLOW("放行规则", "白名单规则")
+    ALLOW("放行规则", "白名单规则"),
+    REWRITE("重写域名规则", "重写规则")
 }
 
 data class RuleListItem(
     val id: Long,
     val pattern: String,
     val rawLine: String,
-    val enabled: Boolean
+    val enabled: Boolean,
+    val targetType: String? = null
 )

@@ -24,6 +24,9 @@ import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.data.entity.DnsLogEntity
 import com.haoze.dnssr.data.entity.HttpRequestLogEntity
 import com.haoze.dnssr.data.entity.RaceLogEntity
+import com.haoze.dnssr.data.entity.RewriteRuleEntity
+import com.haoze.dnssr.data.entity.RewriteRuleSourceEntity
+import com.haoze.dnssr.data.dao.RewriteRuleDao
 import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
 
@@ -40,8 +43,9 @@ import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
         SubscriptionEntity::class,
         SubscriptionAutoUpdateItemEntity::class,
         HttpRequestLogEntity::class
+        ,RewriteRuleEntity::class, RewriteRuleSourceEntity::class
     ],
-    version = 18,
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,6 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun allowRuleDao(): AllowRuleDao
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun subscriptionAutoUpdateDao(): SubscriptionAutoUpdateDao
+    abstract fun rewriteRuleDao(): RewriteRuleDao
 
     companion object {
         @Volatile
@@ -75,6 +80,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_15_16,
                         MIGRATION_16_17,
                         MIGRATION_17_18
+                        ,MIGRATION_18_19, MIGRATION_19_20
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -263,5 +269,23 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_http_request_log_authority` ON `http_request_log` (`authority`)")
             }
         }
+        private val MIGRATION_18_19 = object : Migration(18, 19) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS `rewrite_rule` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `pattern` TEXT NOT NULL, `address` TEXT NOT NULL, `rawLine` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `enabled` INTEGER NOT NULL)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_rewrite_rule_pattern_address` ON `rewrite_rule` (`pattern`, `address`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `rewrite_rule_source` (`ruleId` INTEGER NOT NULL, `source` TEXT NOT NULL, `enabled` INTEGER NOT NULL, PRIMARY KEY(`ruleId`, `source`), FOREIGN KEY(`ruleId`) REFERENCES `rewrite_rule`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+        }}
+        private val MIGRATION_19_20 = object : Migration(19, 20) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE `rewrite_rule_source_backup` (`ruleId` INTEGER NOT NULL, `source` TEXT NOT NULL, `enabled` INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE `rewrite_rule_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `pattern` TEXT NOT NULL, `targetType` TEXT NOT NULL, `targetValue` TEXT NOT NULL, `rawLine` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `enabled` INTEGER NOT NULL)")
+            db.execSQL("INSERT INTO rewrite_rule_new (id,pattern,targetType,targetValue,rawLine,addedAt,enabled) SELECT id,pattern,CASE WHEN instr(address, ':') > 0 THEN 'IPv6' ELSE 'IPv4' END,address,rawLine,addedAt,enabled FROM rewrite_rule")
+            db.execSQL("INSERT INTO rewrite_rule_source_backup SELECT ruleId,source,enabled FROM rewrite_rule_source")
+            db.execSQL("DROP TABLE rewrite_rule_source")
+            db.execSQL("DROP TABLE rewrite_rule")
+            db.execSQL("ALTER TABLE rewrite_rule_new RENAME TO rewrite_rule")
+            db.execSQL("CREATE TABLE `rewrite_rule_source` (`ruleId` INTEGER NOT NULL, `source` TEXT NOT NULL, `enabled` INTEGER NOT NULL, PRIMARY KEY(`ruleId`,`source`), FOREIGN KEY(`ruleId`) REFERENCES `rewrite_rule`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            db.execSQL("INSERT INTO rewrite_rule_source SELECT ruleId,source,enabled FROM rewrite_rule_source_backup")
+            db.execSQL("DROP TABLE rewrite_rule_source_backup")
+            db.execSQL("CREATE UNIQUE INDEX `index_rewrite_rule_pattern_targetType_targetValue` ON `rewrite_rule` (`pattern`,`targetType`,`targetValue`)")
+        }}
     }
 }
