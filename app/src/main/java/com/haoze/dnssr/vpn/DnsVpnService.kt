@@ -473,6 +473,8 @@ class DnsVpnService : VpnService() {
         setRunningFlag(this, false)
         readJob?.cancel()
         readJob = null
+        disconnectVpnInterface()
+        sendStatusBroadcast(false)
         stopInspectionDataPlane()
         closeResolvers()
         if (::providerHealthEngine.isInitialized) {
@@ -482,14 +484,8 @@ class DnsVpnService : VpnService() {
             bootstrapHealthEngine.close()
         }
         flushLoggersBlocking()
-        try {
-            vpnInterface?.close()
-        } catch (_: Exception) {
-        }
-        vpnInterface = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         startMonitorService()
-        sendStatusBroadcast(false)
         stopSelf()
     }
 
@@ -504,13 +500,9 @@ class DnsVpnService : VpnService() {
         isServiceAlive = false
         setRunningFlag(this, false)
         readJob?.cancel()
+        disconnectVpnInterface()
         stopInspectionDataPlane()
         closeResolvers()
-        try {
-            vpnInterface?.close()
-        } catch (_: Exception) {
-        }
-        vpnInterface = null
         if (::dnsCache.isInitialized) {
             runBlocking { DnsCacheController.unregister(dnsCache) }
         }
@@ -597,6 +589,15 @@ class DnsVpnService : VpnService() {
         goInspectionTunnel?.stop()
         goInspectionTunnel = null
         activeInspectionPackages = emptySet()
+    }
+
+    private fun disconnectVpnInterface() {
+        goInspectionTunnel?.releaseTun()
+        try {
+            vpnInterface?.close()
+        } catch (_: Exception) {
+        }
+        vpnInterface = null
     }
 
     private suspend fun handleDnsPacket(

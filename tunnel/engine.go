@@ -515,6 +515,22 @@ func (e *Engine) Start(fd int, protector SocketProtector, wgConfigJSON string) {
 	logf("Engine stopped")
 }
 
+// ReleaseTun closes the engine-owned duplicate of the Android TUN descriptor.
+//
+// The Android side calls this immediately before closing its original
+// ParcelFileDescriptor so the system VPN network can be withdrawn before the
+// potentially blocking engine teardown begins. Stop remains responsible for
+// all remaining engine cleanup.
+func (e *Engine) ReleaseTun() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.tunFile != nil {
+		e.tunFile.Close()
+		e.tunFile = nil
+	}
+}
+
 // Stop stops the engine.
 func (e *Engine) Stop() {
 	e.mu.Lock()

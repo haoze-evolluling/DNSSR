@@ -56,6 +56,11 @@ class GoInspectionTunnel(
         runCatching { engine.stopStackMitm() }
     }
 
+    fun releaseTun() {
+        runCatching { engine.releaseTun() }
+            .onFailure { Log.w(TAG, "Unable to release Go inspection TUN", it) }
+    }
+
     private fun configureEngine(selectedPackages: Set<String>) {
         engine.setDNS(
             provider.protocol.goProtocol,
