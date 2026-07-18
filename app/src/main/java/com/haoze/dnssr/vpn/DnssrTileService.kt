@@ -3,11 +3,9 @@ package com.haoze.dnssr.vpn
 import android.app.PendingIntent
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import androidx.core.content.ContextCompat
 import com.haoze.dnssr.MainActivity
 
 class DnssrTileService : TileService() {
@@ -25,16 +23,11 @@ class DnssrTileService : TileService() {
             return
         }
 
-        if (VpnService.prepare(this) == null) {
-            ContextCompat.startForegroundService(this, DnsVpnService.startIntent(this))
-            updateTile(running = true)
-        } else {
-            openMainForVpnPermission()
-        }
+        openMainForVpnConnection()
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
-    private fun openMainForVpnPermission() {
+    private fun openMainForVpnConnection() {
         val intent = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra(MainActivity.EXTRA_AUTO_START_VPN, true)

@@ -221,7 +221,6 @@ class MainActivity : ComponentActivity() {
         applyRecentsPrivacySetting()
         mainViewModel.refreshStatus()
         PermissionDisclosureSettings.updateNotificationGrant(this, hasNotificationPermission())
-        PermissionDisclosureSettings.updateVpnGrant(this, VpnService.prepare(this) == null)
     }
 
     private fun applyRecentsPrivacySetting() {

@@ -20,7 +20,7 @@ import com.haoze.dnssr.ui.AppSettings
  * VPN 未运行时的前台监控服务。
  *
  * 当 [DnsVpnService] 停止或被系统撤销时启动，常驻通知栏提示用户开启 VPN。
- * 用户点击通知操作按钮后启动 [DnsVpnService]，本服务随即停止。
+ * 用户点击通知或操作按钮后回到主界面，由主界面继续走连接流程，本服务随即停止。
  */
 class VpnMonitorService : Service() {
 
@@ -62,14 +62,6 @@ class VpnMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun buildStoppedNotification(): android.app.Notification {
-        val startVpnIntent = DnsVpnService.startIntent(this, DnsProvider.loadSelected(this))
-        val startPendingIntent = PendingIntent.getService(
-            this,
-            0,
-            startVpnIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_AUTO_START_VPN, true)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -91,7 +83,7 @@ class VpnMonitorService : Service() {
                     .ifBlank { "未连接" }
             )
             .setContentIntent(openAppPendingIntent)
-            .addAction(R.drawable.ic_play_arrow, "开启", startPendingIntent)
+            .addAction(R.drawable.ic_play_arrow, "开启", openAppPendingIntent)
             .setOngoing(true)
             .setShowWhen(false)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)

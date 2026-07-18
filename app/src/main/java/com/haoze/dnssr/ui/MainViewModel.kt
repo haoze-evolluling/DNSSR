@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.VpnService
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,23 +69,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshStatus(onComplete: ((Boolean) -> Unit)? = null) {
         val context = getApplication<Application>()
-        val prepared = VpnService.prepare(context) == null
-
-        if (!prepared) {
-            DnsVpnService.setRunningFlag(context, false)
-            _uiState.value = _uiState.value.copy(isRunning = false, isBusy = false)
-            onComplete?.invoke(false)
-            return
-        }
-
-        val isAlive = isDnsVpnServiceRunning(context)
+        val isAlive = DnsVpnService.isRunning(context)
         DnsVpnService.setRunningFlag(context, isAlive)
         _uiState.value = _uiState.value.copy(isRunning = isAlive, isBusy = false)
         onComplete?.invoke(isAlive)
-    }
-
-    private fun isDnsVpnServiceRunning(context: Context): Boolean {
-        return DnsVpnService.isRunning(context)
     }
 
     fun loadProviders() {
