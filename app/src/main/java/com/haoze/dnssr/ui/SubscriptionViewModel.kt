@@ -40,7 +40,7 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
             AppDatabase.getInstance(application).subscriptionDao(),
             blockListManager,
             allowListManager,
-            com.haoze.dnssr.vpn.RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao())
+            com.haoze.dnssr.vpn.RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao(), java.io.File(application.filesDir, "rule-index"))
         )
     }
 

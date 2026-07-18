@@ -22,7 +22,7 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
     private val allowRuleDao = db.allowRuleDao()
     private val subscriptionDao = db.subscriptionDao()
     private val rewriteRuleDao = db.rewriteRuleDao()
-    private val rewriteRuleManager by lazy { RewriteRuleManager(rewriteRuleDao) }
+    private val rewriteRuleManager by lazy { RewriteRuleManager(rewriteRuleDao, java.io.File(application.filesDir, "rule-index")) }
     private val blockListManager: BlockListManager by lazy {
         BlockListManager(blockRuleDao)
     }

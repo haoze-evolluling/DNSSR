@@ -130,7 +130,7 @@ class DnsVpnService : VpnService() {
         val ruleIndexDirectory = File(filesDir, "rule-index")
         blockListManager = BlockListManager(db.blockRuleDao(), ruleIndexDirectory)
         allowListManager = AllowListManager(db.allowRuleDao(), ruleIndexDirectory)
-        rewriteRuleManager = RewriteRuleManager(db.rewriteRuleDao())
+        rewriteRuleManager = RewriteRuleManager(db.rewriteRuleDao(), ruleIndexDirectory)
         dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope)
         raceLogger = RaceLogger(db.raceLogDao(), logRetentionDays, serviceScope)
@@ -503,6 +503,7 @@ class DnsVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        rewriteRuleManager.close()
         isServiceAlive = false
         setRunningFlag(this, false)
         readJob?.cancel()

@@ -25,6 +25,8 @@ interface RewriteRuleDao {
         enabled: Boolean
     ): Int = rules.count { insertForSource(it, source, enabled) }
     @Query("SELECT r.pattern, r.targetType, r.targetValue FROM rewrite_rule r JOIN rewrite_rule_source s ON s.ruleId=r.id WHERE r.enabled=1 AND s.enabled=1 GROUP BY r.id") suspend fun enabledRules(): List<EnabledRewriteRule>
+    @Query("SELECT r.pattern, r.targetType, r.targetValue FROM rewrite_rule r JOIN rewrite_rule_source s ON s.ruleId=r.id WHERE r.enabled=1 AND s.enabled=1 AND s.source GLOB 'sub_*' GROUP BY r.id") suspend fun enabledSubscriptionRules(): List<EnabledRewriteRule>
+    @Query("SELECT r.pattern, r.targetType, r.targetValue FROM rewrite_rule r JOIN rewrite_rule_source s ON s.ruleId=r.id WHERE r.enabled=1 AND s.enabled=1 AND s.source NOT GLOB 'sub_*' GROUP BY r.id") suspend fun enabledNonSubscriptionRules(): List<EnabledRewriteRule>
     @Query("SELECT * FROM rewrite_rule ORDER BY id DESC LIMIT :limit OFFSET :offset") suspend fun paged(limit: Int, offset: Int): List<RewriteRuleEntity>
     @Query("SELECT * FROM rewrite_rule WHERE pattern LIKE :query OR targetValue LIKE :query OR rawLine LIKE :query ORDER BY id DESC LIMIT :limit OFFSET :offset") suspend fun searchPaged(query: String, limit: Int, offset: Int): List<RewriteRuleEntity>
     @Query("SELECT r.* FROM rewrite_rule r JOIN rewrite_rule_source s ON s.ruleId=r.id WHERE s.source=:source AND (r.pattern LIKE :query OR r.targetValue LIKE :query OR r.rawLine LIKE :query) GROUP BY r.id ORDER BY r.id DESC LIMIT :limit OFFSET :offset") suspend fun searchPagedBySource(source: String, query: String, limit: Int, offset: Int): List<RewriteRuleEntity>
@@ -37,6 +39,7 @@ interface RewriteRuleDao {
     @Query("SELECT COUNT(*) FROM rewrite_rule WHERE pattern=:pattern AND targetType=:targetType") suspend fun countType(pattern: String, targetType: String): Int
     @Query("SELECT COUNT(*) FROM rewrite_rule WHERE pattern=:pattern AND targetType!=:targetType") suspend fun countOtherTypes(pattern: String, targetType: String): Int
     @Query("UPDATE rewrite_rule SET enabled=:enabled WHERE id=:id") suspend fun setEnabled(id: Long, enabled: Boolean)
+    @Query("SELECT EXISTS(SELECT 1 FROM rewrite_rule_source WHERE ruleId=:id AND source GLOB 'sub_*')") suspend fun hasSubscriptionSource(id: Long): Boolean
     @Query("DELETE FROM rewrite_rule WHERE id=:id") suspend fun deleteById(id: Long)
     @Query("DELETE FROM rewrite_rule") suspend fun clearAll()
     @Query("DELETE FROM rewrite_rule_source WHERE source=:source") suspend fun deleteSource(source: String)

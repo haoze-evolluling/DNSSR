@@ -177,7 +177,7 @@ suspend fun clearAllDomainRules(context: Context) {
     val database = AppDatabase.getInstance(context)
     BlockListManager(database.blockRuleDao()).clearAll()
     AllowListManager(database.allowRuleDao()).clearAll()
-    RewriteRuleManager(database.rewriteRuleDao()).clearAll()
+    RewriteRuleManager(database.rewriteRuleDao(), java.io.File(context.filesDir, "rule-index")).clearAll()
     database.subscriptionDao().resetAfterRuleCleanup()
 }
 

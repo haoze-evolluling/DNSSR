@@ -30,7 +30,7 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
         AllowListManager(AppDatabase.getInstance(application).allowRuleDao())
     }
     private val rewriteRuleManager: RewriteRuleManager by lazy {
-        RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao())
+        RewriteRuleManager(AppDatabase.getInstance(application).rewriteRuleDao(), java.io.File(application.filesDir, "rule-index"))
     }
 
     private val _ruleCount = MutableStateFlow(0)

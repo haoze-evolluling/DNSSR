@@ -41,7 +41,7 @@ class ConfigTransferManager(private val context: Context) {
         database.subscriptionDao(),
         BlockListManager(database.blockRuleDao()),
         AllowListManager(database.allowRuleDao()),
-        RewriteRuleManager(database.rewriteRuleDao())
+        RewriteRuleManager(database.rewriteRuleDao(), java.io.File(context.filesDir, "rule-index"))
     )
 
     suspend fun export(selection: ConfigExportSelection): String {

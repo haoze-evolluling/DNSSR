@@ -133,9 +133,9 @@ class RuleOperationWorker(
             database.subscriptionDao(),
             blockManager,
             allowManager,
-            RewriteRuleManager(database.rewriteRuleDao())
+            RewriteRuleManager(database.rewriteRuleDao(), java.io.File(applicationContext.filesDir, "rule-index"))
         )
-        val rewriteManager = RewriteRuleManager(database.rewriteRuleDao())
+        val rewriteManager = RewriteRuleManager(database.rewriteRuleDao(), java.io.File(applicationContext.filesDir, "rule-index"))
         var activeSubscriptionId = subscriptionId
         var latestCurrent = -1
         var latestTotal = 0
