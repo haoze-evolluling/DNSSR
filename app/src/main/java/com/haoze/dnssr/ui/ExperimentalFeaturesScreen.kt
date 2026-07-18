@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Construction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,14 +17,12 @@ import androidx.compose.ui.unit.dp
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
-import com.haoze.dnssr.ui.components.SettingsNavigationItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
 import com.haoze.dnssr.ui.components.SettingsSwitchItem
 
 @Composable
 fun ExperimentalFeaturesScreen(
     onBack: () -> Unit,
-    onNavigateToDoh3Service: () -> Unit,
     title: String = "实验功能"
 ) {
     val context = LocalContext.current
@@ -63,16 +59,6 @@ fun ExperimentalFeaturesScreen(
                 text = "这里会集中放置尚未成熟、仍在开发中的功能。实验性功能可能调整、移除或存在兼容性问题。",
                 modifier = Modifier.padding(top = 8.dp)
             )
-
-            SettingsGroupTitle("服务")
-            SettingsGroup {
-                SettingsNavigationItem(
-                    title = "DOH3 服务",
-                    subtitle = "查看开发进度",
-                    leadingIcon = Icons.Filled.Construction,
-                    onClick = onNavigateToDoh3Service
-                )
-            }
 
             SettingsGroupTitle("外观")
             SettingsGroup {

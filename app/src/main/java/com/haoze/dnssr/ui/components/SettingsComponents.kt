@@ -289,6 +289,7 @@ fun SettingsNavigationItem(
     leadingIcon: ImageVector? = null,
     value: String? = null,
     valueMaxScreenFraction: Float? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -301,6 +302,7 @@ fun SettingsNavigationItem(
         subtitle = subtitle,
         leadingIcon = leadingIcon,
         modifier = modifier,
+        enabled = enabled,
         onClick = onClick
     ) {
         Row(
@@ -311,18 +313,22 @@ fun SettingsNavigationItem(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = if (enabled) 1f else 0.38f
+                    ),
                     textAlign = TextAlign.End,
                     modifier = valueMaxWidth?.let { maxWidth ->
                         Modifier.widthIn(max = maxWidth)
                     } ?: Modifier
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (enabled) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

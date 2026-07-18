@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,11 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
@@ -45,7 +41,6 @@ fun ForegroundBackgroundSettingsScreen(
     onHideFromRecentsChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val scrollState = rememberScrollState()
     var hideFromRecentsEnabled by remember {
         mutableStateOf(AppSettings.isHideFromRecentsEnabled(context))
@@ -55,18 +50,6 @@ fun ForegroundBackgroundSettingsScreen(
     }
     var batteryOptimizationIgnored by remember(context) {
         mutableStateOf(isBatteryOptimizationIgnored(context))
-    }
-
-    DisposableEffect(context, lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                batteryOptimizationIgnored = isBatteryOptimizationIgnored(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
     }
 
     fun saveHideFromRecents(enabled: Boolean) {
@@ -79,6 +62,14 @@ fun ForegroundBackgroundSettingsScreen(
         persistentNotificationEnabled = enabled
         AppSettings.setPersistentNotificationEnabled(context, enabled)
         updateMonitorServiceForPersistentNotification(context, enabled)
+    }
+
+    fun handleBatteryOptimizationClick() {
+        val ignored = isBatteryOptimizationIgnored(context)
+        batteryOptimizationIgnored = ignored
+        if (!ignored) {
+            requestIgnoreBatteryOptimization(context)
+        }
     }
 
     SettingsScaffold(
@@ -119,7 +110,9 @@ fun ForegroundBackgroundSettingsScreen(
                         } else {
                             "允许应用在后台稳定运行"
                         },
-                        onClick = { requestIgnoreBatteryOptimization(context) }
+                        value = if (batteryOptimizationIgnored) "已忽略" else null,
+                        enabled = !batteryOptimizationIgnored,
+                        onClick = ::handleBatteryOptimizationClick
                     )
                 } else {
                     SettingsItem(

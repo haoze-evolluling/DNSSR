@@ -90,7 +90,6 @@ object Routes {
     const val HTTP_INSPECTION_SETTINGS = "http_inspection_settings"
     const val HTTP_INSPECTION_APPS = "http_inspection_apps"
     const val HTTP_REQUEST_LOGS = "http_request_logs"
-    const val DOH3_SERVICE = "doh3_service"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
     const val ABOUT = "about"
@@ -406,7 +405,6 @@ fun AppNavHost(
             SettingsGuideHost(SettingsGuides.EXPERIMENTAL_FEATURES) {
                 ExperimentalFeaturesScreen(
                 onBack = { navController.popWhenResumed() },
-                onNavigateToDoh3Service = { navController.navigateWhenResumed(Routes.DOH3_SERVICE) },
                     title = entry.arguments?.getString(SCREEN_TITLE_ARG) ?: "实验功能"
                 )
             }
@@ -423,9 +421,6 @@ fun AppNavHost(
         }
         composable(Routes.HTTP_REQUEST_LOGS) {
             HttpRequestLogScreen(onBack = { navController.popWhenResumed() })
-        }
-        composable(Routes.DOH3_SERVICE) {
-            Doh3ServiceScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.SUBSCRIPTION_MANAGEMENT) {
             SubscriptionScreen(
