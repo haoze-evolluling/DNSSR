@@ -61,6 +61,12 @@ interface SubscriptionDao {
     suspend fun setImportState(id: Long, state: String, error: String?)
 
     @Query(
+        "UPDATE subscription SET ruleCount = 0, lastUpdated = 0, " +
+            "httpEtag = NULL, httpLastModified = NULL, ruleSetHash = NULL"
+    )
+    suspend fun resetAfterRuleCleanup()
+
+    @Query(
         "UPDATE subscription SET importState = :state, importError = NULL, " +
             "lastAttemptAt = :attemptedAt, consecutiveFailureCount = 0, " +
             "httpEtag = :etag, httpLastModified = :lastModified WHERE id = :id"

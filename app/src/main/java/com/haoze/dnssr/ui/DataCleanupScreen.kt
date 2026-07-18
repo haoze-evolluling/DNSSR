@@ -176,6 +176,7 @@ suspend fun clearAllDomainRules(context: Context) {
     val database = AppDatabase.getInstance(context)
     BlockListManager(database.blockRuleDao()).clearAll()
     AllowListManager(database.allowRuleDao()).clearAll()
+    database.subscriptionDao().resetAfterRuleCleanup()
 }
 
 private enum class CleanupAction(

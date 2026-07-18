@@ -1,16 +1,21 @@
 package com.haoze.dnssr.ui
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
+import com.haoze.dnssr.vpn.RuleOperationScheduler
+import com.haoze.dnssr.vpn.RuleOperationType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -51,78 +56,53 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun addRule(pattern: String, onResult: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val success = blockListManager.addRule(pattern)
-            val message = if (success) "已添加到屏蔽规则" else "规则格式无效，请输入域名或支持的过滤规则"
-            if (success) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "block_rule_added"
-                )
-            }
-            withContext(Dispatchers.Main) {
-                onResult(message)
-            }
-            if (success) {
-                loadRuleCount()
-            }
-        }
+        observeResult(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.ADD_BLOCK_RULE, pattern = pattern
+            ).id,
+            onResult
+        )
     }
 
     fun addAllowRule(pattern: String, onResult: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val success = allowListManager.addRule(pattern)
-            val message = if (success) "已添加到白名单规则" else "规则格式无效，请输入域名或支持的白名单规则"
-            if (success) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "allow_rule_added"
-                )
-            }
-            withContext(Dispatchers.Main) {
-                onResult(message)
-            }
-            if (success) {
-                loadRuleCount()
-            }
-        }
+        observeResult(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.ADD_ALLOW_RULE, pattern = pattern
+            ).id,
+            onResult
+        )
     }
 
     fun importRules(uri: Uri, onResult: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            try {
-                val text = context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
-                    reader?.readText()
-                } ?: throw IOException("无法读取所选文件")
-                val rules = com.haoze.dnssr.vpn.AdGuardRuleParser.parseCategorized(text)
-                if (rules.isEmpty()) throw IllegalArgumentException("文件中没有可导入的有效 DNS 规则")
-                val insertedBlock = blockListManager.addRulesBatch(rules.blockRules, LOCAL_IMPORT_SOURCE)
-                val insertedAllow = allowListManager.addRulesBatch(rules.allowRules, LOCAL_IMPORT_SOURCE)
-                if (insertedBlock + insertedAllow > 0) {
-                    RuntimeDnsSettingsRefresher.refreshIfRunning(
-                        context,
-                        "rules_imported"
-                    )
+        runCatching {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+        observeResult(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.IMPORT_RULES, uri = uri
+            ).id,
+            onResult
+        )
+    }
+
+    private fun observeResult(workId: java.util.UUID, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            WorkManager.getInstance(getApplication<Application>())
+                .getWorkInfoByIdFlow(workId)
+                .collect { info ->
+                    if (info?.state?.isFinished == true) {
+                        val success = info.outputData.getBoolean(RuleOperationScheduler.KEY_SUCCESS, false)
+                        val message = info.outputData.getString(RuleOperationScheduler.KEY_MESSAGE)
+                            ?: "操作失败"
+                        onResult(if (success) message else "操作失败：$message")
+                        loadRuleCount()
+                        return@collect
+                    }
                 }
-                withContext(Dispatchers.Main) {
-                    val databaseDuplicates = rules.size - insertedBlock - insertedAllow
-                    onResult(
-                        "导入完成：黑名单 $insertedBlock 条，白名单 $insertedAllow 条，" +
-                            "重复 ${rules.duplicateCount + databaseDuplicates.coerceAtLeast(0)} 条，" +
-                            "无效/不支持 ${rules.invalidCount + rules.unsupportedCount} 条"
-                    )
-                }
-                loadRuleCount()
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    onResult("导入失败：${e.message ?: "无法读取规则文件"}")
-                }
-            }
         }
     }
 
-    private companion object {
-        const val LOCAL_IMPORT_SOURCE = "local_import"
-    }
 }

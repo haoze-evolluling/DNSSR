@@ -1,14 +1,20 @@
 package com.haoze.dnssr.ui
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.SubscriptionManager
+import com.haoze.dnssr.vpn.SubscriptionAutoUpdateScheduler
+import com.haoze.dnssr.vpn.RuleOperationScheduler
+import com.haoze.dnssr.vpn.RuleOperationType
 import com.haoze.dnssr.vpn.SubscriptionUpdateCoordinator
 import com.haoze.dnssr.vpn.SubscriptionUpdateOutcome
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -39,9 +46,12 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     private val _subscriptions = MutableStateFlow<List<SubscriptionEntity>>(emptyList())
     val subscriptions: StateFlow<List<SubscriptionEntity>> = _subscriptions.asStateFlow()
 
-    val importProgress: StateFlow<Pair<Int, Int>> = subscriptionManager.importProgress
-    val importing: StateFlow<Boolean> = subscriptionManager.importing
-    val importingSubscriptionId: StateFlow<Long?> = subscriptionManager.importingSubscriptionId
+    private val _importProgress = MutableStateFlow(-1 to 0)
+    val importProgress: StateFlow<Pair<Int, Int>> = _importProgress.asStateFlow()
+    private val _importing = MutableStateFlow(false)
+    val importing: StateFlow<Boolean> = _importing.asStateFlow()
+    private val _importingSubscriptionId = MutableStateFlow<Long?>(null)
+    val importingSubscriptionId: StateFlow<Long?> = _importingSubscriptionId.asStateFlow()
 
     private val _updatingSubscriptionId = MutableStateFlow<Long?>(null)
     val updatingSubscriptionId: StateFlow<Long?> = _updatingSubscriptionId.asStateFlow()
@@ -58,6 +68,14 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
                 _subscriptions.value = list
             }
         }
+        viewModelScope.launch {
+            val workManager = WorkManager.getInstance(application)
+            combine(
+                workManager.getWorkInfosByTagFlow(RuleOperationScheduler.TAG),
+                workManager.getWorkInfosByTagFlow(SubscriptionAutoUpdateScheduler.WORK_TAG)
+            ) { manual, automatic -> manual + automatic }
+                .collectLatest(::applyBackgroundWorkState)
+        }
     }
 
     fun activate() {
@@ -71,48 +89,25 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun addSubscription(url: String, name: String? = null) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = subscriptionManager.addSubscription(url, name = name)
-            if (result.isSuccess) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "subscription_added"
-                )
-            }
-            withContext(Dispatchers.Main) {
-                if (result.isSuccess) {
-                    _message.value = subscriptionManager.latestImportSummary()
-                        ?.displayMessage("导入成功")
-                        ?: "导入成功"
-                } else {
-                    _message.value = "导入失败：${result.exceptionOrNull()?.message}"
-                }
-            }
-            loadSubscriptions()
-        }
+        enqueueAndObserve(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.ADD_SUBSCRIPTION, url = url, name = name
+            ).id
+        )
     }
 
     fun addLocalSubscription(uri: Uri, name: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val context = getApplication<Application>()
-            val result = subscriptionManager.addLocalSubscription(uri.toString(), name) {
-                context.contentResolver.openInputStream(uri)?.bufferedReader().use { reader ->
-                    reader?.readText()
-                } ?: throw IllegalArgumentException("无法读取所选文件")
-            }
-            if (result.isSuccess) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "local_subscription_added")
-            }
-            withContext(Dispatchers.Main) {
-                _message.value = if (result.isSuccess) {
-                    subscriptionManager.latestImportSummary()?.displayMessage("导入成功")
-                        ?: "导入成功"
-                } else {
-                    "导入失败：${result.exceptionOrNull()?.message}"
-                }
-            }
-            loadSubscriptions()
+        runCatching {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
         }
+        enqueueAndObserve(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.ADD_LOCAL_SUBSCRIPTION, name = name, uri = uri
+            ).id
+        )
     }
 
     fun renameSubscription(id: Long, name: String) {
@@ -130,97 +125,28 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun editSubscription(id: Long, url: String, name: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = subscriptionManager.editSubscription(id, url, name)
-            if (result.isSuccess) {
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "subscription_edited"
-                )
-            }
-            loadSubscriptionsIntoState()
-            withContext(Dispatchers.Main) {
-                _message.value = if (result.isSuccess) {
-                    "订阅已保存"
-                } else {
-                    "保存订阅失败：${result.exceptionOrNull()?.message}"
-                }
-            }
-        }
+        enqueueAndObserve(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.EDIT_SUBSCRIPTION,
+                subscriptionId = id, url = url, name = name
+            ).id
+        )
     }
 
     fun updateSubscription(id: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _updatingSubscriptionId.value = id
-            try {
-                val outcome = SubscriptionUpdateCoordinator.runManual {
-                    subscriptionManager.updateSubscription(id)
-                }
-                if (outcome is SubscriptionUpdateOutcome.Updated) {
-                    RuntimeDnsSettingsRefresher.refreshIfRunning(
-                        getApplication<Application>(),
-                        "subscription_updated"
-                    )
-                }
-                withContext(Dispatchers.Main) {
-                    _message.value = when (outcome) {
-                        is SubscriptionUpdateOutcome.Updated -> subscriptionManager.latestImportSummary()
-                            ?.displayMessage("更新成功")
-                            ?: "更新成功，共导入 ${outcome.ruleCount} 条规则"
-                        is SubscriptionUpdateOutcome.NotModified -> "订阅已是最新"
-                        is SubscriptionUpdateOutcome.Failed -> "更新失败：${outcome.error}"
-                    }
-                }
-                loadSubscriptions()
-            } finally {
-                _updatingSubscriptionId.value = null
-            }
-        }
+        enqueueAndObserve(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.UPDATE_SUBSCRIPTION, subscriptionId = id
+            ).id
+        )
     }
 
     fun updateAllSubscriptions() {
-        _operationMessage.value = "正在更新所有规则订阅..."
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                var updated = 0
-                var unchanged = 0
-                var failed = 0
-                var totalRules = 0
-                SubscriptionUpdateCoordinator.runManual {
-                    subscriptionManager.remoteSubscriptions().forEach { subscription ->
-                        _updatingSubscriptionId.value = subscription.id
-                        try {
-                            when (val outcome = subscriptionManager.updateSubscription(subscription.id)) {
-                                is SubscriptionUpdateOutcome.Updated -> {
-                                    updated++
-                                    totalRules += outcome.ruleCount
-                                }
-                                is SubscriptionUpdateOutcome.NotModified -> unchanged++
-                                is SubscriptionUpdateOutcome.Failed -> failed++
-                            }
-                        } finally {
-                            _updatingSubscriptionId.value = null
-                        }
-                    }
-                }
-                if (updated > 0) {
-                    RuntimeDnsSettingsRefresher.refreshIfRunning(
-                        getApplication<Application>(),
-                        "subscriptions_updated"
-                    )
-                }
-                loadSubscriptionsIntoState()
-                withContext(Dispatchers.Main) {
-                    _message.value = when {
-                        failed == 0 -> "检查完成：更新 $updated 个，已是最新 $unchanged 个，共导入 $totalRules 条规则"
-                        updated + unchanged == 0 -> "更新所有订阅失败"
-                        else -> "检查完成：更新 $updated 个，已是最新 $unchanged 个，失败 $failed 个"
-                    }
-                }
-            } finally {
-                _operationMessage.value = null
-            }
-        }
+        enqueueAndObserve(
+            RuleOperationScheduler.enqueue(
+                getApplication(), RuleOperationType.UPDATE_ALL_SUBSCRIPTIONS
+            ).id
+        )
     }
 
     fun deleteSubscription(id: Long) {
@@ -277,6 +203,51 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
 
     fun clearMessage() {
         _message.value = null
+    }
+
+    private fun enqueueAndObserve(workId: java.util.UUID) {
+        viewModelScope.launch {
+            WorkManager.getInstance(getApplication<Application>())
+                .getWorkInfoByIdFlow(workId)
+                .collectLatest { info ->
+                    if (info?.state?.isFinished == true) {
+                        val message = info.outputData.getString(RuleOperationScheduler.KEY_MESSAGE)
+                        val success = info.outputData.getBoolean(RuleOperationScheduler.KEY_SUCCESS, false)
+                        _message.value = if (success) message else "操作失败：$message"
+                        loadSubscriptions()
+                        return@collectLatest
+                    }
+                }
+        }
+    }
+
+    private fun applyBackgroundWorkState(infos: List<WorkInfo>) {
+        val active = infos.firstOrNull {
+            it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED ||
+                it.state == WorkInfo.State.BLOCKED
+        }
+        val type = active?.progress?.getString(RuleOperationScheduler.KEY_TYPE)
+            ?.let { runCatching { RuleOperationType.valueOf(it) }.getOrNull() }
+        val subscriptionOperation = type in setOf(
+            RuleOperationType.ADD_SUBSCRIPTION,
+            RuleOperationType.ADD_LOCAL_SUBSCRIPTION,
+            RuleOperationType.EDIT_SUBSCRIPTION,
+            RuleOperationType.UPDATE_SUBSCRIPTION,
+            RuleOperationType.UPDATE_ALL_SUBSCRIPTIONS
+        )
+        _importing.value = active != null && subscriptionOperation
+        val id = active?.progress?.getLong(RuleOperationScheduler.KEY_SUBSCRIPTION_ID, -1) ?: -1
+        _importingSubscriptionId.value = id.takeIf { it >= 0 }
+        _updatingSubscriptionId.value = _importingSubscriptionId.value
+        _importProgress.value = if (active != null) {
+            active.progress.getInt(RuleOperationScheduler.KEY_CURRENT, -1) to
+                active.progress.getInt(RuleOperationScheduler.KEY_TOTAL, 0)
+        } else {
+            -1 to 0
+        }
+        _operationMessage.value = if (type == RuleOperationType.UPDATE_ALL_SUBSCRIPTIONS) {
+            "正在更新所有规则订阅..."
+        } else null
     }
 
     private suspend fun loadSubscriptionsIntoState() {

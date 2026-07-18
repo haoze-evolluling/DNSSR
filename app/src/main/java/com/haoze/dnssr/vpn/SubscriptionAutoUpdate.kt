@@ -30,6 +30,9 @@ import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemStatus
 import com.haoze.dnssr.ui.RuntimeDnsSettingsRefresher
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 object SubscriptionAutoUpdateSettings {
     private const val PREFS = "dns_vpn_prefs"
@@ -59,6 +62,7 @@ object SubscriptionAutoUpdateSettings {
 }
 
 object SubscriptionAutoUpdateScheduler {
+    const val WORK_TAG = "subscription_auto_update_work"
     private const val WORK_NAME = "subscription_auto_update"
     private const val RETRY_WORK_NAME = "subscription_auto_update_retry"
 
@@ -71,6 +75,7 @@ object SubscriptionAutoUpdateScheduler {
         }
         val hours = SubscriptionAutoUpdateSettings.intervalHours(context)
         val request = PeriodicWorkRequestBuilder<SubscriptionAutoUpdateWorker>(hours.toLong(), TimeUnit.HOURS)
+            .addTag(WORK_TAG)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
@@ -79,6 +84,7 @@ object SubscriptionAutoUpdateScheduler {
 
     fun scheduleRetry(context: Context, batchId: String) {
         val request = OneTimeWorkRequestBuilder<SubscriptionAutoUpdateRetryWorker>()
+            .addTag(WORK_TAG)
             .setInputData(workDataOf(SubscriptionAutoUpdateRetryWorker.KEY_BATCH_ID to batchId))
             .setInitialDelay(30, TimeUnit.SECONDS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -96,7 +102,7 @@ class SubscriptionAutoUpdateWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = coroutineScope {
         val database = AppDatabase.getInstance(applicationContext)
         val manager = SubscriptionManager(
             database.subscriptionDao(),
@@ -105,33 +111,68 @@ class SubscriptionAutoUpdateWorker(
         )
         val batchDao = database.subscriptionAutoUpdateDao()
         val batchId = UUID.randomUUID().toString()
+        val subscriptions = manager.enabledRemoteSubscriptions()
+        val notifier = RuleUpdateNotifier(applicationContext, AUTO_UPDATE_PROGRESS_NOTIFICATION_ID)
+        var currentName = ""
+        var currentIndex = 0
+        setForeground(notifier.foregroundInfo("正在自动更新规则订阅"))
+        val progressJob = launch {
+            manager.importProgress.collect { (current, total) ->
+                if (current >= 0) {
+                    setProgress(
+                        automaticProgressData(
+                            subscriptions.getOrNull(currentIndex - 1)?.id ?: -1,
+                            current,
+                            total
+                        )
+                    )
+                    notifier.showProgress(
+                        "正在导入规则订阅",
+                        importProgressDetail(currentName, currentIndex, subscriptions.size, current, total),
+                        current,
+                        total
+                    )
+                }
+            }
+        }
         var changed = false
         var aborted = false
-        val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
-            batchDao.clear()
-            for (subscription in manager.enabledRemoteSubscriptions()) {
-                if (shouldStop()) {
-                    aborted = true
-                    break
+        try {
+            val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
+                batchDao.clear()
+                for ((index, subscription) in subscriptions.withIndex()) {
+                    if (shouldStop()) {
+                        aborted = true
+                        break
+                    }
+                    currentName = subscription.name
+                    currentIndex = index + 1
+                    setProgress(automaticProgressData(subscription.id, -1, 0))
+                    notifier.showProgress(
+                        "正在自动更新规则订阅",
+                        progressDetail(currentName, currentIndex, subscriptions.size, -1, 0)
+                    )
+                    val outcome = manager.updateSubscription(subscription.id)
+                    changed = recordOutcome(batchDao, batchId, subscription.id, outcome) || changed
                 }
-                val outcome = manager.updateSubscription(subscription.id)
-                changed = recordOutcome(batchDao, batchId, subscription.id, outcome) || changed
+                if (shouldStop()) aborted = true
             }
-            if (shouldStop()) aborted = true
-        }
-        if (!ran || aborted) {
-            batchDao.deleteBatch(batchId)
-            return Result.success()
-        }
-        if (changed) {
-            RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
-        }
-        return if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
-            SubscriptionAutoUpdateScheduler.scheduleRetry(applicationContext, batchId)
-            Result.success()
-        } else {
-            finishBatch(applicationContext, batchDao, batchId)
-            Result.success()
+            if (!ran || aborted) {
+                batchDao.deleteBatch(batchId)
+                return@coroutineScope Result.success()
+            }
+            if (changed) {
+                RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
+            }
+            if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
+                SubscriptionAutoUpdateScheduler.scheduleRetry(applicationContext, batchId)
+                Result.success()
+            } else {
+                finishBatch(applicationContext, batchDao, batchId)
+                Result.success()
+            }
+        } finally {
+            progressJob.cancel()
         }
     }
 }
@@ -140,8 +181,8 @@ class SubscriptionAutoUpdateRetryWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val batchId = inputData.getString(KEY_BATCH_ID) ?: return Result.success()
+    override suspend fun doWork(): Result = coroutineScope {
+        val batchId = inputData.getString(KEY_BATCH_ID) ?: return@coroutineScope Result.success()
         val database = AppDatabase.getInstance(applicationContext)
         val batchDao = database.subscriptionAutoUpdateDao()
         val manager = SubscriptionManager(
@@ -149,45 +190,80 @@ class SubscriptionAutoUpdateRetryWorker(
             BlockListManager(database.blockRuleDao()),
             AllowListManager(database.allowRuleDao())
         )
+        val pendingItems = batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY)
+        val notifier = RuleUpdateNotifier(applicationContext, AUTO_UPDATE_RETRY_PROGRESS_NOTIFICATION_ID)
+        var currentName = ""
+        var currentIndex = 0
+        setForeground(notifier.foregroundInfo("正在重试自动更新规则订阅"))
+        val progressJob = launch {
+            manager.importProgress.collect { (current, total) ->
+                if (current >= 0) {
+                    setProgress(
+                        automaticProgressData(
+                            pendingItems.getOrNull(currentIndex - 1)?.subscriptionId ?: -1,
+                            current,
+                            total
+                        )
+                    )
+                    notifier.showProgress(
+                        "正在导入规则订阅",
+                        importProgressDetail(currentName, currentIndex, pendingItems.size, current, total),
+                        current,
+                        total
+                    )
+                }
+            }
+        }
         var changed = false
         var aborted = false
-        val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
-            for (item in batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY)) {
-                if (shouldStop()) {
-                    aborted = true
-                    break
+        try {
+            val ran = SubscriptionUpdateCoordinator.runAutomatic { shouldStop ->
+                for ((index, item) in pendingItems.withIndex()) {
+                    if (shouldStop()) {
+                        aborted = true
+                        break
+                    }
+                    val subscription = database.subscriptionDao().byId(item.subscriptionId)
+                    if (subscription == null || !subscription.enabled) {
+                        batchDao.deleteItem(batchId, item.subscriptionId)
+                        continue
+                    }
+                    currentName = subscription.name
+                    currentIndex = index + 1
+                    setProgress(automaticProgressData(subscription.id, -1, 0))
+                    notifier.showProgress(
+                        "正在重试自动更新规则订阅",
+                        progressDetail(currentName, currentIndex, pendingItems.size, -1, 0)
+                    )
+                    val outcome = manager.updateSubscription(item.subscriptionId)
+                    val finalOutcome = if (
+                        outcome is SubscriptionUpdateOutcome.Failed &&
+                        outcome.retryable &&
+                        runAttemptCount >= MAX_RETRY_ATTEMPTS - 1
+                    ) {
+                        outcome.copy(retryable = false)
+                    } else {
+                        outcome
+                    }
+                    changed = recordOutcome(batchDao, batchId, item.subscriptionId, finalOutcome) || changed
                 }
-                val subscription = database.subscriptionDao().byId(item.subscriptionId)
-                if (subscription == null || !subscription.enabled) {
-                    batchDao.deleteItem(batchId, item.subscriptionId)
-                    continue
-                }
-                val outcome = manager.updateSubscription(item.subscriptionId)
-                val finalOutcome = if (
-                    outcome is SubscriptionUpdateOutcome.Failed &&
-                    outcome.retryable &&
-                    runAttemptCount >= MAX_RETRY_ATTEMPTS - 1
-                ) {
-                    outcome.copy(retryable = false)
-                } else {
-                    outcome
-                }
-                changed = recordOutcome(batchDao, batchId, item.subscriptionId, finalOutcome) || changed
+                if (shouldStop()) aborted = true
             }
-            if (shouldStop()) aborted = true
-        }
-        if (!ran || aborted) {
-            batchDao.deleteBatch(batchId)
-            return Result.success()
-        }
-        if (changed) {
-            RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
-        }
-        return if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
-            Result.retry()
-        } else {
-            finishBatch(applicationContext, batchDao, batchId)
-            Result.success()
+            if (!ran || aborted) {
+                batchDao.deleteBatch(batchId)
+                return@coroutineScope Result.success()
+            }
+            if (changed) {
+                RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "subscriptions_auto_updated")
+            }
+            if (batchDao.byStatus(batchId, SubscriptionAutoUpdateItemStatus.PENDING_RETRY).isNotEmpty()) {
+                Result.retry()
+            } else {
+                finishBatch(applicationContext, batchDao, batchId)
+                Result.success()
+            }
+        } finally {
+            progressJob.cancel()
         }
     }
 
@@ -196,6 +272,54 @@ class SubscriptionAutoUpdateRetryWorker(
         private const val MAX_RETRY_ATTEMPTS = 3
     }
 }
+
+private fun progressDetail(
+    subscriptionName: String,
+    subscriptionIndex: Int,
+    subscriptionTotal: Int,
+    currentRules: Int,
+    totalRules: Int
+): String {
+    val batch = if (subscriptionTotal > 0 && subscriptionIndex > 0) {
+        "第 $subscriptionIndex / $subscriptionTotal 个"
+    } else {
+        "正在准备"
+    }
+    val name = subscriptionName.takeIf { it.isNotBlank() }?.let { "：$it" }.orEmpty()
+    val rules = if (totalRules > 0 && currentRules >= 0) {
+        "，规则 $currentRules / $totalRules"
+    } else {
+        "，正在下载"
+    }
+    return "$batch$name$rules"
+}
+
+private fun importProgressDetail(
+    subscriptionName: String,
+    subscriptionIndex: Int,
+    subscriptionTotal: Int,
+    currentRules: Int,
+    totalRules: Int
+): String {
+    val batch = if (subscriptionTotal > 0 && subscriptionIndex > 0) {
+        "第 $subscriptionIndex / $subscriptionTotal 个"
+    } else null
+    return listOfNotNull(
+        subscriptionName.takeIf { it.isNotBlank() },
+        batch,
+        "正在导入规则... $currentRules / $totalRules"
+    ).joinToString("，")
+}
+
+private fun automaticProgressData(subscriptionId: Long, current: Int, total: Int) = workDataOf(
+    RuleOperationScheduler.KEY_TYPE to RuleOperationType.UPDATE_SUBSCRIPTION.name,
+    RuleOperationScheduler.KEY_SUBSCRIPTION_ID to subscriptionId,
+    RuleOperationScheduler.KEY_CURRENT to current,
+    RuleOperationScheduler.KEY_TOTAL to total
+)
+
+private const val AUTO_UPDATE_PROGRESS_NOTIFICATION_ID = 4201
+private const val AUTO_UPDATE_RETRY_PROGRESS_NOTIFICATION_ID = 4202
 
 private suspend fun recordOutcome(
     dao: com.haoze.dnssr.data.dao.SubscriptionAutoUpdateDao,
