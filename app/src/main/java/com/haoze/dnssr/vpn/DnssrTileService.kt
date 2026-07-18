@@ -3,10 +3,14 @@ package com.haoze.dnssr.vpn
 import android.app.PendingIntent
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import androidx.core.content.ContextCompat
 import com.haoze.dnssr.MainActivity
+import com.haoze.dnssr.ui.PermissionDisclosureSettings
 
 class DnssrTileService : TileService() {
 
@@ -23,7 +27,12 @@ class DnssrTileService : TileService() {
             return
         }
 
-        openMainForVpnConnection()
+        if (PermissionDisclosureSettings.wasVpnGranted(this) && !hasActiveVpn()) {
+            ContextCompat.startForegroundService(this, DnsVpnService.startIntent(this))
+            updateTile(running = true)
+        } else {
+            openMainForVpnConnection()
+        }
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
@@ -52,6 +61,14 @@ class DnssrTileService : TileService() {
                 subtitle = if (running) "已开启" else "已关闭"
             }
             updateTile()
+        }
+    }
+
+    private fun hasActiveVpn(): Boolean {
+        val connectivityManager = getSystemService(ConnectivityManager::class.java) ?: return false
+        return connectivityManager.allNetworks.any { network ->
+            connectivityManager.getNetworkCapabilities(network)
+                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
         }
     }
 }

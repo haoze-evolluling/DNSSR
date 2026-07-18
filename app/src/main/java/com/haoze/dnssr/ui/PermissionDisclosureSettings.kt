@@ -74,4 +74,7 @@ object PermissionDisclosureSettings {
             preferences.edit().putBoolean(KEY_VPN_WAS_GRANTED, true).apply()
         }
     }
+
+    fun wasVpnGranted(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_VPN_WAS_GRANTED, false)
 }

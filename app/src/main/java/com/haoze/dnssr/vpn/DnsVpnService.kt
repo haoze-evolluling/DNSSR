@@ -23,6 +23,7 @@ import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.ui.AppSettings
 import com.haoze.dnssr.ui.DnsResolutionMode
 import com.haoze.dnssr.ui.DnsLogMode
+import com.haoze.dnssr.ui.PermissionDisclosureSettings
 import com.haoze.dnssr.ui.RaceModeStrategy
 import com.haoze.dnssr.vpn.cache.DnsCacheController
 import com.haoze.dnssr.vpn.cache.DnsCachePolicy
@@ -222,6 +223,7 @@ class DnsVpnService : VpnService() {
 
         vpnInterface = builder.establish() ?: run {
             Log.e(TAG, "Failed to establish VPN")
+            PermissionDisclosureSettings.updateVpnGrant(this, false)
             setRunningFlag(this, false)
             sendStatusBroadcast(false)
             stopSelf()
@@ -492,6 +494,7 @@ class DnsVpnService : VpnService() {
     override fun onRevoke() {
         super.onRevoke()
         Log.w(TAG, "VPN permission revoked, stopping service")
+        PermissionDisclosureSettings.updateVpnGrant(this, false)
         wasStopped = false
         stopVpn()
     }
