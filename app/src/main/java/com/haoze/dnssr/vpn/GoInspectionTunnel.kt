@@ -13,6 +13,7 @@ import tunnel.AppUidResolver
 import tunnel.DomainChecker
 import tunnel.Engine
 import tunnel.HttpLogCallback
+import tunnel.LogCallback
 import tunnel.SocketProtector
 import tunnel.UIDResolver
 import java.io.File
@@ -33,6 +34,7 @@ class GoInspectionTunnel(
     private val policy: HttpDomainPolicy,
     private val allowListManager: AllowListManager,
     private val blockListManager: BlockListManager,
+    private val dnsLogger: DnsLogger,
     private val httpRequestLogger: HttpRequestLogger,
     private val filterHttp3: Boolean
 ) {
@@ -80,6 +82,26 @@ class GoInspectionTunnel(
                 is HttpDomainDecision.Allow -> if (allowListManager.findMatch(domain) != null) 0L else -1L
             }
         })
+        engine.setLogCallback(object : LogCallback {
+            override fun onDNSQuery(
+                domain: String,
+                blocked: Boolean,
+                queryType: Long,
+                responseTimeMs: Long,
+                appName: String,
+                resolvedIP: String,
+                blockedBy: String
+            ) {
+                scope.launch {
+                    dnsLogger.log(
+                        queryName = domain,
+                        queryType = queryType.toInt(),
+                        result = if (blocked) LogResult.BLOCKED else LogResult.PASSED,
+                        message = buildDnsLogMessage(appName, resolvedIP, blockedBy, responseTimeMs)
+                    )
+                }
+            }
+        })
         engine.setHttpLogCallback(object : HttpLogCallback {
             override fun onHttpEvent(
                 packageName: String,
@@ -123,6 +145,18 @@ class GoInspectionTunnel(
         const val TAG = "GoInspectionTunnel"
     }
 }
+
+private fun buildDnsLogMessage(
+    appName: String,
+    resolvedIP: String,
+    blockedBy: String,
+    responseTimeMs: Long
+): String? = listOfNotNull(
+    appName.takeIf { it.isNotBlank() }?.let { "app=$it" },
+    resolvedIP.takeIf { it.isNotBlank() }?.let { "resolved=$it" },
+    blockedBy.takeIf { it.isNotBlank() }?.let { "blocked_by=$it" },
+    responseTimeMs.takeIf { it > 0 }?.let { "elapsed=${it}ms" }
+).joinToString(", ").takeIf { it.isNotEmpty() }
 
 private fun String.toHttpRequestOutcome(): HttpRequestOutcome = when (this) {
     "blocked" -> HttpRequestOutcome.BLOCKED

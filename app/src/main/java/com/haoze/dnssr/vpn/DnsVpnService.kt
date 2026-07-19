@@ -244,6 +244,7 @@ class DnsVpnService : VpnService() {
                 policy = HttpDomainPolicy(allowListManager, blockListManager),
                 allowListManager = allowListManager,
                 blockListManager = blockListManager,
+                dnsLogger = dnsLogger,
                 httpRequestLogger = httpRequestLogger,
                 filterHttp3 = AppSettings.isHttp3InspectionEnabled(this)
             )
