@@ -4,6 +4,8 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -224,6 +226,11 @@ func newFullTunnelUdpHandler(engine *Engine, filter *MitmFilter, uidr UIDResolve
 	relay := newProtectedUdpHandler(uidr, protectFn)
 	return func(conn adapter.UDPConn) {
 		flow := udpFlowID(conn)
+		uid := resolveFlowUID(uidr, ProtocolUDP, flow)
+		if engine.isUIDBlocked(uid) {
+			_ = conn.Close()
+			return
+		}
 		// DNS → answer locally (adblock + resolve).
 		if flow.serverPort == 53 {
 			handleDNSOverUDP(conn, engine)
@@ -235,7 +242,6 @@ func newFullTunnelUdpHandler(engine *Engine, filter *MitmFilter, uidr UIDResolve
 		// relay QUIC so pages load fully. DNS-level blocking still applies
 		// either way.
 		if engine.quicDrop.Load() && flow.serverPort == 443 && filter != nil && filter.HasAllowedUIDs() {
-			uid := resolveFlowUID(uidr, ProtocolUDP, flow)
 			if uid != UIDUnknown && filter.IsUIDAllowed(uid) {
 				_ = conn.Close()
 				return
@@ -260,6 +266,9 @@ func newFullPassthroughTcpHandler(engine *Engine, uidr UIDResolver, protectFn fu
 	return func(conn adapter.TCPConn) {
 		defer conn.Close()
 		flow := tcpFlowID(conn)
+		if engine.isUIDBlocked(resolveFlowUID(uidr, ProtocolTCP, flow)) {
+			return
+		}
 		engine.logConnection(flow, ProtocolTCP)
 		relayDirectFromFlow(conn, flow, engine, protectFn)
 	}
@@ -278,6 +287,31 @@ func (e *Engine) SetFilterHttp3(enabled bool) {
 // DNS-over-TLS. Non-selected and UID-unknown flows are always passed through.
 func (e *Engine) SetBlockEncryptedDns(enabled bool) {
 	e.blockEncryptedDNS.Store(enabled)
+}
+
+// SetBlockedUIDs replaces the Android UIDs whose traffic must be dropped.
+// Unknown UIDs are always allowed so a resolver failure cannot block another app.
+func (e *Engine) SetBlockedUIDs(uidsCsv string) {
+	next := make(map[int]struct{})
+	for _, raw := range strings.Split(uidsCsv, ",") {
+		uid, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err == nil && uid > 0 {
+			next[uid] = struct{}{}
+		}
+	}
+	e.blockedUIDsMu.Lock()
+	e.blockedUIDs = next
+	e.blockedUIDsMu.Unlock()
+}
+
+func (e *Engine) isUIDBlocked(uid int) bool {
+	if uid == UIDUnknown {
+		return false
+	}
+	e.blockedUIDsMu.RLock()
+	_, blocked := e.blockedUIDs[uid]
+	e.blockedUIDsMu.RUnlock()
+	return blocked
 }
 
 // dnsUDPIdleTimeout bounds how long a DNS UDP flow is kept open waiting

@@ -141,6 +141,8 @@ type Engine struct {
 	// ad-blocking still applies. Toggled from the UI via SetFilterHttp3.
 	quicDrop atomic.Bool
 	blockEncryptedDNS atomic.Bool
+	blockedUIDsMu     sync.RWMutex
+	blockedUIDs       map[int]struct{}
 
 	// Stack-mode MITM state (Phase D). When both are non-nil, the stack
 	// uses the MITM TCP handler; otherwise the Phase C direct-dial
@@ -188,6 +190,7 @@ func NewEngine() *Engine {
 		safeSearch:     NewSafeSearch(),
 		responseType:   ResponseCustomIP,
 		router:         router,
+		blockedUIDs:    make(map[int]struct{}),
 	}
 	e.interceptor = NewDnsInterceptor(e, router)
 	return e

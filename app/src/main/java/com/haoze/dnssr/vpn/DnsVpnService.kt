@@ -197,6 +197,12 @@ class DnsVpnService : VpnService() {
             AppSettings.isHttpInspectionEnabled(this) &&
             AppSettings.getHttpInspectionAppPackages(this).isNotEmpty() &&
             !inspectionFallbackActive
+        val blockedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            AppSettings.getBlockedAppPackages(this)
+        } else {
+            emptySet()
+        }
+        val fullTunnelRequested = inspectionRequested || blockedPackages.isNotEmpty()
         activeInspectionPackages = if (inspectionRequested) {
             AppSettings.getHttpInspectionAppPackages(this)
         } else {
@@ -212,7 +218,7 @@ class DnsVpnService : VpnService() {
             .allowFamily(android.system.OsConstants.AF_INET6)
             .setMtu(1500)
 
-        if (inspectionRequested) {
+        if (fullTunnelRequested) {
             builder.addRoute("0.0.0.0", 0)
             builder.addRoute("::", 0)
         } else {
@@ -242,7 +248,7 @@ class DnsVpnService : VpnService() {
         }
         configureLegacyBlockingMode(vpnInterface!!)
 
-        if (inspectionRequested) {
+        if (fullTunnelRequested) {
             val tunnel = GoInspectionTunnel(
                 context = this,
                 vpnService = this,
@@ -253,7 +259,9 @@ class DnsVpnService : VpnService() {
                     activeBlockResponseMode,
                     activeDynamicBlockResponseConfig
                 ),
+                inspectionEnabled = inspectionRequested,
                 selectedPackages = activeInspectionPackages,
+                blockedPackages = blockedPackages,
                 policy = domainPolicy,
                 rewriteRuleManager = rewriteRuleManager,
                 dnsLogger = dnsLogger,
@@ -262,9 +270,15 @@ class DnsVpnService : VpnService() {
                 blockEncryptedDns = AppSettings.isEncryptedDnsBlockingEnabled(this)
             )
             if (!tunnel.start(vpnInterface!!.fd)) {
-                Log.e(TAG, "Go inspection tunnel failed to start; falling back to DNS-only mode")
+                Log.e(TAG, "Go full tunnel failed to start")
                 runCatching { vpnInterface?.close() }
                 vpnInterface = null
+                if (blockedPackages.isNotEmpty()) {
+                    setRunningFlag(this, false)
+                    sendStatusBroadcast(false)
+                    stopSelf()
+                    return
+                }
                 inspectionFallbackActive = true
                 startVpn(intent)
                 return
@@ -277,7 +291,7 @@ class DnsVpnService : VpnService() {
         stopMonitorService()
         sendStatusBroadcast(true)
         // The Go full-TUN engine owns this descriptor while inspection is active.
-        if (!inspectionRequested) {
+        if (!fullTunnelRequested) {
             readJob = serviceScope.launch { packetLoop() }
         }
     }

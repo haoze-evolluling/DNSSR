@@ -1,0 +1,101 @@
+package com.haoze.dnssr.ui
+
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.haoze.dnssr.ui.components.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.util.Locale
+
+@Composable
+fun BlockedAppsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        SettingsScaffold(title = "禁止联网应用", onBack = onBack) { padding ->
+            SettingsInfoText("此功能需要 Android 10 或更高版本。", Modifier.padding(padding).padding(top = 16.dp))
+        }
+        return
+    }
+    var selectedPackages by remember { mutableStateOf(AppSettings.getBlockedAppPackages(context)) }
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(AppListFilter.USER) }
+    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
+    val access = rememberAppListAccessState { loadInstalledApps(context) }
+    AppListDisclosureDialog(access)
+    val loadedApps = access.apps
+    if (loadedApps == null) {
+        SettingsScaffold(title = "禁止联网应用", onBack = onBack) { AppListLoadingContent(Modifier.padding(it)) }
+        return
+    }
+    if (access.unavailable) {
+        SettingsScaffold(title = "禁止联网应用", onBack = onBack) {
+            AppListUnavailableContent(Modifier.padding(it), access.retry)
+        }
+        return
+    }
+    val selectableApps = remember(loadedApps, context.packageName) { loadedApps.filter { it.packageName != context.packageName } }
+    var debouncedQuery by remember { mutableStateOf("") }
+    var visibleApps by remember { mutableStateOf(emptyList<InstalledApp>()) }
+    LaunchedEffect(query) { delay(250); debouncedQuery = query }
+    LaunchedEffect(selectableApps, filter, sort, debouncedQuery, selectedPackages) {
+        val normalized = debouncedQuery.trim().lowercase(Locale.ROOT)
+        visibleApps = withContext(Dispatchers.Default) {
+            selectableApps.filter { app ->
+                (filter == AppListFilter.ALL || filter == AppListFilter.USER && !app.isSystem ||
+                    filter == AppListFilter.SYSTEM && app.isSystem ||
+                    filter == AppListFilter.SELECTED && app.packageName in selectedPackages) &&
+                    (normalized.isEmpty() || app.normalizedLabel.contains(normalized) || app.normalizedPackageName.contains(normalized))
+            }.sortedWith(sort.comparator)
+        }
+    }
+    SettingsScaffold(title = "禁止联网应用", onBack = onBack, actions = {
+        val packageNames = selectableApps.mapTo(mutableSetOf()) { it.packageName }
+        AppListOverflowMenu(filter, sort,
+            onSelectAll = { selectedPackages += packageNames },
+            onClear = { selectedPackages = emptySet() },
+            onInvert = { selectedPackages = selectedPackages - packageNames + (packageNames - selectedPackages) },
+            onFilterChange = { filter = it }, onSortChange = { sort = it })
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingsInfoText("服务开启时，所选应用的全部网络连接将被阻止。共享同一 UID 的应用会一并受影响。", Modifier.padding(top = 8.dp))
+            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), label = { Text("搜索应用或包名") }, singleLine = true)
+            SettingsInfoText("已显示 ${visibleApps.size} 个应用，已选择 ${selectedPackages.size} 个")
+            Card(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), SettingsCornerShape,
+                CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer)) {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    itemsIndexed(visibleApps, key = { _, app -> app.packageName }) { index, app ->
+                        InstalledAppCheckboxItem(app, app.packageName in selectedPackages) { checked ->
+                            selectedPackages = if (checked) selectedPackages + app.packageName else selectedPackages - app.packageName
+                        }
+                        if (index != visibleApps.lastIndex) SettingsDivider()
+                    }
+                }
+            }
+            Button(onClick = {
+                AppSettings.setBlockedAppPackages(context, selectedPackages)
+                AppSettings.setExcludedAppPackages(context, AppSettings.getExcludedAppPackages(context) - selectedPackages)
+                AppSettings.setHttpInspectionAppPackages(context, AppSettings.getHttpInspectionAppPackages(context) - selectedPackages)
+                RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
+                Toast.makeText(context, if (com.haoze.dnssr.vpn.DnsVpnService.isRunning(context)) "已保存，DNS VPN 正在重连" else "已保存，下次启动 DNS VPN 时生效", Toast.LENGTH_SHORT).show()
+                onBack()
+            }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { Text("保存") }
+        }
+    }
+}

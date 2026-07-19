@@ -48,6 +48,7 @@ object Routes {
     const val REWRITE_RULE_LIST = "rewrite_rule_list"
     const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
     const val EXCLUDED_APPS = "excluded_apps"
+    const val BLOCKED_APPS = "blocked_apps"
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
     const val CONFIG_IMPORT_EXPORT = "config_import_export"
@@ -310,6 +311,9 @@ fun AppNavHost(
                 ruleKind = ManagedRuleKind.ALLOW,
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
+        }
+        composable(ScreenDestinations.blockedApps.route) {
+            BlockedAppsScreen(onBack = { navController.popWhenResumed() })
         }
         composable(ScreenDestinations.rewriteRuleList.route) {
             RuleListScreen(onBack = { navController.popWhenResumed() }, ruleKind = ManagedRuleKind.REWRITE, onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged)

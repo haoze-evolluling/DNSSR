@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FlipToBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Http
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -188,6 +189,7 @@ object ScreenDestinations {
     val logRetentionSettings = main(Routes.LOG_RETENTION_SETTINGS, "日志模式", "选择 DNS 请求日志的记录范围", Icons.Filled.History, SettingsSection.PERFORMANCE)
     val foregroundBackgroundSettings = main(Routes.FOREGROUND_BACKGROUND_SETTINGS, "前后台行为", "后台隐藏、通知常驻", Icons.Filled.FlipToBack, SettingsSection.BEHAVIOR)
     val excludedApps = main(Routes.EXCLUDED_APPS, "排除应用", "指定使用系统 DNS 的应用", Icons.Filled.Apps, SettingsSection.BEHAVIOR)
+    val blockedApps = main(Routes.BLOCKED_APPS, "禁止联网应用", "阻止所选应用连接网络（Android 10+）", Icons.Filled.WifiOff, SettingsSection.BEHAVIOR, "断网", "防火墙")
     val httpInspectionSettings = main(Routes.HTTP_INSPECTION_SETTINGS, "HTTPS 过滤 (Beta)", "按应用检查 HTTP(S) 请求并应用现有域名规则", Icons.Filled.Http, SettingsSection.BEHAVIOR, "HTTPS", "HTTP3", "QUIC")
     val homeProviderVisibility = main(Routes.HOME_PROVIDER_VISIBILITY, "服务显示", "配置首页解析服务列表中显示的协议和服务商", Icons.Filled.Visibility, SettingsSection.APPEARANCE)
     val appearanceSettings = main(Routes.APPEARANCE_SETTINGS, "外观设置", "设置应用的显示外观", Icons.Filled.Palette, SettingsSection.APPEARANCE)
@@ -225,7 +227,7 @@ object ScreenDestinations {
     val legacyLogPageSettings = child(Routes.LEGACY_LOG_PAGE_SETTINGS, "旧版日志页面", "使用旧版日志页面布局", Icons.Filled.Palette, appearanceSettings)
 
     val all = listOf(providerManagement, bootstrapSettings, raceModeLatency, cacheSettings, raceModeProviders, logRetentionSettings,
-        foregroundBackgroundSettings, excludedApps, httpInspectionSettings, homeProviderVisibility, appearanceSettings,
+        foregroundBackgroundSettings, excludedApps, blockedApps, httpInspectionSettings, homeProviderVisibility, appearanceSettings,
         configTransfer, ruleManagement, dataCleanup, about, sponsor, sponsorList, coBuilderList, configImportExport,
         ruleExport, blockResponseSettings, subscriptionManagement, subscriptionAutoUpdate, ruleList, allowRuleList,
         rewriteRuleList, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps, caCertificateGuide,

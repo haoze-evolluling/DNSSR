@@ -100,6 +100,7 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
             Button(onClick = {
                 AppSettings.setHttpInspectionAppPackages(context, selectedPackages)
                 AppSettings.setExcludedAppPackages(context, AppSettings.getExcludedAppPackages(context) - selectedPackages)
+                AppSettings.setBlockedAppPackages(context, AppSettings.getBlockedAppPackages(context) - selectedPackages)
                 RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
                 Toast.makeText(context, "已保存过滤应用", Toast.LENGTH_SHORT).show()
                 onBack()

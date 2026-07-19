@@ -65,8 +65,9 @@ fun ConfigImportExportScreen(
     var bootstrapIps by remember { mutableStateOf(true) }
     var subscriptions by remember { mutableStateOf(true) }
     var excludedApps by remember { mutableStateOf(true) }
+    var blockedApps by remember { mutableStateOf(true) }
     var showImportOverlay by remember { mutableStateOf(false) }
-    val selection = ConfigExportSelection(providers, bootstrapIps, subscriptions, excludedApps)
+    val selection = ConfigExportSelection(providers, bootstrapIps, subscriptions, excludedApps, blockedApps)
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -103,13 +104,15 @@ fun ConfigImportExportScreen(
                 SettingsCheckboxItem("网络规则订阅", subscriptions, { subscriptions = it }, subtitle = "订阅名称和链接", enabled = !busy)
                 SettingsDivider()
                 SettingsCheckboxItem("排除应用", excludedApps, { excludedApps = it }, subtitle = "使用系统 DNS 的应用包名", enabled = !busy)
+                SettingsDivider()
+                SettingsCheckboxItem("禁止联网应用", blockedApps, { blockedApps = it }, subtitle = "服务运行时禁止联网的应用包名", enabled = !busy)
             }
             SettingsGroupTitle("配置文件")
             SettingsGroup {
                 SettingsTextItem(
                     title = "导出配置",
                     subtitle = "将勾选内容保存为 JSON 配置文件",
-                    enabled = !busy && (providers || bootstrapIps || subscriptions || excludedApps),
+                    enabled = !busy && (providers || bootstrapIps || subscriptions || excludedApps || blockedApps),
                     onClick = {
                         val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                         exportLauncher.launch("DNSSR-config-$date.json")

@@ -65,6 +65,9 @@ func newMitmTcpHandler(
 		flow := tcpFlowID(conn)
 		uid := resolveFlowUID(uidr, ProtocolTCP, flow)
 		eng, _ := blocker.(*Engine)
+		if eng != nil && eng.isUIDBlocked(uid) {
+			return
+		}
 
 		if flow.serverIP.IsUnspecified() {
 			return

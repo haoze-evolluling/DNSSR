@@ -33,7 +33,9 @@ class GoInspectionTunnel(
     private val vpnService: DnsVpnService,
     private val scope: CoroutineScope,
     private var dnsConfig: HttpsDnsConfigSnapshot,
+    private val inspectionEnabled: Boolean,
     private val selectedPackages: Set<String>,
+    private val blockedPackages: Set<String>,
     private val policy: DomainPolicy,
     private val rewriteRuleManager: RewriteRuleManager,
     private val dnsLogger: DnsLogger,
@@ -145,10 +147,11 @@ class GoInspectionTunnel(
         engine.setUIDResolver(ConnectionOwnerUidResolver(context))
         engine.setAppUidResolver(AppPackageResolver(context))
         engine.setUseTcpStack(true)
-        engine.startStackMitm(GoInspectionCaManager.certificateDirectory(context).absolutePath)
-        engine.setMitmAllowedUIDs(selectedPackages.mapNotNull { packageName ->
-            runCatching { context.packageManager.getPackageUid(packageName, 0) }.getOrNull()
-        }.joinToString(","))
+        engine.setBlockedUIDs(blockedPackages.mapNotNull(::packageUid).joinToString(","))
+        if (inspectionEnabled) {
+            engine.startStackMitm(GoInspectionCaManager.certificateDirectory(context).absolutePath)
+            engine.setMitmAllowedUIDs(selectedPackages.mapNotNull(::packageUid).joinToString(","))
+        }
         engine.setFilterHttp3(filterHttp3)
         engine.setBlockEncryptedDns(blockEncryptedDns)
         context.assets.open("https_passthrough.txt").bufferedReader().use {
@@ -196,6 +199,9 @@ class GoInspectionTunnel(
             BlockResponseMode.ZERO_ADDRESS -> "CUSTOM_IP"
         }
 
+    private fun packageUid(packageName: String): Int? =
+        runCatching { context.packageManager.getPackageUid(packageName, 0) }.getOrNull()
+
     private companion object {
         const val TAG = "GoInspectionTunnel"
     }
@@ -222,6 +228,7 @@ data class HttpsDnsConfigSnapshot private constructor(
             return HttpsDnsConfigSnapshot(selected, mode, blockResponseMode, dynamicBlockResponseConfig)
         }
     }
+
 }
 
 private fun buildDnsLogMessage(

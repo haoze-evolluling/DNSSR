@@ -17,14 +17,16 @@ data class ConfigExportSelection(
     val providers: Boolean,
     val bootstrapIps: Boolean,
     val subscriptions: Boolean,
-    val excludedApps: Boolean
+    val excludedApps: Boolean,
+    val blockedApps: Boolean
 )
 
 data class ConfigImportResult(
     val added: Int,
     val skipped: Int,
     val failed: Int,
-    val excludedAppsUpdated: Boolean
+    val excludedAppsUpdated: Boolean,
+    val blockedAppsUpdated: Boolean
 ) {
     fun message(): String = "导入完成：新增 $added 项，跳过 $skipped 项，失败 $failed 项"
 }
@@ -85,6 +87,11 @@ class ConfigTransferManager(private val context: Context) {
                 AppSettings.getExcludedAppPackages(context).forEach(::put)
             })
         }
+        if (selection.blockedApps) {
+            root.put("blockedApps", JSONArray().apply {
+                AppSettings.getBlockedAppPackages(context).forEach(::put)
+            })
+        }
         return root.toString(2)
     }
 
@@ -132,8 +139,10 @@ class ConfigTransferManager(private val context: Context) {
         var skipped = 0
         var failed = 0
         var excludedAppsUpdated = false
+        var blockedAppsUpdated = false
         var processed = 0
-        val total = config.providers.size + config.bootstrapIps.size + config.subscriptions.size + config.excludedApps.size
+        val total = config.providers.size + config.bootstrapIps.size + config.subscriptions.size +
+            config.excludedApps.size + config.blockedApps.size
 
         fun report(item: String) {
             onProgress(ConfigImportProgress(processed, total, item))
@@ -207,12 +216,31 @@ class ConfigTransferManager(private val context: Context) {
             val existingPackages = AppSettings.getExcludedAppPackages(context)
             val newPackages = validPackages - existingPackages
             AppSettings.setExcludedAppPackages(context, existingPackages + validPackages)
+            AppSettings.setHttpInspectionAppPackages(context, AppSettings.getHttpInspectionAppPackages(context) - validPackages)
+            AppSettings.setBlockedAppPackages(context, AppSettings.getBlockedAppPackages(context) - validPackages)
             excludedAppsUpdated = newPackages.isNotEmpty()
             added += newPackages.size
             skipped += validPackages.size - newPackages.size + invalidCount
             config.excludedApps.forEach { packageName -> complete("排除应用：$packageName") }
         }
-        return ConfigImportResult(added, skipped, failed, excludedAppsUpdated)
+        if (config.blockedApps.isNotEmpty()) {
+            val installedPackages = context.packageManager.getInstalledApplications(0)
+                .mapTo(mutableSetOf()) { it.packageName }
+            val validPackages = config.blockedApps
+                .filter { it in installedPackages && it != context.packageName }
+                .toSet()
+            val invalidCount = config.blockedApps.size - validPackages.size
+            val existingPackages = AppSettings.getBlockedAppPackages(context)
+            val newPackages = validPackages - existingPackages
+            AppSettings.setBlockedAppPackages(context, existingPackages + validPackages)
+            AppSettings.setExcludedAppPackages(context, AppSettings.getExcludedAppPackages(context) - validPackages)
+            AppSettings.setHttpInspectionAppPackages(context, AppSettings.getHttpInspectionAppPackages(context) - validPackages)
+            blockedAppsUpdated = newPackages.isNotEmpty()
+            added += newPackages.size
+            skipped += validPackages.size - newPackages.size + invalidCount
+            config.blockedApps.forEach { packageName -> complete("禁止联网应用：$packageName") }
+        }
+        return ConfigImportResult(added, skipped, failed, excludedAppsUpdated, blockedAppsUpdated)
     }
 
     private fun parseAndValidate(content: String): TransferConfig {
@@ -262,7 +290,10 @@ class ConfigTransferManager(private val context: Context) {
         val excludedApps = root.optionalArray("excludedApps").mapStrings()
             .filter { it.isNotBlank() }
             .toSet()
-        return TransferConfig(providers, bootstrapIps, subscriptions, excludedApps)
+        val blockedApps = root.optionalArray("blockedApps").mapStrings()
+            .filter { it.isNotBlank() }
+            .toSet()
+        return TransferConfig(providers, bootstrapIps, subscriptions, excludedApps, blockedApps)
     }
 
     private fun providerKey(provider: DnsProvider): String = providerKey(
@@ -304,7 +335,8 @@ class ConfigTransferManager(private val context: Context) {
         val providers: List<ImportedProvider>,
         val bootstrapIps: List<ImportedBootstrap>,
         val subscriptions: List<ImportedSubscription>,
-        val excludedApps: Set<String>
+        val excludedApps: Set<String>,
+        val blockedApps: Set<String>
     )
 
     private data class ImportedProvider(
@@ -319,8 +351,8 @@ class ConfigTransferManager(private val context: Context) {
     private data class ImportedSubscription(val name: String, val url: String)
 
     companion object {
-        private const val FORMAT_VERSION = 2
-        private val SUPPORTED_FORMAT_VERSIONS = setOf(1, FORMAT_VERSION)
+        private const val FORMAT_VERSION = 3
+        private val SUPPORTED_FORMAT_VERSIONS = setOf(1, 2, FORMAT_VERSION)
     }
 }
 

@@ -165,6 +165,7 @@ object AppSettings {
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
     private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
     private const val KEY_EXCLUDED_APPS_FILTER = "excluded_apps_filter"
+    private const val KEY_BLOCKED_APP_PACKAGES = "blocked_app_packages"
     private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
     private const val KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS = "settings_guide_acknowledged_ids"
@@ -419,6 +420,24 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_HTTP3_INSPECTION_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getBlockedAppPackages(context: Context): Set<String> {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_BLOCKED_APP_PACKAGES, emptySet())
+            .orEmpty()
+            .filter { it.isNotBlank() && it != context.packageName }
+            .toSet()
+    }
+
+    fun setBlockedAppPackages(context: Context, packageNames: Set<String>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet(
+                KEY_BLOCKED_APP_PACKAGES,
+                packageNames.filter { it.isNotBlank() && it != context.packageName }.toSet()
+            )
             .apply()
     }
 
