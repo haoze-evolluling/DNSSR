@@ -244,6 +244,7 @@ class DnsVpnService : VpnService() {
                 policy = HttpDomainPolicy(allowListManager, blockListManager),
                 allowListManager = allowListManager,
                 blockListManager = blockListManager,
+                rewriteRuleManager = rewriteRuleManager,
                 dnsLogger = dnsLogger,
                 httpRequestLogger = httpRequestLogger,
                 filterHttp3 = AppSettings.isHttp3InspectionEnabled(this)
@@ -344,6 +345,9 @@ class DnsVpnService : VpnService() {
                     .onFailure { Log.w(TAG, "Failed to refresh block list cache", it) }
                 runCatching { allowListManager.refreshCache() }
                     .onFailure { Log.w(TAG, "Failed to refresh allow list cache", it) }
+                runCatching { rewriteRuleManager.refreshCache() }
+                    .onSuccess { goInspectionTunnel?.updateRewriteRules() }
+                    .onFailure { Log.w(TAG, "Failed to refresh rewrite rule cache", it) }
             }
         }
     }

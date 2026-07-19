@@ -19,6 +19,7 @@ import tunnel.UIDResolver
 import java.io.File
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import org.json.JSONObject
 
 /**
  * Owns the GPL-3.0 Go full-TUN data plane used only while HTTP inspection is
@@ -34,6 +35,7 @@ class GoInspectionTunnel(
     private val policy: HttpDomainPolicy,
     private val allowListManager: AllowListManager,
     private val blockListManager: BlockListManager,
+    private val rewriteRuleManager: RewriteRuleManager,
     private val dnsLogger: DnsLogger,
     private val httpRequestLogger: HttpRequestLogger,
     private val filterHttp3: Boolean
@@ -63,6 +65,10 @@ class GoInspectionTunnel(
             .onFailure { Log.w(TAG, "Unable to release Go inspection TUN", it) }
     }
 
+    fun updateRewriteRules() {
+        engine.setRewriteRules(JSONObject(rewriteRuleManager.cnameRedirects()).toString())
+    }
+
     private fun configureEngine(selectedPackages: Set<String>) {
         engine.setDNS(
             provider.protocol.goProtocol,
@@ -71,6 +77,7 @@ class GoInspectionTunnel(
             provider.url
         )
         engine.setBlockResponseType("NXDOMAIN")
+        updateRewriteRules()
         engine.setDomainChecker(object : DomainChecker {
             override fun isBlocked(domain: String): Boolean = policy.evaluate(domain) is HttpDomainDecision.Block
 
@@ -160,6 +167,7 @@ private fun buildDnsLogMessage(
 
 private fun String.toHttpRequestOutcome(): HttpRequestOutcome = when (this) {
     "blocked" -> HttpRequestOutcome.BLOCKED
+    "rewritten" -> HttpRequestOutcome.REWRITTEN
     "decryption_failed" -> HttpRequestOutcome.DECRYPTION_FAILED
     "invalid" -> HttpRequestOutcome.INVALID
     else -> HttpRequestOutcome.ALLOWED

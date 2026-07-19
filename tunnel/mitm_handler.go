@@ -146,6 +146,20 @@ func newMitmTcpHandler(
 			return
 		}
 
+		// CNAME domain rewrites are user-requested navigation redirects. They
+		// must be served locally before passthrough and upstream TLS checks:
+		// the source domain may not exist and therefore has no upstream cert.
+		if eng != nil {
+			if target := eng.rewriteTarget(hostname); target != "" {
+				if classification == classTLS {
+					serveRewriteRedirectTLS(conn, peekedReader, certMgr, hostname, target, eng, flow)
+				} else {
+					serveRewriteRedirectHTTP(conn, peekedReader, target, eng, flow)
+				}
+				return
+			}
+		}
+
 		// Gate 5 — sensitive / cert-pinned domain → passthrough so the
 		// client's own TLS validation succeeds.
 		if !filter.IsInterceptionAllowed(hostname) {
@@ -537,6 +551,53 @@ func serveLocalAssetPlaintext(conn net.Conn, clientReader io.Reader) {
 		if err := resp.Write(conn); err != nil {
 			return
 		}
+		if req.Close {
+			return
+		}
+	}
+}
+
+func serveRewriteRedirectTLS(conn net.Conn, clientReader io.Reader, certMgr *CertManager, hostname, target string, engine *Engine, flow flowID) {
+	tlsCfg := certMgr.GetDynamicTLSConfigForHost(hostname)
+	clientTLS := tls.Server(&peekReplayConn{Conn: conn, r: clientReader}, tlsCfg)
+	if err := clientTLS.Handshake(); err != nil {
+		engine.logHTTPEvent(flow, hostname, "HTTPS", "decryption_failed", "client_tls")
+		return
+	}
+	defer clientTLS.Close()
+	serveRewriteRedirect(clientTLS, target, "HTTPS", engine, flow)
+}
+
+func serveRewriteRedirectHTTP(conn net.Conn, clientReader io.Reader, target string, engine *Engine, flow flowID) {
+	serveRewriteRedirect(&peekReplayConn{Conn: conn, r: clientReader}, target, "HTTP/1.1", engine, flow)
+}
+
+func serveRewriteRedirect(conn net.Conn, target, protocol string, engine *Engine, flow flowID) {
+	reader := bufio.NewReader(conn)
+	for {
+		req, err := http.ReadRequest(reader)
+		if err != nil {
+			return
+		}
+		location := "https://" + target
+		if uri := req.URL.RequestURI(); uri != "" && uri != "/" {
+			location += uri
+		}
+		resp := &http.Response{
+			StatusCode: http.StatusFound,
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		resp.Header.Set("Location", location)
+		resp.Header.Set("Content-Length", "0")
+		resp.Header.Set("Cache-Control", "no-store")
+		if err := resp.Write(conn); err != nil {
+			return
+		}
+		engine.logHTTPEvent(flow, req.Host, protocol, "rewritten", target)
 		if req.Close {
 			return
 		}

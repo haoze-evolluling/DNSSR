@@ -95,6 +95,7 @@ type Engine struct {
 	resolver        *Resolver
 	safeSearch      *SafeSearch
 	domainChecker   DomainChecker
+	rewriteRules    map[string]string
 	firewallChecker FirewallChecker
 	appResolver     AppResolver
 	appUidResolver  AppUidResolver
@@ -203,6 +204,47 @@ func (e *Engine) SetOutboundAdapter(adapter OutboundAdapter) {
 // This is called before Start() to provide the blocking logic for rules not in the trie (like Custom Rules).
 func (e *Engine) SetDomainChecker(checker DomainChecker) {
 	e.domainChecker = checker
+}
+
+// SetRewriteRules replaces the CNAME rewrite map used by DNS and HTTP(S).
+// The input is a JSON object whose keys are source domains and values are
+// target domains. Parent-domain rules also match subdomains.
+func (e *Engine) SetRewriteRules(content string) {
+	rules := make(map[string]string)
+	if content != "" {
+		if err := json.Unmarshal([]byte(content), &rules); err != nil {
+			logf("SetRewriteRules: invalid JSON: %v", err)
+			return
+		}
+	}
+	clean := make(map[string]string, len(rules))
+	for source, target := range rules {
+		source = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(source)), ".")
+		target = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(target)), ".")
+		if source != "" && target != "" {
+			clean[source] = target
+		}
+	}
+	e.mu.Lock()
+	e.rewriteRules = clean
+	e.mu.Unlock()
+}
+
+func (e *Engine) rewriteTarget(domain string) string {
+	domain = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for candidate := domain; candidate != ""; {
+		if target := e.rewriteRules[candidate]; target != "" {
+			return target
+		}
+		dot := strings.IndexByte(candidate, '.')
+		if dot < 0 {
+			break
+		}
+		candidate = candidate[dot+1:]
+	}
+	return ""
 }
 
 // SetTries loads the native memory-mapped domain tries and bloom filters for blazing-fast lookups in Go.
@@ -759,6 +801,15 @@ func (e *Engine) serveDNS(w dns.ResponseWriter, r *dns.Msg, appOverride string) 
 		}
 	}
 
+	// CNAME rewrites take precedence over allow/block rules. Resolve the
+	// target through the configured upstream and return a complete answer so
+	// Android stub resolvers do not have to chase an incomplete CNAME.
+	if target := e.rewriteTarget(domain); target != "" {
+		if e.standaloneRewrite(w, r, target, appName, startTime) {
+			return
+		}
+	}
+
 	// 1. Custom Rules Override
 	if e.domainChecker != nil {
 		override := e.domainChecker.HasCustomRule(domain)
@@ -974,6 +1025,70 @@ func (e *Engine) standaloneForward(w dns.ResponseWriter, r *dns.Msg, appName str
 
 	respMsg.Id = r.Id
 	_ = w.WriteMsg(&respMsg)
+}
+
+func (e *Engine) standaloneRewrite(w dns.ResponseWriter, r *dns.Msg, target, appName string, startTime time.Time) bool {
+	if len(r.Question) != 1 {
+		return false
+	}
+	qtype := r.Question[0].Qtype
+	if qtype != dns.TypeA && qtype != dns.TypeAAAA {
+		return false
+	}
+
+	e.mu.Lock()
+	resolver := e.resolver
+	e.mu.Unlock()
+	if resolver == nil {
+		return false
+	}
+
+	targetQuery := new(dns.Msg)
+	targetQuery.SetQuestion(dns.Fqdn(target), qtype)
+	targetQuery.RecursionDesired = true
+	rawQuery, err := targetQuery.Pack()
+	if err != nil {
+		return false
+	}
+	rawResponse, err := resolver.Resolve(rawQuery)
+	if err != nil {
+		logf("Rewrite target resolve failed for %s: %v", target, err)
+		return false
+	}
+	resolved := new(dns.Msg)
+	if err := resolved.Unpack(rawResponse); err != nil {
+		return false
+	}
+
+	response := new(dns.Msg)
+	response.SetReply(r)
+	cname, err := dns.NewRR(fmt.Sprintf("%s 300 IN CNAME %s", r.Question[0].Name, dns.Fqdn(target)))
+	if err != nil {
+		return false
+	}
+	response.Answer = append(response.Answer, cname)
+	resolvedIP := ""
+	for _, rr := range resolved.Answer {
+		switch record := rr.(type) {
+		case *dns.A:
+			if qtype == dns.TypeA {
+				response.Answer = append(response.Answer, record)
+				if resolvedIP == "" { resolvedIP = record.A.String() }
+			}
+		case *dns.AAAA:
+			if qtype == dns.TypeAAAA {
+				response.Answer = append(response.Answer, record)
+				if resolvedIP == "" { resolvedIP = record.AAAA.String() }
+			}
+		}
+	}
+	if len(response.Answer) == 1 {
+		return false
+	}
+	_ = w.WriteMsg(response)
+	e.totalQueries.Add(1)
+	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, qtype, time.Since(startTime).Milliseconds(), appName, resolvedIP, "rewrite="+target)
+	return true
 }
 
 func (e *Engine) standaloneRedirect(w dns.ResponseWriter, r *dns.Msg, redirectDomain, appName string, startTime time.Time) bool {

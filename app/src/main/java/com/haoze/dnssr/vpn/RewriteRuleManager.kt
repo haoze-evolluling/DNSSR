@@ -45,6 +45,17 @@ class RewriteRuleManager(
         }
         return emptySet()
     }
+
+    fun cnameRedirects(): Map<String, String> = buildMap {
+        subscriptionFallbackRules.forEach { (pattern, answers) ->
+            answers.firstOrNull { it.targetType == RewriteTargetType.CNAME }
+                ?.let { put(pattern, it.targetValue) }
+        }
+        manualRules.forEach { (pattern, answers) ->
+            answers.firstOrNull { it.targetType == RewriteTargetType.CNAME }
+                ?.let { put(pattern, it.targetValue) }
+        }
+    }
     suspend fun addRule(domain: String, targetType: String, targetValue: String): Boolean {
         val normalized = AdGuardRuleParser.normalizeDomainForRewrite(domain) ?: return false
         val normalizedValue = normalizeTarget(targetType, targetValue) ?: return false

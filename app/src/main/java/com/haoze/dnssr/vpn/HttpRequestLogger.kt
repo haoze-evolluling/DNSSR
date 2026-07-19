@@ -12,6 +12,7 @@ import java.util.Locale
 
 enum class HttpRequestOutcome(val storageValue: String) {
     ALLOWED("allowed"),
+    REWRITTEN("rewritten"),
     BLOCKED("blocked"),
     INVALID("invalid"),
     DECRYPTION_FAILED("decryption_failed")

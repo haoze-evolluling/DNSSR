@@ -49,6 +49,7 @@ import java.util.Locale
 private enum class HttpLogFilter(val label: String) {
     ALL("全部"),
     ALLOWED("放行"),
+    REWRITTEN("重写"),
     BLOCKED("拦截"),
     BYPASSED("直连")
 }
@@ -73,6 +74,7 @@ fun HttpRequestLogScreen(onBack: () -> Unit) {
             when (selectedFilter) {
                 HttpLogFilter.ALL -> true
                 HttpLogFilter.ALLOWED -> log.outcome == "allowed"
+                HttpLogFilter.REWRITTEN -> log.outcome == "rewritten"
                 HttpLogFilter.BLOCKED -> log.outcome == "blocked" || log.outcome == "invalid"
                 HttpLogFilter.BYPASSED -> log.outcome in directOutcomes
             }
@@ -149,6 +151,7 @@ private fun HttpLogFilterBar(
         listOf(
             HttpLogFilterOption(HttpLogFilter.ALL, logs.size, allColor),
             HttpLogFilterOption(HttpLogFilter.ALLOWED, logs.count { it.outcome == "allowed" }, AllowedColor),
+            HttpLogFilterOption(HttpLogFilter.REWRITTEN, logs.count { it.outcome == "rewritten" }, RewrittenColor),
             HttpLogFilterOption(HttpLogFilter.BLOCKED, logs.count { it.outcome == "blocked" || it.outcome == "invalid" }, BlockedColor),
             HttpLogFilterOption(HttpLogFilter.BYPASSED, logs.count { it.outcome in directOutcomes }, BypassedColor)
         )
@@ -236,6 +239,7 @@ private data class HttpOutcomePresentation(val label: String, val color: Color)
 
 private fun httpOutcomePresentation(outcome: String): HttpOutcomePresentation = when (outcome) {
     "allowed" -> HttpOutcomePresentation("已放行", AllowedColor)
+    "rewritten" -> HttpOutcomePresentation("已重写", RewrittenColor)
     "blocked" -> HttpOutcomePresentation("已拦截", BlockedColor)
     "invalid" -> HttpOutcomePresentation("无效请求", BlockedColor)
     "decryption_failed" -> HttpOutcomePresentation("HTTPS 自动旁路", BypassedColor)
@@ -246,5 +250,6 @@ private fun httpOutcomePresentation(outcome: String): HttpOutcomePresentation = 
 
 private val directOutcomes = setOf("decryption_failed", "unsupported_protocol", "resource_bypass")
 private val AllowedColor = Color(0xFF2E7D32)
+private val RewrittenColor = Color(0xFF00695C)
 private val BlockedColor = Color(0xFFC62828)
 private val BypassedColor = Color(0xFF616161)
