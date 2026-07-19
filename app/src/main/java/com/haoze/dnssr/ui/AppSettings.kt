@@ -1,6 +1,7 @@
 package com.haoze.dnssr.ui
 
 import android.content.Context
+import android.os.Build
 import com.haoze.dnssr.vpn.BlockResponseMode
 import com.haoze.dnssr.vpn.DynamicBlockResponseConfig
 import com.haoze.dnssr.vpn.BootstrapIpDefaults
@@ -22,9 +23,9 @@ enum class RaceModeStrategy(
     val storageValue: String,
     val displayName: String
 ) {
-    BRUTE_FORCE_PARALLEL("brute_force_parallel", "百舸争流"),
-    SMART_PREDICTION("smart_prediction", "择优而行"),
-    PRIMARY_BACKUP("primary_backup", "有备无患");
+    BRUTE_FORCE_PARALLEL("brute_force_parallel", "极速"),
+    SMART_PREDICTION("smart_prediction", "均衡"),
+    PRIMARY_BACKUP("primary_backup", "主备（高级）");
 
     companion object {
         fun fromStorageValue(value: String?): RaceModeStrategy {
@@ -430,6 +431,11 @@ object AppSettings {
             .filter { it.isNotBlank() && it != context.packageName }
             .toSet()
     }
+
+    fun isGoTunnelRequired(context: Context): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ((isHttpInspectionEnabled(context) && getHttpInspectionAppPackages(context).isNotEmpty()) ||
+                getBlockedAppPackages(context).isNotEmpty())
 
     fun setBlockedAppPackages(context: Context, packageNames: Set<String>) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

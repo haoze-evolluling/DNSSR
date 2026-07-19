@@ -92,7 +92,7 @@ fun DataCleanupScreen(
             SettingsGroup {
                 SettingsTextItem(
                     title = "恢复 DNS 默认权重",
-                    subtitle = "清除竞速模式的健康样本，让择优而行重新按默认权重分配流量",
+                    subtitle = "清除竞速模式的健康样本，让均衡模式重新按默认权重分配流量",
                     textColor = MaterialTheme.colorScheme.error,
                     onClick = { pendingAction = CleanupAction.PROVIDER_WEIGHT }
                 )

@@ -222,7 +222,7 @@ data class HttpsDnsConfigSnapshot private constructor(
         ): HttpsDnsConfigSnapshot {
             require(providers.isNotEmpty()) { "DNS provider list must not be empty" }
             require(mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP) {
-                "HTTPS DNS does not support ${mode.storageValue}"
+                "Go tunnel DNS does not support ${mode.storageValue}"
             }
             val selected = if (mode == DnsResolutionMode.SINGLE) listOf(providers.first()) else providers
             return HttpsDnsConfigSnapshot(selected, mode, blockResponseMode, dynamicBlockResponseConfig)

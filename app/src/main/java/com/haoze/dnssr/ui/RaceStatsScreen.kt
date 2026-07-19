@@ -111,7 +111,7 @@ private fun RaceStatsContent(
                 SettingsGroup {
                     SettingsItem(
                         title = if (loading) "正在加载" else "暂无竞速数据",
-                        subtitle = "启用竞速模式并产生真实 DNS 查询后，这里会显示百舸争流与择优而行的表现。"
+                        subtitle = "启用竞速模式并产生真实 DNS 查询后，这里会显示极速与均衡模式的表现。"
                     )
                 }
             }
@@ -151,13 +151,13 @@ private fun RaceStatsContent(
         }
 
         item {
-            SettingsGroupTitle("择优而行首选")
+            SettingsGroupTitle("均衡模式首选")
             SettingsGroup {
                 val selections = stats.smartSelectionStats.take(MAX_PROVIDER_ROWS)
                 if (selections.isEmpty()) {
                     SettingsItem(
-                        title = "暂无择优而行记录",
-                        subtitle = "择优而行模式产生查询后，会统计首选服务商的命中情况。"
+                        title = "暂无均衡模式记录",
+                        subtitle = "均衡模式产生查询后，会统计首选服务商的命中情况。"
                     )
                 } else {
                     selections.forEachIndexed { index, item ->

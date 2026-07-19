@@ -100,7 +100,7 @@ fun ResolutionModeHomeScreen(
     val presetDnsService by viewModel.presetDnsService.collectAsStateWithLifecycle()
     val loading by viewModel.initialLoading.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    val httpsInspectionEnabled by viewModel.httpsInspectionEnabled.collectAsStateWithLifecycle()
+    val goTunnelRequired by viewModel.goTunnelRequired.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showModeDialog by remember { mutableStateOf(false) }
     var showPresetDnsServiceDialog by remember { mutableStateOf(false) }
@@ -110,7 +110,7 @@ fun ResolutionModeHomeScreen(
     if (showModeDialog) {
         ResolutionModePickerDialog(
             selectedMode = mode,
-            httpsInspectionEnabled = httpsInspectionEnabled,
+            goTunnelRequired = goTunnelRequired,
             onSelect = { selectedMode ->
                 showModeDialog = false
                 if (!viewModel.setResolutionMode(selectedMode) && mode != selectedMode) {
@@ -212,7 +212,7 @@ private fun PresetDnsServicePickerDialog(
 @Composable
 private fun ResolutionModePickerDialog(
     selectedMode: DnsResolutionMode,
-    httpsInspectionEnabled: Boolean,
+    goTunnelRequired: Boolean,
     onSelect: (DnsResolutionMode) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -222,7 +222,7 @@ private fun ResolutionModePickerDialog(
         text = {
             Column {
                 DnsResolutionMode.entries.forEachIndexed { index, mode ->
-                    val enabled = !httpsInspectionEnabled || mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP
+                    val enabled = !goTunnelRequired || mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP
                     SettingsRadioItem(
                         title = mode.displayName,
                         subtitle = subtitleFor(mode),

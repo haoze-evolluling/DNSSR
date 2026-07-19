@@ -81,9 +81,13 @@ fun BlockedAppsScreen(onBack: () -> Unit) {
                 CardDefaults.cardColors(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer)) {
                 LazyColumn(Modifier.fillMaxSize()) {
                     itemsIndexed(visibleApps, key = { _, app -> app.packageName }) { index, app ->
-                        InstalledAppCheckboxItem(app, app.packageName in selectedPackages) { checked ->
-                            selectedPackages = if (checked) selectedPackages + app.packageName else selectedPackages - app.packageName
-                        }
+                        InstalledAppCheckboxItem(
+                            app = app,
+                            checked = app.packageName in selectedPackages,
+                            onCheckedChange = { checked ->
+                                selectedPackages = if (checked) selectedPackages + app.packageName else selectedPackages - app.packageName
+                            }
+                        )
                         if (index != visibleApps.lastIndex) SettingsDivider()
                     }
                 }

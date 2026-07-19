@@ -124,7 +124,7 @@ class DnsVpnService : VpnService() {
         activeDnsCachePolicy = AppSettings.getDnsCachePolicy(this)
         activeRaceModeStrategy = AppSettings.getRaceModeStrategy(this)
         activeResolutionMode = AppSettings.getDnsResolutionMode(this)
-        if (AppSettings.isHttpInspectionEnabled(this) && !activeResolutionMode.isHttpsCompatible()) {
+        if (AppSettings.isGoTunnelRequired(this) && !activeResolutionMode.isGoTunnelCompatible()) {
             activeResolutionMode = DnsResolutionMode.SINGLE
             AppSettings.setDnsResolutionMode(this, activeResolutionMode)
         }
@@ -183,7 +183,7 @@ class DnsVpnService : VpnService() {
         startIntent = intent
         setRunningFlag(this, true)
 
-        activeResolutionMode = normalizeHttpsResolutionMode()
+        activeResolutionMode = normalizeGoTunnelResolutionMode()
 
         val providers = resolveDnsProviders(intent)
         resolvers = providers.map { provider ->
@@ -321,7 +321,7 @@ class DnsVpnService : VpnService() {
                 val oldResolvers = resolvers
                 val newCachePolicy = AppSettings.getDnsCachePolicy(this@DnsVpnService)
                 val newRaceModeStrategy = AppSettings.getRaceModeStrategy(this@DnsVpnService)
-                val newResolutionMode = normalizeHttpsResolutionMode()
+                val newResolutionMode = normalizeGoTunnelResolutionMode()
                 activeDnsLogMode = AppSettings.getDnsLogMode(this@DnsVpnService)
                 val newBlockResponseMode = AppSettings.getBlockResponseMode(this@DnsVpnService)
                 val newDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this@DnsVpnService)
@@ -530,12 +530,12 @@ class DnsVpnService : VpnService() {
         return listOf(DnsProvider.loadSelected(this))
     }
 
-    private fun DnsResolutionMode.isHttpsCompatible(): Boolean =
+    private fun DnsResolutionMode.isGoTunnelCompatible(): Boolean =
         this == DnsResolutionMode.SINGLE || this == DnsResolutionMode.PRIMARY_BACKUP
 
-    private fun normalizeHttpsResolutionMode(): DnsResolutionMode {
+    private fun normalizeGoTunnelResolutionMode(): DnsResolutionMode {
         val configured = AppSettings.getDnsResolutionMode(this)
-        if (!AppSettings.isHttpInspectionEnabled(this) || configured.isHttpsCompatible()) return configured
+        if (!AppSettings.isGoTunnelRequired(this) || configured.isGoTunnelCompatible()) return configured
         AppSettings.setDnsResolutionMode(this, DnsResolutionMode.SINGLE)
         return DnsResolutionMode.SINGLE
     }

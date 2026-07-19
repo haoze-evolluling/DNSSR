@@ -74,7 +74,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
     val raceModeEnabled by viewModel.raceModeEnabled.collectAsStateWithLifecycle()
     val raceModeStrategy by viewModel.raceModeStrategy.collectAsStateWithLifecycle()
     val resolutionMode by viewModel.resolutionMode.collectAsStateWithLifecycle()
-    val httpsInspectionEnabled by viewModel.httpsInspectionEnabled.collectAsStateWithLifecycle()
+    val goTunnelRequired by viewModel.goTunnelRequired.collectAsStateWithLifecycle()
     val primaryBackupIds by viewModel.primaryBackupIds.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
@@ -133,7 +133,7 @@ private fun LegacyRaceModeProviderSettingsScreen(
                                     DnsResolutionMode.PRIMARY_BACKUP -> "主服务失败后，按优先级依次尝试备用服务"
                                 },
                                 selected = resolutionMode == mode,
-                                enabled = !httpsInspectionEnabled || mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP,
+                                enabled = !goTunnelRequired || mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP,
                                 onClick = {
                                     if (viewModel.setResolutionMode(mode)) onRuntimeDnsSettingsChanged()
                                 }
