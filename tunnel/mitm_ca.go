@@ -34,6 +34,8 @@ import (
 const (
 	caCertFile = "ca.crt"
 	caKeyFile  = "ca.key"
+	caOrganization = "DNSSR"
+	caCommonName = "DNSSR HTTPS Inspection Root CA"
 )
 
 // CertManager handles Root CA lifecycle and per-host certificate generation.
@@ -200,6 +202,10 @@ func (cm *CertManager) loadCA(certPath, keyPath string) error {
 	if !caCert.IsCA {
 		return fmt.Errorf("loaded certificate is not a CA (IsCA=false)")
 	}
+	if caCert.Subject.CommonName != caCommonName ||
+		len(caCert.Subject.Organization) != 1 || caCert.Subject.Organization[0] != caOrganization {
+		return fmt.Errorf("loaded certificate has an outdated subject")
+	}
 
 	// Validate: must not be expired
 	now := time.Now()
@@ -274,8 +280,8 @@ func (cm *CertManager) generateCA() error {
 	caTemplate := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"BlockAds"},
-			CommonName:   "BlockAds Root CA",
+			Organization: []string{caOrganization},
+			CommonName:   caCommonName,
 		},
 		NotBefore:             time.Now().Add(-24 * time.Hour), // 1 day grace
 		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour), // 10 years
@@ -362,7 +368,7 @@ func (cm *CertManager) getCertForHost(host string) (*tls.Certificate, error) {
 	leafTemplate := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"BlockAds"},
+			Organization: []string{caOrganization},
 			CommonName:   host,
 		},
 		DNSNames:              dnsNames,

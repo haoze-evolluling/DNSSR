@@ -13,7 +13,7 @@ import java.security.cert.X509Certificate
 
 /** Root CA lifecycle for the Go MITM engine. The private key stays in app-private storage. */
 object GoInspectionCaManager {
-    const val EXPORTED_CERTIFICATE_NAME = "DNSSR-Go-HTTPS-CA.crt"
+    const val EXPORTED_CERTIFICATE_NAME = "DNSSR-HTTPS-Inspection-Root-CA.crt"
 
     fun certificateDirectory(context: Context): File = File(context.filesDir, "go-mitm").apply { mkdirs() }
 
@@ -100,6 +100,6 @@ object GoInspectionCaManager {
     private val downloadCertificateSelectionArgs = arrayOf(
         "${Environment.DIRECTORY_DOWNLOADS}/",
         EXPORTED_CERTIFICATE_NAME,
-        "DNSSR-Go-HTTPS-CA (%).crt"
+        "DNSSR-HTTPS-Inspection-Root-CA (%).crt"
     )
 }
