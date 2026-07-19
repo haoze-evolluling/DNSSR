@@ -212,6 +212,7 @@ object ScreenDestinations {
     val resolutionParallel = child(Routes.RESOLUTION_PARALLEL, "极速", "配置参与并行查询的服务商", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
     val resolutionBackup = child(Routes.RESOLUTION_BACKUP, "主备（高级）", "配置服务商主备顺序", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
     val httpInspectionApps = child(Routes.HTTP_INSPECTION_APPS, "选择过滤应用", "选择需要检查流量的应用", Icons.Filled.Http, httpInspectionSettings)
+    val caCertificateGuide = child(Routes.CA_CERTIFICATE_GUIDE, "安装和卸载CA证书方法", "查看 Android 系统 CA 证书操作指南", Icons.Filled.Http, httpInspectionSettings, true, "CA", "证书", "安装", "卸载")
     val httpRequestLogs = child(Routes.HTTP_REQUEST_LOGS, "HTTP 请求记录", "查看 HTTP 请求记录", Icons.Filled.Http, httpInspectionSettings, searchable = false)
     val dayNightMode = child(Routes.DAY_NIGHT_MODE, "日夜模式", "选择浅色、深色或跟随系统", Icons.Filled.Palette, appearanceSettings)
     val themeColorSettings = child(Routes.THEME_COLOR_SETTINGS, "主题色配置", "选择应用界面的强调色", Icons.Filled.Palette, appearanceSettings)
@@ -227,7 +228,7 @@ object ScreenDestinations {
         foregroundBackgroundSettings, excludedApps, httpInspectionSettings, homeProviderVisibility, appearanceSettings,
         configTransfer, ruleManagement, dataCleanup, about, sponsor, sponsorList, coBuilderList, configImportExport,
         ruleExport, blockResponseSettings, subscriptionManagement, subscriptionAutoUpdate, ruleList, allowRuleList,
-        rewriteRuleList, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps,
+        rewriteRuleList, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps, caCertificateGuide,
         httpRequestLogs, dayNightMode, themeColorSettings, homeComponentOpacity, homeSentenceSettings,
         notificationTextSettings, customBackgroundSettings, serviceLightEffectSettings, legacyIconSettings, legacyLogPageSettings)
     val mainEntries = all.filter { it.mainSection != null }.sortedWith(compareBy({ it.mainSection!!.order }, { all.indexOf(it) }))

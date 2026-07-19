@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 fun HttpInspectionSettingsScreen(
     onBack: () -> Unit,
     onNavigateToRequestLogs: () -> Unit,
-    onNavigateToApps: () -> Unit
+    onNavigateToApps: () -> Unit,
+    onNavigateToCaGuide: () -> Unit
 ) {
     val context = LocalContext.current
     val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -138,7 +139,7 @@ fun HttpInspectionSettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(scrollState)
         ) {
-            SettingsGroupTitle("流量过滤")
+            SettingsGroupTitle("过滤范围")
             SettingsGroup {
                 val selectedCount = AppSettings.getHttpInspectionAppPackages(context).size
                 SettingsSwitchItem(
@@ -164,7 +165,9 @@ fun HttpInspectionSettingsScreen(
                     subtitle = if (selectedCount == 0) "选择需要进行 HTTP(S) 过滤的应用" else "已选择 $selectedCount 个应用",
                     onClick = { if (supported) onNavigateToApps() }
                 )
-                com.haoze.dnssr.ui.components.SettingsDivider()
+            }
+            SettingsGroupTitle("协议与兼容性")
+            SettingsGroup {
                 SettingsSwitchItem(
                     title = "尝试检查 HTTP/3",
                     subtitle = "阻断所选应用的 QUIC，促使其回退到可检查的 TCP；部分站点可能加载失败",
@@ -195,8 +198,14 @@ fun HttpInspectionSettingsScreen(
                     onClick = onNavigateToRequestLogs
                 )
             }
-            SettingsGroupTitle("HTTPS 解密")
+            SettingsGroupTitle("CA 证书")
             SettingsGroup {
+                SettingsNavigationItem(
+                    title = "安装和卸载CA证书方法",
+                    subtitle = "查看 Android 系统 CA 证书的安装、卸载和安全说明",
+                    onClick = onNavigateToCaGuide
+                )
+                com.haoze.dnssr.ui.components.SettingsDivider()
                 SettingsNavigationItem(
                     title = "安装 HTTPS 根证书",
                     subtitle = "导出 DNSSR 根证书，并前往系统设置完成安装",

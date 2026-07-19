@@ -76,6 +76,7 @@ object Routes {
     const val LEGACY_LOG_PAGE_SETTINGS = "legacy_log_page_settings"
     const val HTTP_INSPECTION_SETTINGS = "http_inspection_settings"
     const val HTTP_INSPECTION_APPS = "http_inspection_apps"
+    const val CA_CERTIFICATE_GUIDE = "ca_certificate_guide"
     const val HTTP_REQUEST_LOGS = "http_request_logs"
     const val SUBSCRIPTION_MANAGEMENT = "subscription_management"
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "subscription_auto_update_interval"
@@ -372,8 +373,12 @@ fun AppNavHost(
             HttpInspectionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 onNavigateToRequestLogs = { navController.navigateWhenResumed(ScreenDestinations.httpRequestLogs.route) },
-                onNavigateToApps = { navController.navigateWhenResumed(ScreenDestinations.httpInspectionApps.route) }
+                onNavigateToApps = { navController.navigateWhenResumed(ScreenDestinations.httpInspectionApps.route) },
+                onNavigateToCaGuide = { navController.navigateWhenResumed(ScreenDestinations.caCertificateGuide.route) }
             )
+        }
+        composable(ScreenDestinations.caCertificateGuide.route) {
+            CaCertificateGuideScreen(onBack = { navController.popWhenResumed() })
         }
         composable(ScreenDestinations.httpInspectionApps.route) {
             HttpInspectionAppsScreen(onBack = { navController.popWhenResumed() })
