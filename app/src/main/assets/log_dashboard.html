@@ -383,13 +383,13 @@
 </head>
 <body>
   <script src="log_dashboard_topbar.js"></script>
-  <script>mountLogDashboardTopbar('等待数据同步...');</script>
+  <script>mountLogDashboardTopbar('记录全部请求');</script>
   <main class="page">
 
     <section class="hero">
       <div>
         <h1>请求日志仪表盘</h1>
-        <p>DNS、HTTPS、缓存、竞速与规则拦截的实时概览</p>
+        <p>全部 DNS、HTTPS、缓存、竞速与规则拦截的实时概览</p>
       </div>
     </section>
 
@@ -578,8 +578,8 @@
 
     function render(data) {
       if (!data) return;
-      const stats = data.dailyStats || {};
-      $("updated").textContent = `更新于 ${time(data.generatedAt)}`;
+      const stats = data.dailyStats || data.stats || {};
+      $("updated").textContent = `记录全部请求 · 更新于 ${time(data.generatedAt)}`;
       $("error").innerHTML = data.error ? `<div class="error">${text(data.error)}</div>` : "";
       setMetric("total", stats.total);
       setMetric("passed", stats.passed);
@@ -588,12 +588,12 @@
       setMetric("bypassed", stats.bypassed);
       renderDonut(stats);
 
-      const race = data.race || {};
+      const race = data.race || data.raceStats || {};
       const raceRate = race.requests ? race.successes / race.requests : 0;
       $("raceRate").textContent = `${pct(raceRate)} · ${fmt.format(race.requests || 0)} 次 · ${ms(race.avgElapsedMs)}`;
       $("raceBar").style.width = `${Math.max(0, Math.min(100, raceRate * 100))}%`;
 
-      const bootstrap = data.bootstrap || {};
+      const bootstrap = data.bootstrap || data.bootstrapStats || {};
       $("bootstrapRate").textContent = `${pct(bootstrap.successRate)} · ${fmt.format(bootstrap.attempts || 0)} 次 · ${ms(bootstrap.avgElapsedMs)}`;
       $("bootstrapBar").style.width = `${Math.max(0, Math.min(100, (bootstrap.successRate || 0) * 100))}%`;
 
@@ -605,12 +605,12 @@
       $("cacheRate").textContent = `${pct(cacheRate)} · ${fmt.format(stats.cached || 0)} 次`;
       $("cacheBar").style.width = `${Math.max(0, Math.min(100, cacheRate * 100))}%`;
 
-      renderRows("recentLogs", data.recentLogs, "暂无请求日志", item => {
+      renderRows("recentLogs", data.recentLogs || data.requests || data.logs, "暂无请求日志", item => {
         const cls = item.status === "passed" ? "accent-green" : item.status === "blocked" ? "accent-red" : item.status === "bypassed" ? "accent-violet" : "accent-amber";
         return `<div class="row"><div class="main">${text(item.name)}<div class="sub">${time(item.timestamp)} · ${text(item.source)} · ${text(item.meta)}</div></div><span class="tag ${cls}">${text(item.resultLabel)}</span></div>`;
       });
 
-      renderRows("cacheEntries", data.cacheEntries, "暂无有效缓存", item =>
+      renderRows("cacheEntries", data.cacheEntries || data.cache, "暂无有效缓存", item =>
         `<div class="row"><div class="main">${text(item.queryName)}<div class="sub">${text(item.queryType)} · ${duration(item.remainingSeconds)} 后过期 · ${fmt.format(item.responseSize || 0)} B</div></div><span class="tag accent-blue">${fmt.format(item.hitCount || 0)} 次</span></div>`
       );
 
@@ -622,7 +622,7 @@
         `<div class="row"><div class="main">${text(item.name)}<div class="sub">${text(item.ip)} · 成功 ${pct(item.successRate)} · ${ms(item.avgElapsedMs)}</div></div><span class="tag accent-cyan">${fmt.format(item.attempts || 0)} 次</span></div>`
       );
 
-      const subscriptions = data.subscriptions || {};
+      const subscriptions = data.subscriptions || data.subscriptionStats || {};
       renderRows("subscriptions", subscriptions.items, "暂无规则拦截数据", item =>
         `<div class="row"><div class="main">${text(item.name)}<div class="sub">${item.deleted ? "已删除" : item.enabled ? "已启用" : "已禁用"} · 占全部请求 ${pct(item.rate)}</div></div><span class="tag accent-red">${fmt.format(item.hits || 0)} 次</span></div>`
       );

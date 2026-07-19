@@ -67,17 +67,17 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
         }
         val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT, logMode)
         val recentHttpLogs = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
-            .filter { logMode == DnsLogMode.ALL || it.outcome != "allowed" }
+            .filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }
         val httpStats = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().dailyStats(dayStartMillis())
         var httpPassed = 0
         var httpBlocked = 0
         var httpError = 0
         var httpBypassed = 0
-        httpStats.filter { logMode == DnsLogMode.ALL || it.outcome != "allowed" }.forEach { row ->
-            when (row.outcome) {
-                "allowed", "rewritten" -> httpPassed += row.count
-                "blocked", "invalid" -> httpBlocked += row.count
-                "decryption_failed", "unsupported_protocol", "resource_bypass" -> httpBypassed += row.count
+        httpStats.filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }.forEach { row ->
+            when (normalizeHttpOutcome(row.outcome)) {
+                "passed" -> httpPassed += row.count
+                "blocked" -> httpBlocked += row.count
+                "bypassed" -> httpBypassed += row.count
                 else -> httpError += row.count
             }
         }
@@ -219,12 +219,7 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                 })
                 .put("resultLabel", resultLabel(log.result))
         } + httpLogs.map { log ->
-            val status = when (log.outcome) {
-                "allowed", "rewritten" -> "passed"
-                "blocked", "invalid" -> "blocked"
-                "decryption_failed", "unsupported_protocol", "resource_bypass" -> "bypassed"
-                else -> "error"
-            }
+            val status = normalizeHttpOutcome(log.outcome)
             JSONObject()
                 .put("timestamp", log.timestamp)
                 .put("source", "HTTPS")
@@ -268,6 +263,13 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             LogResult.ERROR.value -> "失败"
             else -> result
         }
+    }
+
+    private fun normalizeHttpOutcome(outcome: String): String = when (outcome.lowercase()) {
+        "allowed", "rewritten", "passed", "success" -> "passed"
+        "blocked", "invalid", "filtered", "denied" -> "blocked"
+        "decryption_failed", "unsupported_protocol", "resource_bypass", "bypassed", "passthrough" -> "bypassed"
+        else -> "error"
     }
 
     private fun dnsTypeName(type: Int): String {
