@@ -144,6 +144,17 @@ fun ResolutionModeHomeScreen(
                     )
                 }
             }
+            item { SettingsGroupTitle("预设 DNS 服务") }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "预设 DNS 服务",
+                        subtitle = "切换阿里云和腾讯 DNSPod 的预设服务协议",
+                        value = presetDnsService.displayName,
+                        onClick = { showPresetDnsServiceDialog = true }
+                    )
+                }
+            }
             item { SettingsGroupTitle("模式配置") }
             item {
                 SettingsGroup {
@@ -162,17 +173,6 @@ fun ResolutionModeHomeScreen(
                         )
                         if (index < DnsResolutionMode.entries.lastIndex) SettingsDivider()
                     }
-                }
-            }
-            item { SettingsGroupTitle("预设 DNS 服务") }
-            item {
-                SettingsGroup {
-                    SettingsNavigationItem(
-                        title = "预设 DNS 服务",
-                        subtitle = "切换阿里云和腾讯 DNSPod 的预设服务协议",
-                        value = presetDnsService.displayName,
-                        onClick = { showPresetDnsServiceDialog = true }
-                    )
                 }
             }
         }
