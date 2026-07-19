@@ -190,26 +190,7 @@ fun AppNavHost(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                onNavigateToRuleManagement = { navController.navigateWhenResumed(ScreenDestinations.ruleManagement.route) },
-                onNavigateToExcludedApps = { navController.navigateWhenResumed(Routes.EXCLUDED_APPS) },
-                onNavigateToDataCleanup = { navController.navigateWhenResumed(ScreenDestinations.dataCleanup.route) },
-                onNavigateToConfigTransfer = { navController.navigateWhenResumed(ScreenDestinations.configTransfer.route) },
-                onNavigateToProviderManagement = { navController.navigateWhenResumed(ScreenDestinations.providerManagement.route) },
-                onNavigateToHomeProviderVisibility = { navController.navigateWhenResumed(ScreenDestinations.homeProviderVisibility.route) },
-                onNavigateToRaceModeLatency = { navController.navigateWhenResumed(ScreenDestinations.raceModeLatency.route) },
-                onNavigateToRaceModeProviders = { navController.navigateWhenResumed(ScreenDestinations.raceModeProviders.route) },
-                onNavigateToCacheSettings = { navController.navigateWhenResumed(ScreenDestinations.cacheSettings.route) },
-                onNavigateToBootstrapSettings = { navController.navigateWhenResumed(ScreenDestinations.bootstrapSettings.route) },
-                onNavigateToLogRetentionSettings = { navController.navigateWhenResumed(ScreenDestinations.logRetentionSettings.route) },
-                onNavigateToForegroundBackgroundSettings = { navController.navigateWhenResumed(ScreenDestinations.foregroundBackgroundSettings.route) },
-                onNavigateToHttpInspection = {
-                    navController.navigateWhenResumed(Routes.HTTP_INSPECTION_SETTINGS)
-                },
-                onNavigateToAppearanceSettings = { navController.navigateWhenResumed(ScreenDestinations.appearanceSettings.route) },
-                onNavigateToAbout = { navController.navigateWhenResumed(ScreenDestinations.about.route) },
-                onNavigateToSponsor = { navController.navigateWhenResumed(ScreenDestinations.sponsor.route) },
-                onNavigateToSponsorList = { navController.navigateWhenResumed(ScreenDestinations.sponsorList.route) },
-                onNavigateToCoBuilderList = { navController.navigateWhenResumed(ScreenDestinations.coBuilderList.route) }
+                onNavigateToRoute = { navController.navigateWhenResumed(it) }
             )
         }
         composable(Routes.LOG_DASHBOARD) {
