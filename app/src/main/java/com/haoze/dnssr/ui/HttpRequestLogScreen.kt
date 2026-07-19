@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -34,6 +35,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -64,11 +67,13 @@ private data class HttpLogFilterOption(
 @Composable
 fun HttpRequestLogScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val logs by remember(context) {
-        AppDatabase.getInstance(context).httpRequestLogDao().observeRecent()
+    var loadLimit by remember { mutableStateOf(50) }
+    val logs by remember(context, loadLimit) {
+        AppDatabase.getInstance(context).httpRequestLogDao().observeRecent(loadLimit)
     }.collectAsStateWithLifecycle(initialValue = emptyList())
     var selectedFilter by remember { mutableStateOf(HttpLogFilter.ALL) }
     var showExplanation by remember { mutableStateOf(false) }
+    var initialScrollDone by remember { mutableStateOf(false) }
     val filteredLogs = remember(logs, selectedFilter) {
         logs.filter { log ->
             when (selectedFilter) {
@@ -79,6 +84,21 @@ fun HttpRequestLogScreen(onBack: () -> Unit) {
                 HttpLogFilter.BYPASSED -> log.outcome in directOutcomes
             }
         }
+    }
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember { derivedStateOf {
+        val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        initialScrollDone && listState.firstVisibleItemIndex > 0 && filteredLogs.isNotEmpty() && last >= filteredLogs.lastIndex - 5 && logs.size >= loadLimit
+    } }
+    LaunchedEffect(logs.isNotEmpty()) {
+        if (!initialScrollDone && logs.isNotEmpty()) {
+            listState.scrollToItem(0)
+            initialScrollDone = true
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) loadLimit += 50 }
+    LaunchedEffect(filteredLogs.isNotEmpty()) {
+        if (filteredLogs.isNotEmpty()) listState.scrollToItem(0)
     }
 
     Scaffold(
@@ -110,6 +130,7 @@ fun HttpRequestLogScreen(onBack: () -> Unit) {
                 EmptyHttpLogMessage("当前筛选下暂无请求记录")
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)

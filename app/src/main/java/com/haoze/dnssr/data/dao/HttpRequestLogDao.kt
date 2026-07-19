@@ -12,7 +12,7 @@ interface HttpRequestLogDao {
     suspend fun insertAll(entities: List<HttpRequestLogEntity>)
 
     @Query("SELECT * FROM http_request_log ORDER BY timestamp DESC LIMIT :limit")
-    fun observeRecent(limit: Int = 500): Flow<List<HttpRequestLogEntity>>
+    fun observeRecent(limit: Int = 50): Flow<List<HttpRequestLogEntity>>
 
     @Query("SELECT * FROM http_request_log ORDER BY timestamp DESC LIMIT :limit")
     suspend fun recent(limit: Int): List<HttpRequestLogEntity>

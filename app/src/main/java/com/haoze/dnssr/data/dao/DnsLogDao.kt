@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DnsLogDao {
-    @Query("SELECT * FROM dns_log ORDER BY timestamp DESC LIMIT 500")
-    fun observeRecentForRequests(): Flow<List<DnsLogEntity>>
+    @Query("SELECT * FROM dns_log ORDER BY timestamp DESC LIMIT :limit")
+    fun observeRecentForRequests(limit: Int = 50): Flow<List<DnsLogEntity>>
     @Insert
     suspend fun insert(entity: DnsLogEntity)
 

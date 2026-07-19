@@ -23,15 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,13 +47,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.DnsLogEntity
@@ -64,6 +63,8 @@ import com.haoze.dnssr.data.entity.HttpRequestLogEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.LogResult
+import com.haoze.dnssr.ui.components.SettingsDivider
+import com.haoze.dnssr.ui.components.SettingsRadioItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,7 +73,14 @@ import java.util.Date
 import java.util.Locale
 
 private enum class RequestSource(val label: String) { ALL("全部"), DNS("DNS"), HTTPS("HTTPS") }
-private enum class RequestStatus(val label: String) { ALL("全部"), PASSED("通过"), BLOCKED("过滤"), ERROR("失败"), BYPASSED("旁路") }
+private enum class RequestStatus(val label: String, val explanation: String) {
+    ALL("全部", "显示所有请求记录"),
+    PASSED("通过", "请求正常放行，未命中拦截规则"),
+    REWRITTEN("覆写", "请求命中了覆写规则，并返回覆写后的结果"),
+    BLOCKED("过滤", "请求命中了过滤规则并被拦截"),
+    ERROR("失败", "请求解析或处理失败"),
+    BYPASSED("旁路", "请求未被读取或过滤，直接建立连接")
+}
 
 private data class RequestLogItem(
     val key: String,
@@ -91,7 +99,8 @@ private data class RequestLogItem(
 fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit = {}) {
     val context = LocalContext.current
     val database = remember(context) { AppDatabase.getInstance(context) }
-    val dnsLogs by remember(database) { database.dnsLogDao().observeRecentForRequests() }
+    var loadLimit by remember { mutableStateOf(50) }
+    val dnsLogs by remember(database, loadLimit) { database.dnsLogDao().observeRecentForRequests(loadLimit) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val httpLogs by remember(database) { database.httpRequestLogDao().observeRecent() }
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -100,6 +109,8 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var pendingDomain by remember { mutableStateOf<String?>(null) }
+    var showStatusDialog by remember { mutableStateOf(false) }
+    var initialScrollDone by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val allItems = remember(dnsLogs, httpLogs) {
@@ -120,6 +131,22 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
         }
     }
 
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember { derivedStateOf {
+        val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        initialScrollDone && listState.firstVisibleItemIndex > 0 && visibleItems.isNotEmpty() && last >= visibleItems.lastIndex - 5 &&
+            (dnsLogs.size >= loadLimit || httpLogs.size >= loadLimit)
+    } }
+    LaunchedEffect(dnsLogs.isNotEmpty(), httpLogs.isNotEmpty()) {
+        if (!initialScrollDone && (dnsLogs.isNotEmpty() || httpLogs.isNotEmpty())) {
+            listState.scrollToItem(0)
+            initialScrollDone = true
+        }
+    }
+    LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) loadLimit += 50 }
+    LaunchedEffect(visibleItems.isNotEmpty()) {
+        if (visibleItems.isNotEmpty()) listState.scrollToItem(0)
+    }
     Scaffold(topBar = {
         TopAppBar(
             title = {
@@ -130,7 +157,7 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
             actions = {
                 IconButton(onClick = { if (searching && query.isNotEmpty()) query = "" else searching = !searching }) { Icon(if (searching) Icons.Default.Close else Icons.Default.Search, if (searching) "关闭搜索" else "搜索") }
                 IconButton(onClick = { exportLauncher.launch("dnssr-request-logs-${System.currentTimeMillis()}.csv") }) { Icon(Icons.Default.FileDownload, "导出 CSV") }
-                RequestLogOverflowMenu(status = status, onStatusChange = { status = it })
+                IconButton(onClick = { showStatusDialog = true }) { Icon(Icons.Default.FilterList, "选择状态") }
             }
         )
     }) { padding ->
@@ -138,10 +165,28 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
             RequestFilterRow(RequestSource.entries, source, { it.label }, { source = it })
             HorizontalDivider()
             if (visibleItems.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("当前筛选下暂无请求日志", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            else LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(visibleItems, key = { it.key }) { item -> RequestLogCard(item) { item.domain?.let { pendingDomain = it } } }
             }
         }
+    }
+    if (showStatusDialog) {
+        AlertDialog(
+            onDismissRequest = { showStatusDialog = false },
+            title = { Text("筛选请求状态") },
+            text = { Column {
+                RequestStatus.entries.forEachIndexed { index, option ->
+                    SettingsRadioItem(
+                        title = option.label,
+                        subtitle = option.explanation,
+                        selected = status == option,
+                        onClick = { status = option; showStatusDialog = false }
+                    )
+                    if (index < RequestStatus.entries.lastIndex) SettingsDivider()
+                }
+            } },
+            confirmButton = { TextButton(onClick = { showStatusDialog = false }) { Text("取消") } }
+        )
     }
     pendingDomain?.let { domain ->
         RequestDomainDialog(domain, { pendingDomain = null }, {
@@ -152,41 +197,6 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
                 withContext(Dispatchers.Main) { if (success) onRuntimeDnsSettingsChanged(); Toast.makeText(context, if (success) "已添加规则" else "规则格式无效", Toast.LENGTH_SHORT).show(); pendingDomain = null }
             }
         })
-    }
-}
-
-@Composable
-private fun RequestLogOverflowMenu(
-    status: RequestStatus,
-    onStatusChange: (RequestStatus) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.FilterList, contentDescription = "选择状态")
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.width(100.dp)
-        ) {
-            RequestStatus.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = if (status == option) "已选中" else null,
-                            tint = if (status == option) MaterialTheme.colorScheme.primary else Color.Transparent
-                        )
-                    },
-                    onClick = {
-                        onStatusChange(option)
-                        expanded = false
-                    }
-                )
-            }
-        }
     }
 }
 
@@ -221,6 +231,6 @@ private fun RequestDomainDialog(domain: String, dismiss: () -> Unit, copy: () ->
 
 private val requestTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 private fun dnsRequestItem(log: DnsLogEntity) = RequestLogItem("dns-${log.id}", log.timestamp, RequestSource.DNS, when (log.result) { LogResult.PASSED.value -> RequestStatus.PASSED; LogResult.BLOCKED.value -> RequestStatus.BLOCKED; else -> RequestStatus.ERROR }, log.queryName, "${requestTime.format(Date(log.timestamp))} · DNS · ${dnsRequestType(log.queryType)}${if (log.cached) " · 命中缓存" else ""}", log.message, log.queryName, log.cached)
-private fun httpRequestItem(log: HttpRequestLogEntity) = RequestLogItem("https-${log.id}", log.timestamp, RequestSource.HTTPS, when (log.outcome) { "allowed", "rewritten" -> RequestStatus.PASSED; "blocked", "invalid" -> RequestStatus.BLOCKED; "decryption_failed", "unsupported_protocol", "resource_bypass" -> RequestStatus.BYPASSED; else -> RequestStatus.ERROR }, log.authority ?: "未取得 authority", "${requestTime.format(Date(log.timestamp))} · HTTPS · ${log.protocol} · ${log.packageName}", log.matchedRule?.let { "匹配规则 · $it" }, log.authority)
+private fun httpRequestItem(log: HttpRequestLogEntity) = RequestLogItem("https-${log.id}", log.timestamp, RequestSource.HTTPS, when (log.outcome) { "allowed" -> RequestStatus.PASSED; "rewritten" -> RequestStatus.REWRITTEN; "blocked", "invalid" -> RequestStatus.BLOCKED; "decryption_failed", "unsupported_protocol", "resource_bypass" -> RequestStatus.BYPASSED; else -> RequestStatus.ERROR }, log.authority ?: "未取得 authority", "${requestTime.format(Date(log.timestamp))} · HTTPS · ${log.protocol} · ${log.packageName}", log.matchedRule?.let { "匹配规则 · $it" }, log.authority)
 private fun dnsRequestType(type: Int) = when (type) { 1 -> "A"; 28 -> "AAAA"; 5 -> "CNAME"; 15 -> "MX"; 16 -> "TXT"; 2 -> "NS"; 12 -> "PTR"; 255 -> "ANY"; else -> "TYPE$type" }
 private fun requestCsv(items: List<RequestLogItem>) = buildString { append('\uFEFF'); appendLine("timestamp,time,source,status,request,details"); items.forEach { appendLine(listOf(it.timestamp, requestTime.format(Date(it.timestamp)), it.source.label, it.status.label, it.title, it.subtitle + (it.detail?.let { d -> " · $d" } ?: "")).joinToString(",") { v -> "\"${v.toString().replace("\"", "\"\"")}\"" }) } }
