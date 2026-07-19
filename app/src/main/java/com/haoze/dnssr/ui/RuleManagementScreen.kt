@@ -162,7 +162,7 @@ fun RuleManagementScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = "添加白名单域名",
+                        title = "添加放行域名",
                         subtitle = "输入要放行的域名，如 example.com",
                         onClick = ::openAddAllowRuleDialog
                     )
@@ -316,7 +316,7 @@ fun RuleManagementScreen(
     if (showAddAllowRuleDialog) {
         AlertDialog(
             onDismissRequest = ::closeAddAllowRuleDialog,
-            title = { Text("添加白名单域名") },
+            title = { Text("添加放行域名") },
             text = {
                 OutlinedTextField(
                     value = newAllowRule,
