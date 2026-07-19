@@ -66,7 +66,9 @@ fun ModernLogDashboardScreen(
     val dashboardTheme = rememberDashboardThemeColors()
     val cachedWebView = DashboardWebViewCache.webViews[assetUrl]
     var webView by remember { mutableStateOf(cachedWebView) }
-    var pageReady by remember(assetUrl) { mutableStateOf(assetUrl in DashboardWebViewCache.readyUrls) }
+    // A cached WebView may still contain the asset's default light theme. Keep it
+    // covered until the current Compose theme has been pushed into the page.
+    var pageReady by remember(assetUrl) { mutableStateOf(false) }
     var webViewAttached by rememberSaveable { mutableStateOf(false) }
     val hasDashboardData = uiState.dashboardJson != EMPTY_DASHBOARD_JSON
     LaunchedEffect(viewModel) {
@@ -76,20 +78,17 @@ fun ModernLogDashboardScreen(
         webViewAttached = true
     }
 
-    LaunchedEffect(pageReady, uiState.dashboardJson, dashboardTheme) {
+    LaunchedEffect(webView, uiState.dashboardJson, dashboardTheme) {
         val view = webView
-        if (pageReady && view != null) {
+        if (view != null) {
             view.post {
                 view.evaluateJavascript(
                     "window.DNSSR && window.DNSSR.setTheme(${dashboardTheme.toJson()});",
+                ) { pageReady = true }
+                if (hasDashboardData) view.evaluateJavascript(
+                    "window.DNSSR && window.DNSSR.render(${uiState.dashboardJson});",
                     null
                 )
-                if (hasDashboardData) {
-                    view.evaluateJavascript(
-                        "window.DNSSR && window.DNSSR.render(${uiState.dashboardJson});",
-                        null
-                    )
-                }
             }
         }
     }
