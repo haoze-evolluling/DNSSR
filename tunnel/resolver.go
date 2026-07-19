@@ -61,6 +61,21 @@ type Resolver struct {
 	quicConn   quic.Connection
 	quicMu     sync.Mutex
 	quicServer string
+
+	providerSnapshot *resolverSnapshot
+}
+
+type configuredProvider struct {
+	resolver *Resolver
+}
+
+type resolverSnapshot struct {
+	mu        sync.Mutex
+	providers []*configuredProvider
+	mode      string
+	active    int
+	retired   bool
+	closed    bool
 }
 
 const (
@@ -113,6 +128,28 @@ func (r *Resolver) Configure(protocol DNSProtocol, primary, fallback, dohURL str
 		r.quicConn = nil
 	}
 	r.quicMu.Unlock()
+}
+
+// ConfigureProviders swaps the complete provider set used by HTTPS full-tunnel mode.
+func (r *Resolver) ConfigureProviders(mode string, configs []dnsProviderConfig) error {
+	providers := make([]*configuredProvider, 0, len(configs))
+	for _, cfg := range configs {
+		child := NewResolver(r.protectSocketFn)
+		child.Configure(ParseProtocol(cfg.Protocol), cfg.Server, "", cfg.URL)
+		providers = append(providers, &configuredProvider{resolver: child})
+	}
+	if len(providers) == 0 {
+		return fmt.Errorf("DNS snapshot has no providers")
+	}
+	next := &resolverSnapshot{providers: providers, mode: mode}
+	r.mu.Lock()
+	old := r.providerSnapshot
+	r.providerSnapshot = next
+	r.mu.Unlock()
+	if old != nil {
+		old.retire()
+	}
+	return nil
 }
 
 // SetSplitDNS configures split-DNS routing for specific zones.
@@ -179,11 +216,17 @@ func (r *Resolver) queryPlainUnprotected(rawQuery []byte, server string) ([]byte
 // Split-DNS is handled by the engine (handleSplitDNSForward) before calling this.
 func (r *Resolver) Resolve(rawQuery []byte) ([]byte, error) {
 	r.mu.RLock()
+	snapshot := r.providerSnapshot
+	acquiredSnapshot := snapshot != nil && snapshot.acquire()
 	protocol := r.protocol
 	primary := r.primaryServer
 	fallback := r.fallbackServer
 	dohURL := r.dohURL
 	r.mu.RUnlock()
+	if acquiredSnapshot {
+		defer snapshot.release()
+		return resolveConfigured(rawQuery, snapshot.mode, snapshot.providers)
+	}
 
 	// Try primary
 	resp, err := r.query(rawQuery, protocol, primary, dohURL)
@@ -201,6 +244,100 @@ func (r *Resolver) Resolve(rawQuery []byte) ([]byte, error) {
 	}
 
 	return nil, err
+}
+
+func resolveConfigured(rawQuery []byte, mode string, providers []*configuredProvider) ([]byte, error) {
+	if len(providers) == 1 || mode == "single" {
+		return queryConfiguredProvider(providers[0], rawQuery)
+	}
+	var lastErr error
+	for _, provider := range providers {
+		response, err := queryConfiguredProvider(provider, rawQuery)
+		if err == nil {
+			return response, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func queryConfiguredProvider(provider *configuredProvider, rawQuery []byte) ([]byte, error) {
+	response, err := provider.resolver.Resolve(rawQuery)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateDNSResponse(rawQuery, response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func validateDNSResponse(rawQuery, rawResponse []byte) error {
+	var query, response dns.Msg
+	if err := query.Unpack(rawQuery); err != nil {
+		return fmt.Errorf("invalid DNS query: %w", err)
+	}
+	if query.Response || len(query.Question) == 0 {
+		return fmt.Errorf("invalid DNS query flags or empty question")
+	}
+	if err := response.Unpack(rawResponse); err != nil {
+		return fmt.Errorf("invalid DNS response: %w", err)
+	}
+	if !response.Response || response.Id != query.Id {
+		return fmt.Errorf("DNS response transaction mismatch")
+	}
+	if len(response.Question) != len(query.Question) {
+		return fmt.Errorf("DNS response question count mismatch")
+	}
+	for i := range query.Question {
+		q, a := query.Question[i], response.Question[i]
+		if !strings.EqualFold(q.Name, a.Name) || q.Qtype != a.Qtype || q.Qclass != a.Qclass {
+			return fmt.Errorf("DNS response question mismatch")
+		}
+	}
+	return nil
+}
+
+func (s *resolverSnapshot) acquire() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.retired {
+		return false
+	}
+	s.active++
+	return true
+}
+
+func (s *resolverSnapshot) release() {
+	s.mu.Lock()
+	s.active--
+	closeNow := s.retired && s.active == 0 && !s.closed
+	if closeNow {
+		s.closed = true
+	}
+	s.mu.Unlock()
+	if closeNow {
+		s.closeProviders()
+	}
+}
+
+func (s *resolverSnapshot) retire() {
+	s.mu.Lock()
+	s.retired = true
+	closeNow := s.active == 0 && !s.closed
+	if closeNow {
+		s.closed = true
+	}
+	s.mu.Unlock()
+	if closeNow {
+		s.closeProviders()
+	}
+}
+
+func (s *resolverSnapshot) closeProviders() {
+	for _, provider := range s.providers {
+		provider.resolver.Shutdown()
+	}
 }
 
 // query performs a DNS query using the specified protocol.
@@ -505,6 +642,13 @@ func (r *Resolver) resetQUICConn() {
 
 // Shutdown cleans up resolver resources.
 func (r *Resolver) Shutdown() {
+	r.mu.Lock()
+	snapshot := r.providerSnapshot
+	r.providerSnapshot = nil
+	r.mu.Unlock()
+	if snapshot != nil {
+		snapshot.retire()
+	}
 	r.resetQUICConn()
 	r.httpClient.CloseIdleConnections()
 }

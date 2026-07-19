@@ -146,6 +146,12 @@ fun HttpInspectionSettingsScreen(
                     checked = enabled,
                     enabled = supported,
                     onCheckedChange = { checked ->
+                        if (checked && AppSettings.getDnsResolutionMode(context) in setOf(
+                                DnsResolutionMode.SMART_PREDICTION,
+                                DnsResolutionMode.PARALLEL_RACE
+                            )) {
+                            AppSettings.setDnsResolutionMode(context, DnsResolutionMode.SINGLE)
+                        }
                         enabled = checked
                         AppSettings.setHttpInspectionEnabled(context, checked)
                         RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)

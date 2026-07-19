@@ -15,6 +15,7 @@ const (
 	ResponseCustomIP ResponseType = iota // 0.0.0.0
 	ResponseNXDomain                     // NXDOMAIN
 	ResponseRefused                      // REFUSED
+	ResponseNoData                       // NOERROR with an empty answer
 )
 
 // ParseResponseType converts a string to ResponseType.
@@ -24,6 +25,8 @@ func ParseResponseType(s string) ResponseType {
 		return ResponseNXDomain
 	case "REFUSED":
 		return ResponseRefused
+	case "NODATA":
+		return ResponseNoData
 	default:
 		return ResponseCustomIP
 	}

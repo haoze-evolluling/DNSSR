@@ -55,6 +55,9 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
     private val _resolutionMode = MutableStateFlow(DnsResolutionMode.SINGLE)
     val resolutionMode: StateFlow<DnsResolutionMode> = _resolutionMode.asStateFlow()
 
+    private val _httpsInspectionEnabled = MutableStateFlow(false)
+    val httpsInspectionEnabled: StateFlow<Boolean> = _httpsInspectionEnabled.asStateFlow()
+
     private val _presetDnsService = MutableStateFlow(PresetDnsService.DNS)
     val presetDnsService: StateFlow<PresetDnsService> = _presetDnsService.asStateFlow()
 
@@ -119,6 +122,7 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
                 _raceModeEnabled.value = raceModeEnabled
                 _raceModeStrategy.value = strategy
                 _resolutionMode.value = resolutionMode
+                _httpsInspectionEnabled.value = AppSettings.isHttpInspectionEnabled(context)
                 _presetDnsService.value = presetDnsService
                 _primaryBackupIds.value = primaryBackupIds
                 _smartPredictionIds.value = smartIds
@@ -173,6 +177,10 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
 
     fun setResolutionMode(mode: DnsResolutionMode): Boolean {
         if (_resolutionMode.value == mode) return false
+        if (_httpsInspectionEnabled.value && !isHttpsCompatible(mode)) {
+            _message.value = "HTTPS 过滤仅支持省电和有备无患模式"
+            return false
+        }
         if (!isModeValid(mode)) {
             _message.value = "至少选择 2 个服务商后才能启用该模式"
             if (mode == DnsResolutionMode.PRIMARY_BACKUP) _message.value = "有备无患至少需要 1 个主服务和 1 个备用服务"
@@ -185,6 +193,12 @@ class RaceModeSettingsViewModel(application: Application) : AndroidViewModel(app
         _message.value = "已切换为${mode.displayName}"
         return true
     }
+
+    fun isModeEnabled(mode: DnsResolutionMode): Boolean =
+        !_httpsInspectionEnabled.value || isHttpsCompatible(mode)
+
+    private fun isHttpsCompatible(mode: DnsResolutionMode): Boolean =
+        mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP
 
     fun isModeValid(mode: DnsResolutionMode): Boolean = when (mode) {
         DnsResolutionMode.SINGLE -> _providers.value.any { it.id == _singleProviderId.value }

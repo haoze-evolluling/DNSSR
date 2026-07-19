@@ -130,7 +130,13 @@ func (e *Engine) StartFull(fd int, protector SocketProtector) {
 	}
 	e.protectFn = protectFn
 	e.resolver = NewResolver(protectFn)
-	e.resolver.Configure(ParseProtocol(e.protocol), e.primaryDNS, e.fallbackDNS, e.dohURL)
+	if e.dnsConfig != nil {
+		if err := e.resolver.ConfigureProviders(e.dnsConfig.Mode, e.dnsConfig.Providers); err != nil {
+			logf("StartFull: DNS snapshot rejected: %v", err)
+		}
+	} else {
+		e.resolver.Configure(ParseProtocol(e.protocol), e.primaryDNS, e.fallbackDNS, e.dohURL)
+	}
 
 	certMgr := e.stackCertMgr
 	filter := e.stackMitmFilter

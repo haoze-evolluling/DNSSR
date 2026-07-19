@@ -90,6 +90,9 @@ type Engine struct {
 	fallbackDNS     string
 	dohURL          string
 	responseType    ResponseType
+	dnsConfig       *dnsEngineConfig
+	dynamicResponse dynamicBlockConfig
+	dynamicBlocks   dynamicBlockTracker
 	logCallback     LogCallback
 	httpLogCallback HttpLogCallback
 	resolver        *Resolver
@@ -957,11 +960,18 @@ func (e *Engine) standaloneBlock(w dns.ResponseWriter, r *dns.Msg, blockedBy, ap
 	m := new(dns.Msg)
 	m.SetReply(r)
 
-	switch e.responseType {
+	e.mu.Lock()
+	responseType := e.responseType
+	dynamicConfig := e.dynamicResponse
+	e.mu.Unlock()
+	responseType = e.dynamicBlocks.responseFor(strings.TrimSuffix(strings.ToLower(r.Question[0].Name), "."), dynamicConfig, responseType)
+	switch responseType {
 	case ResponseNXDomain:
 		m.Rcode = dns.RcodeNameError
 	case ResponseRefused:
 		m.Rcode = dns.RcodeRefused
+	case ResponseNoData:
+		m.Rcode = dns.RcodeSuccess
 	default:
 		m.Rcode = dns.RcodeSuccess
 		if r.Question[0].Qtype == dns.TypeA {

@@ -372,19 +372,21 @@ fun SettingsRadioItem(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    subtitle: String? = null
+    subtitle: String? = null,
+    enabled: Boolean = true
 ) {
     SettingsItem(
         title = title,
         subtitle = subtitle,
         modifier = modifier,
+        enabled = enabled,
         onClick = onClick
     ) {
         if (selected) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = "已选中",
-                tint = MaterialTheme.colorScheme.primary
+                tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             )
         }
     }

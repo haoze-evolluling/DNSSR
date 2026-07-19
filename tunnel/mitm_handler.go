@@ -101,11 +101,9 @@ func newMitmTcpHandler(
 			return
 		}
 
-		// Gate 2 — browser allowlist (UID). When Kotlin has configured
-		// an allowlist, non-allowed UIDs get passthrough. If UID is
-		// unknown (API < 29, resolver failure), err on the safe side:
-		// passthrough rather than MITM an unknown app.
-		if filter.HasAllowedUIDs() && (uid == UIDUnknown || !filter.IsUIDAllowed(uid)) {
+		// Gate 2 — only explicitly allowed UIDs may be intercepted. An empty
+		// allowlist and UID lookup failures both fail closed to passthrough.
+		if uid == UIDUnknown || !filter.IsUIDAllowed(uid) {
 			relayDirectFromFlow(conn, flow, blocker, protectFn)
 			return
 		}

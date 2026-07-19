@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import com.haoze.dnssr.ui.DnsResolutionMode
 import tunnel.AppUidResolver
 import tunnel.DomainChecker
 import tunnel.Engine
@@ -20,6 +21,7 @@ import java.io.File
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import org.json.JSONObject
+import org.json.JSONArray
 
 /**
  * Owns the GPL-3.0 Go full-TUN data plane used only while HTTP inspection is
@@ -30,7 +32,7 @@ class GoInspectionTunnel(
     private val context: Context,
     private val vpnService: DnsVpnService,
     private val scope: CoroutineScope,
-    private val provider: DnsProvider,
+    private var dnsConfig: HttpsDnsConfigSnapshot,
     private val selectedPackages: Set<String>,
     private val policy: HttpDomainPolicy,
     private val allowListManager: AllowListManager,
@@ -69,14 +71,27 @@ class GoInspectionTunnel(
         engine.setRewriteRules(JSONObject(rewriteRuleManager.cnameRedirects()).toString())
     }
 
-    private fun configureEngine(selectedPackages: Set<String>) {
-        engine.setDNS(
-            provider.protocol.goProtocol,
-            provider.host,
-            "",
-            provider.url
+    @Synchronized
+    fun syncDnsConfig(
+        providers: List<DnsProvider>,
+        resolutionMode: DnsResolutionMode,
+        blockResponseMode: BlockResponseMode,
+        dynamicBlockResponseConfig: DynamicBlockResponseConfig
+    ) {
+        val next = HttpsDnsConfigSnapshot.create(
+            providers, resolutionMode, blockResponseMode, dynamicBlockResponseConfig
         )
-        engine.setBlockResponseType("NXDOMAIN")
+        engine.applyDNSConfig(next.toJson())
+        dnsConfig = next
+    }
+
+    private fun configureEngine(selectedPackages: Set<String>) {
+        syncDnsConfig(
+            dnsConfig.providers,
+            dnsConfig.mode,
+            dnsConfig.blockResponseMode,
+            dnsConfig.dynamicBlockResponseConfig
+        )
         updateRewriteRules()
         engine.setDomainChecker(object : DomainChecker {
             override fun isBlocked(domain: String): Boolean = policy.evaluate(domain) is HttpDomainDecision.Block
@@ -141,6 +156,28 @@ class GoInspectionTunnel(
         }
     }
 
+    private fun HttpsDnsConfigSnapshot.toJson(): String = JSONObject()
+            .put("mode", mode.storageValue)
+            .put("blockResponse", blockResponseMode.goValue)
+            .put("dynamicResponse", JSONObject()
+                .put("enabled", dynamicBlockResponseConfig.enabled)
+                .put("requestThreshold", dynamicBlockResponseConfig.requestThreshold)
+                .put("windowSeconds", dynamicBlockResponseConfig.windowSeconds)
+                .put("nxDomainDurationSeconds", dynamicBlockResponseConfig.nxDomainDurationSeconds))
+            .put("providers", JSONArray().apply {
+                providers.forEach { provider ->
+                    put(JSONObject()
+                        .put("id", provider.id)
+                        .put("protocol", provider.protocol.goProtocol)
+                        .put("server", when (provider.protocol) {
+                            DnsProtocol.DNS, DnsProtocol.DOT -> provider.hostPort()
+                            DnsProtocol.DOH -> ""
+                        })
+                        .put("url", provider.url))
+                }
+            })
+            .toString()
+
     private val DnsProtocol.goProtocol: String
         get() = when (this) {
             DnsProtocol.DNS -> "PLAIN"
@@ -148,8 +185,42 @@ class GoInspectionTunnel(
             DnsProtocol.DOT -> "DOT"
         }
 
+    private fun DnsProvider.hostPort(): String =
+        if (host.contains(':') && !host.startsWith('[')) "[$host]:$port" else "$host:$port"
+
+    private val BlockResponseMode.goValue: String
+        get() = when (this) {
+            BlockResponseMode.NXDOMAIN -> "NXDOMAIN"
+            BlockResponseMode.NODATA -> "NODATA"
+            BlockResponseMode.REFUSED -> "REFUSED"
+            BlockResponseMode.ZERO_ADDRESS -> "CUSTOM_IP"
+        }
+
     private companion object {
         const val TAG = "GoInspectionTunnel"
+    }
+}
+
+data class HttpsDnsConfigSnapshot private constructor(
+    val providers: List<DnsProvider>,
+    val mode: DnsResolutionMode,
+    val blockResponseMode: BlockResponseMode,
+    val dynamicBlockResponseConfig: DynamicBlockResponseConfig
+) {
+    companion object {
+        fun create(
+            providers: List<DnsProvider>,
+            mode: DnsResolutionMode,
+            blockResponseMode: BlockResponseMode,
+            dynamicBlockResponseConfig: DynamicBlockResponseConfig
+        ): HttpsDnsConfigSnapshot {
+            require(providers.isNotEmpty()) { "DNS provider list must not be empty" }
+            require(mode == DnsResolutionMode.SINGLE || mode == DnsResolutionMode.PRIMARY_BACKUP) {
+                "HTTPS DNS does not support ${mode.storageValue}"
+            }
+            val selected = if (mode == DnsResolutionMode.SINGLE) listOf(providers.first()) else providers
+            return HttpsDnsConfigSnapshot(selected, mode, blockResponseMode, dynamicBlockResponseConfig)
+        }
     }
 }
 

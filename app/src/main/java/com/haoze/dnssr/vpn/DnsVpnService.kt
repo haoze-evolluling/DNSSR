@@ -123,6 +123,10 @@ class DnsVpnService : VpnService() {
         activeDnsCachePolicy = AppSettings.getDnsCachePolicy(this)
         activeRaceModeStrategy = AppSettings.getRaceModeStrategy(this)
         activeResolutionMode = AppSettings.getDnsResolutionMode(this)
+        if (AppSettings.isHttpInspectionEnabled(this) && !activeResolutionMode.isHttpsCompatible()) {
+            activeResolutionMode = DnsResolutionMode.SINGLE
+            AppSettings.setDnsResolutionMode(this, activeResolutionMode)
+        }
         activeDnsLogMode = AppSettings.getDnsLogMode(this)
         activeBlockResponseMode = AppSettings.getBlockResponseMode(this)
         activeDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this)
@@ -176,6 +180,8 @@ class DnsVpnService : VpnService() {
         }
         startIntent = intent
         setRunningFlag(this, true)
+
+        activeResolutionMode = normalizeHttpsResolutionMode()
 
         val providers = resolveDnsProviders(intent)
         resolvers = providers.map { provider ->
@@ -239,7 +245,12 @@ class DnsVpnService : VpnService() {
                 context = this,
                 vpnService = this,
                 scope = serviceScope,
-                provider = providers.first(),
+                dnsConfig = HttpsDnsConfigSnapshot.create(
+                    providers,
+                    activeResolutionMode,
+                    activeBlockResponseMode,
+                    activeDynamicBlockResponseConfig
+                ),
                 selectedPackages = activeInspectionPackages,
                 policy = HttpDomainPolicy(allowListManager, blockListManager),
                 allowListManager = allowListManager,
@@ -295,7 +306,7 @@ class DnsVpnService : VpnService() {
                 val oldResolvers = resolvers
                 val newCachePolicy = AppSettings.getDnsCachePolicy(this@DnsVpnService)
                 val newRaceModeStrategy = AppSettings.getRaceModeStrategy(this@DnsVpnService)
-                val newResolutionMode = AppSettings.getDnsResolutionMode(this@DnsVpnService)
+                val newResolutionMode = normalizeHttpsResolutionMode()
                 activeDnsLogMode = AppSettings.getDnsLogMode(this@DnsVpnService)
                 val newBlockResponseMode = AppSettings.getBlockResponseMode(this@DnsVpnService)
                 val newDynamicBlockResponseConfig = AppSettings.getDynamicBlockResponseConfig(this@DnsVpnService)
@@ -310,13 +321,29 @@ class DnsVpnService : VpnService() {
 
                 newResolvers.fold(
                     onSuccess = { updatedResolvers ->
+                        val goSyncError = goInspectionTunnel?.let { tunnel ->
+                            runCatching {
+                                tunnel.syncDnsConfig(
+                                    providers = updatedResolvers.map { it.provider },
+                                    resolutionMode = newResolutionMode,
+                                    blockResponseMode = newBlockResponseMode,
+                                    dynamicBlockResponseConfig = newDynamicBlockResponseConfig
+                                )
+                            }.exceptionOrNull()
+                        }
                         activeDnsCachePolicy = newCachePolicy
-                        activeRaceModeStrategy = newRaceModeStrategy
-                        activeResolutionMode = newResolutionMode
                         activeBlockResponseMode = newBlockResponseMode
                         activeDynamicBlockResponseConfig = newDynamicBlockResponseConfig
                         dynamicBlockResponseTracker.clear()
                         dnsCache.updatePolicy(newCachePolicy)
+                        if (goSyncError != null) {
+                            closeResolverList(updatedResolvers)
+                            startForeground(NOTIFICATION_ID, buildForegroundNotification())
+                            Log.w(TAG, "Failed to refresh Go DNS upstream; keeping current snapshot", goSyncError)
+                            return@onSuccess
+                        }
+                        activeRaceModeStrategy = newRaceModeStrategy
+                        activeResolutionMode = newResolutionMode
                         resolvers = updatedResolvers
                         startForeground(NOTIFICATION_ID, buildForegroundNotification())
                         Log.i(
@@ -329,6 +356,16 @@ class DnsVpnService : VpnService() {
                         }
                     },
                     onFailure = { error ->
+                        runCatching {
+                            goInspectionTunnel?.syncDnsConfig(
+                                providers = oldResolvers.map { it.provider },
+                                resolutionMode = activeResolutionMode,
+                                blockResponseMode = newBlockResponseMode,
+                                dynamicBlockResponseConfig = newDynamicBlockResponseConfig
+                            )
+                        }.onFailure { syncError ->
+                            Log.w(TAG, "Failed to sync Go DNS response policy", syncError)
+                        }
                         activeDnsCachePolicy = newCachePolicy
                         activeRaceModeStrategy = newRaceModeStrategy
                         activeResolutionMode = newResolutionMode
@@ -476,6 +513,16 @@ class DnsVpnService : VpnService() {
             }
         }
         return listOf(DnsProvider.loadSelected(this))
+    }
+
+    private fun DnsResolutionMode.isHttpsCompatible(): Boolean =
+        this == DnsResolutionMode.SINGLE || this == DnsResolutionMode.PRIMARY_BACKUP
+
+    private fun normalizeHttpsResolutionMode(): DnsResolutionMode {
+        val configured = AppSettings.getDnsResolutionMode(this)
+        if (!AppSettings.isHttpInspectionEnabled(this) || configured.isHttpsCompatible()) return configured
+        AppSettings.setDnsResolutionMode(this, DnsResolutionMode.SINGLE)
+        return DnsResolutionMode.SINGLE
     }
 
     private fun stopVpn() {
