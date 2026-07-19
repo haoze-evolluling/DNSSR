@@ -133,7 +133,7 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
     Scaffold(topBar = {
         TopAppBar(
             title = {
-                if (searching) OutlinedTextField(value = query, onValueChange = viewModel::setQuery, singleLine = true, placeholder = { Text("搜索请求") }, modifier = Modifier.fillMaxWidth())
+                if (searching) OutlinedTextField(value = query, onValueChange = viewModel::setQuery, singleLine = true, placeholder = { Text("搜索请求") }, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth())
                 else Text("请求日志")
             },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },

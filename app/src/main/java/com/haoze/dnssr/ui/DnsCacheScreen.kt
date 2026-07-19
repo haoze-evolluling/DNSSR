@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -42,7 +43,6 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import com.haoze.dnssr.data.entity.DnsCacheEntity
-import com.haoze.dnssr.ui.components.SettingsCornerShape
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,7 +87,7 @@ fun DnsCacheScreen(
                                 onValueChange = viewModel::onSearchQueryChange,
                                 placeholder = { Text("搜索缓存域名...") },
                                 singleLine = true,
-                                shape = SettingsCornerShape,
+                                shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         } else {
