@@ -214,7 +214,28 @@ private fun RequestDomainDialog(domain: String, dismiss: () -> Unit, copy: () ->
 }
 
 private val requestTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-fun dnsRequestItem(log: DnsLogEntity) = RequestLogItem("dns-${log.id}", log.timestamp, RequestSource.DNS, when (log.result) { LogResult.PASSED.value -> RequestStatus.PASSED; LogResult.BLOCKED.value -> RequestStatus.BLOCKED; else -> RequestStatus.ERROR }, log.queryName, "${requestTime.format(Date(log.timestamp))} · DNS · ${dnsRequestType(log.queryType)}${if (log.cached) " · 命中缓存" else ""}", log.message, log.queryName, log.cached)
+fun dnsRequestItem(log: DnsLogEntity): RequestLogItem {
+    val message = log.message.orEmpty()
+    val rewritten = message.contains("matched rewrite rule", ignoreCase = true) ||
+        message.contains("blocked_by=rewrite=", ignoreCase = true) ||
+        message.contains("复写") || message.contains("重写")
+    return RequestLogItem(
+        key = "dns-${log.id}",
+        timestamp = log.timestamp,
+        source = RequestSource.DNS,
+        status = when {
+            rewritten -> RequestStatus.REWRITTEN
+            log.result == LogResult.PASSED.value -> RequestStatus.PASSED
+            log.result == LogResult.BLOCKED.value -> RequestStatus.BLOCKED
+            else -> RequestStatus.ERROR
+        },
+        title = log.queryName,
+        subtitle = "${requestTime.format(Date(log.timestamp))} · DNS · ${dnsRequestType(log.queryType)}${if (log.cached) " · 命中缓存" else ""}",
+        detail = log.message,
+        domain = log.queryName,
+        cached = log.cached
+    )
+}
 fun httpRequestItem(log: HttpRequestLogEntity) = RequestLogItem("https-${log.id}", log.timestamp, RequestSource.HTTPS, when (log.outcome) { "allowed" -> RequestStatus.PASSED; "rewritten" -> RequestStatus.REWRITTEN; "blocked", "invalid" -> RequestStatus.BLOCKED; "decryption_failed", "unsupported_protocol", "resource_bypass" -> RequestStatus.BYPASSED; else -> RequestStatus.ERROR }, log.authority ?: "未取得 authority", "${requestTime.format(Date(log.timestamp))} · HTTPS · ${log.protocol} · ${log.packageName}", log.matchedRule?.let { "匹配规则 · $it" }, log.authority)
 private fun dnsRequestType(type: Int) = when (type) { 1 -> "A"; 28 -> "AAAA"; 5 -> "CNAME"; 15 -> "MX"; 16 -> "TXT"; 2 -> "NS"; 12 -> "PTR"; 255 -> "ANY"; else -> "TYPE$type" }
 private fun requestCsv(items: List<RequestLogItem>) = buildString { append('\uFEFF'); appendLine("timestamp,time,source,status,request,details"); items.forEach { appendLine(listOf(it.timestamp, requestTime.format(Date(it.timestamp)), it.source.label, it.status.label, it.title, it.subtitle + (it.detail?.let { d -> " · $d" } ?: "")).joinToString(",") { v -> "\"${v.toString().replace("\"", "\"\"")}\"" }) } }
