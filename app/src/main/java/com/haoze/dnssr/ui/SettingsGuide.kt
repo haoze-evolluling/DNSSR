@@ -32,7 +32,6 @@ object SettingsGuides {
     val FOREGROUND_BACKGROUND = SettingsGuide("foreground_background", "前后台行为", "前后台行为控制通知常驻、最近任务显示等运行表现，部分选项可能影响系统对服务的管理方式。")
     val EXCLUDED_APPS = SettingsGuide("excluded_apps", "排除应用", "排除应用会改用系统 DNS，不再经过 DNSSR 的 DNS 解析和域名规则。")
     val HTTP_INSPECTION = SettingsGuide("http_inspection", "HTTP(S) 流量过滤", "")
-    val EXPERIMENTAL_FEATURES = SettingsGuide("experimental_features", "实验功能", "实验功能仍在开发或验证中，行为和兼容性可能变化，不建议在依赖稳定性的场景中启用。")
     val ABOUT = SettingsGuide("about", "应用信息", "应用信息提供软件说明、作者信息和项目资料，便于了解项目与获取支持。")
     val SPONSOR = SettingsGuide("sponsor", "赞助", "赞助页面提供支持项目持续开发的方式。")
     val SPONSOR_LIST = SettingsGuide("sponsor_list", "赞助者名单", "赞助者名单用于感谢支持 DNSSR 项目的朋友。")

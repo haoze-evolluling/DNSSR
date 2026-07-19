@@ -72,7 +72,8 @@ object Routes {
     const val NOTIFICATION_TEXT_SETTINGS = "notification_text_settings"
     const val CUSTOM_BACKGROUND_SETTINGS = "custom_background_settings"
     const val SERVICE_LIGHT_EFFECT_SETTINGS = "service_light_effect_settings"
-    const val EXPERIMENTAL_FEATURES = "experimental_features"
+    const val LEGACY_ICON_SETTINGS = "legacy_icon_settings"
+    const val LEGACY_LOG_PAGE_SETTINGS = "legacy_log_page_settings"
     const val HTTP_INSPECTION_SETTINGS = "http_inspection_settings"
     const val HTTP_INSPECTION_APPS = "http_inspection_apps"
     const val HTTP_REQUEST_LOGS = "http_request_logs"
@@ -101,7 +102,6 @@ object ScreenDestinations {
     val logRetentionSettings = ScreenDestination(Routes.LOG_RETENTION_SETTINGS, "日志模式")
     val foregroundBackgroundSettings = ScreenDestination(Routes.FOREGROUND_BACKGROUND_SETTINGS, "前后台行为")
     val appearanceSettings = ScreenDestination(Routes.APPEARANCE_SETTINGS, "外观设置")
-    val experimentalFeatures = ScreenDestination(Routes.EXPERIMENTAL_FEATURES, "实验功能")
     val about = ScreenDestination(Routes.ABOUT, "应用信息")
     val sponsor = ScreenDestination(Routes.SPONSOR, "赞助")
     val sponsorList = ScreenDestination(Routes.SPONSOR_LIST, "赞助者名单")
@@ -113,6 +113,8 @@ object ScreenDestinations {
     val notificationTextSettings = ScreenDestination(Routes.NOTIFICATION_TEXT_SETTINGS, "通知栏文案")
     val customBackgroundSettings = ScreenDestination(Routes.CUSTOM_BACKGROUND_SETTINGS, "软件背景")
     val serviceLightEffectSettings = ScreenDestination(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, "服务动态光影")
+    val legacyIconSettings = ScreenDestination(Routes.LEGACY_ICON_SETTINGS, "旧版图标")
+    val legacyLogPageSettings = ScreenDestination(Routes.LEGACY_LOG_PAGE_SETTINGS, "旧版日志页面")
 }
 
 @Composable
@@ -204,7 +206,6 @@ fun AppNavHost(
                     navController.navigateWhenResumed(Routes.HTTP_INSPECTION_SETTINGS)
                 },
                 onNavigateToAppearanceSettings = { navController.navigateWhenResumed(ScreenDestinations.appearanceSettings.route) },
-                onNavigateToExperimentalFeatures = { navController.navigateWhenResumed(ScreenDestinations.experimentalFeatures.route) },
                 onNavigateToAbout = { navController.navigateWhenResumed(ScreenDestinations.about.route) },
                 onNavigateToSponsor = { navController.navigateWhenResumed(ScreenDestinations.sponsor.route) },
                 onNavigateToSponsorList = { navController.navigateWhenResumed(ScreenDestinations.sponsorList.route) },
@@ -418,14 +419,6 @@ fun AppNavHost(
                 )
             }
         }
-        composable(ScreenDestinations.experimentalFeatures.route) {
-            SettingsGuideHost(SettingsGuides.EXPERIMENTAL_FEATURES) {
-                ExperimentalFeaturesScreen(
-                onBack = { navController.popWhenResumed() },
-                    title = ScreenDestinations.experimentalFeatures.title
-                )
-            }
-        }
         composable(Routes.HTTP_INSPECTION_SETTINGS) {
             HttpInspectionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
@@ -477,7 +470,9 @@ fun AppNavHost(
                 onNavigateToHomeSentence = { navController.navigateWhenResumed(ScreenDestinations.homeSentenceSettings.route) },
                 onNavigateToNotificationText = { navController.navigateWhenResumed(ScreenDestinations.notificationTextSettings.route) },
                 onNavigateToCustomBackground = { navController.navigateWhenResumed(ScreenDestinations.customBackgroundSettings.route) },
-                onNavigateToServiceLightEffect = { navController.navigateWhenResumed(ScreenDestinations.serviceLightEffectSettings.route) }
+                onNavigateToServiceLightEffect = { navController.navigateWhenResumed(ScreenDestinations.serviceLightEffectSettings.route) },
+                onNavigateToLegacyIcon = { navController.navigateWhenResumed(ScreenDestinations.legacyIconSettings.route) },
+                onNavigateToLegacyLogPage = { navController.navigateWhenResumed(ScreenDestinations.legacyLogPageSettings.route) }
                 )
             }
         }
@@ -524,6 +519,18 @@ fun AppNavHost(
             ServiceLightEffectSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 title = ScreenDestinations.serviceLightEffectSettings.title
+            )
+        }
+        composable(ScreenDestinations.legacyIconSettings.route) {
+            LegacyIconSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = ScreenDestinations.legacyIconSettings.title
+            )
+        }
+        composable(ScreenDestinations.legacyLogPageSettings.route) {
+            LegacyLogPageSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                title = ScreenDestinations.legacyLogPageSettings.title
             )
         }
         composable(ScreenDestinations.sponsorList.route) {

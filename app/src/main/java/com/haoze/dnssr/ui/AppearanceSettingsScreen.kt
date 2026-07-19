@@ -81,7 +81,9 @@ fun AppearanceSettingsScreen(
     onNavigateToHomeSentence: () -> Unit,
     onNavigateToNotificationText: () -> Unit,
     onNavigateToCustomBackground: () -> Unit,
-    onNavigateToServiceLightEffect: () -> Unit
+    onNavigateToServiceLightEffect: () -> Unit,
+    onNavigateToLegacyIcon: () -> Unit,
+    onNavigateToLegacyLogPage: () -> Unit
 ) {
     val context = LocalContext.current
     val mode = AppSettings.getAppThemeMode(context)
@@ -116,7 +118,7 @@ fun AppearanceSettingsScreen(
                     )
                 }
             }
-            item { SettingsGroupTitle("首页与效果") }
+            item { SettingsGroupTitle("首页内容") }
             item {
                 SettingsGroup {
                     SettingsNavigationItem(
@@ -130,7 +132,11 @@ fun AppearanceSettingsScreen(
                         subtitle = "分别设置 DNS 服务开启和关闭时的通知栏文案",
                         onClick = onNavigateToNotificationText
                     )
-                    SettingsDivider()
+                }
+            }
+            item { SettingsGroupTitle("背景与动效") }
+            item {
+                SettingsGroup {
                     SettingsNavigationItem(
                         title = ScreenDestinations.customBackgroundSettings.title,
                         subtitle = "选取手机图片作为应用背景",
@@ -141,6 +147,80 @@ fun AppearanceSettingsScreen(
                         title = ScreenDestinations.serviceLightEffectSettings.title,
                         subtitle = "设置服务启动和关闭时的动态光影效果",
                         onClick = onNavigateToServiceLightEffect
+                    )
+                }
+            }
+            item { SettingsGroupTitle("兼容功能") }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.legacyIconSettings.title,
+                        subtitle = "切换桌面入口图标的样式",
+                        onClick = onNavigateToLegacyIcon
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.legacyLogPageSettings.title,
+                        subtitle = "选择首页日志按钮打开的页面",
+                        onClick = onNavigateToLegacyLogPage
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LegacyIconSettingsScreen(onBack: () -> Unit, title: String) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(AppSettings.isLegacyIconEnabled(context)) }
+
+    SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
+        ) {
+            item { SettingsGroupTitle(title) }
+            item {
+                SettingsGroup {
+                    SettingsSwitchItem(
+                        title = "使用旧版图标",
+                        subtitle = "开启后仅将桌面入口图标切换为旧版样式",
+                        checked = enabled,
+                        onCheckedChange = {
+                            enabled = it
+                            AppSettings.setLegacyIconEnabled(context, it)
+                            LauncherIconManager.setLegacyIconEnabled(context, it)
+                        }
+                    )
+                }
+            }
+            item { SettingsInfoText("桌面图标可能需要等待启动器刷新；如果未立即变化，可回到桌面稍等片刻。") }
+        }
+    }
+}
+
+@Composable
+fun LegacyLogPageSettingsScreen(onBack: () -> Unit, title: String) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(AppSettings.isLegacyLogPageEnabled(context)) }
+
+    SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
+        ) {
+            item { SettingsGroupTitle(title) }
+            item {
+                SettingsGroup {
+                    SettingsSwitchItem(
+                        title = "使用旧版日志页面",
+                        subtitle = "开启后首页日志按钮显示当前的日志分组页；关闭后显示新版日志仪表盘",
+                        checked = enabled,
+                        onCheckedChange = {
+                            enabled = it
+                            AppSettings.setLegacyLogPageEnabled(context, it)
+                        }
                     )
                 }
             }

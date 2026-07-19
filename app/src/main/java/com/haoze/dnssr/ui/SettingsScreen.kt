@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
@@ -47,7 +46,6 @@ fun SettingsScreen(
     onNavigateToForegroundBackgroundSettings: () -> Unit,
     onNavigateToHttpInspection: () -> Unit,
     onNavigateToAppearanceSettings: () -> Unit,
-    onNavigateToExperimentalFeatures: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToSponsor: () -> Unit,
     onNavigateToSponsorList: () -> Unit,
@@ -113,51 +111,6 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingsGroupTitle("数据管理") }
-            item {
-                SettingsGroup {
-                    SettingsNavigationItem(
-                        title = ScreenDestinations.configTransfer.title,
-                        subtitle = "备份或恢复自定义服务与规则订阅",
-                        leadingIcon = Icons.Filled.ImportExport,
-                        onClick = onNavigateToConfigTransfer
-                    )
-                    SettingsDivider()
-                    SettingsNavigationItem(
-                        title = ScreenDestinations.ruleManagement.title,
-                        subtitle = "添加屏蔽或白名单规则，导入规则订阅",
-                        leadingIcon = Icons.AutoMirrored.Filled.Rule,
-                        onClick = onNavigateToRuleManagement
-                    )
-                    SettingsDivider()
-                    SettingsNavigationItem(
-                        title = ScreenDestinations.dataCleanup.title,
-                        subtitle = "删除缓存、日志或域名规则",
-                        leadingIcon = Icons.Filled.DeleteSweep,
-                        onClick = onNavigateToDataCleanup
-                    )
-                }
-            }
-
-            item { SettingsGroupTitle("外观") }
-            item {
-                SettingsGroup {
-                    SettingsNavigationItem(
-                        title = ScreenDestinations.homeProviderVisibility.title,
-                        subtitle = "配置首页解析服务列表中显示的协议和服务商",
-                        leadingIcon = Icons.Filled.Visibility,
-                        onClick = onNavigateToHomeProviderVisibility
-                    )
-                    SettingsDivider()
-                    SettingsNavigationItem(
-                        title = ScreenDestinations.appearanceSettings.title,
-                        subtitle = "设置应用的显示外观",
-                        leadingIcon = Icons.Filled.Palette,
-                        onClick = onNavigateToAppearanceSettings
-                    )
-                }
-            }
-
             item { SettingsGroupTitle("运行行为") }
             item {
                 SettingsGroup {
@@ -184,14 +137,47 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingsGroupTitle("实验功能") }
+            item { SettingsGroupTitle("外观") }
             item {
                 SettingsGroup {
                     SettingsNavigationItem(
-                        title = ScreenDestinations.experimentalFeatures.title,
-                        subtitle = "查看还在开发中的功能",
-                        leadingIcon = Icons.Filled.Science,
-                        onClick = onNavigateToExperimentalFeatures
+                        title = ScreenDestinations.homeProviderVisibility.title,
+                        subtitle = "配置首页解析服务列表中显示的协议和服务商",
+                        leadingIcon = Icons.Filled.Visibility,
+                        onClick = onNavigateToHomeProviderVisibility
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.appearanceSettings.title,
+                        subtitle = "设置应用的显示外观",
+                        leadingIcon = Icons.Filled.Palette,
+                        onClick = onNavigateToAppearanceSettings
+                    )
+                }
+            }
+
+            item { SettingsGroupTitle("数据管理") }
+            item {
+                SettingsGroup {
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.configTransfer.title,
+                        subtitle = "备份或恢复自定义服务与规则订阅",
+                        leadingIcon = Icons.Filled.ImportExport,
+                        onClick = onNavigateToConfigTransfer
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.ruleManagement.title,
+                        subtitle = "添加屏蔽或白名单规则，导入规则订阅",
+                        leadingIcon = Icons.AutoMirrored.Filled.Rule,
+                        onClick = onNavigateToRuleManagement
+                    )
+                    SettingsDivider()
+                    SettingsNavigationItem(
+                        title = ScreenDestinations.dataCleanup.title,
+                        subtitle = "删除缓存、日志或域名规则",
+                        leadingIcon = Icons.Filled.DeleteSweep,
+                        onClick = onNavigateToDataCleanup
                     )
                 }
             }
