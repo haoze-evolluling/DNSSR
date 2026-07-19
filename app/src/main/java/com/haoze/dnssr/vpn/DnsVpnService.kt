@@ -197,7 +197,9 @@ class DnsVpnService : VpnService() {
             AppSettings.isHttpInspectionEnabled(this) &&
             AppSettings.getHttpInspectionAppPackages(this).isNotEmpty() &&
             !inspectionFallbackActive
-        val blockedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val blockedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            AppSettings.isBlockedAppsEnabled(this)
+        ) {
             AppSettings.getBlockedAppPackages(this)
         } else {
             emptySet()

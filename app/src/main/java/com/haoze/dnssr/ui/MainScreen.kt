@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -30,6 +31,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -60,6 +63,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.haoze.dnssr.R
 import com.haoze.dnssr.ui.components.DnsProtocolBadge
 import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.effect.ServiceLightEffect
@@ -93,12 +97,17 @@ fun MainScreen(
     var serviceLightEffectEnabled by remember {
         mutableStateOf(AppSettings.isServiceLightEffectEnabled(context))
     }
+    var goTunnelRequired by remember { mutableStateOf(AppSettings.isGoTunnelRequired(context)) }
+    var goTunnelReasons by remember { mutableStateOf(AppSettings.getGoTunnelReasons(context)) }
+    var showGoTunnelInfo by remember { mutableStateOf(false) }
     var powerButtonCenter by remember { mutableStateOf(Offset.Unspecified) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 serviceLightEffectEnabled = AppSettings.isServiceLightEffectEnabled(context)
+                goTunnelRequired = AppSettings.isGoTunnelRequired(context)
+                goTunnelReasons = AppSettings.getGoTunnelReasons(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -126,7 +135,24 @@ fun MainScreen(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
                 ),
-                title = { Text("DNSSR") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("DNSSR")
+                        if (goTunnelRequired) {
+                            IconButton(
+                                onClick = { showGoTunnelInfo = true },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_google_g),
+                                    contentDescription = "查看 Go 隧道限制",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                },
                 actions = {
                     TextButton(onClick = onNavigateToLogs) {
                         Text("日志")
@@ -147,6 +173,24 @@ fun MainScreen(
             onNavigateToRaceModeSettings = onNavigateToRaceModeSettings,
             viewModel = viewModel,
             modifier = Modifier.padding(innerPadding)
+        )
+    }
+    if (showGoTunnelInfo) {
+        AlertDialog(
+            onDismissRequest = { showGoTunnelInfo = false },
+            title = { Text("Go 隧道已启用") },
+            text = {
+                Text(
+                    "Go 隧道用于在本机 VPN 中接管 TCP、UDP、DNS 和 HTTP(S) 流量，使 DNSSR 能识别应用连接、检查 HTTPS 或按 UID 阻断联网。\n\n" +
+                        "当前触发功能：\n" + goTunnelReasons.joinToString("\n") { "• ${it.displayName}" } +
+                        "\n\n启用期间，均衡和极速解析模式不可用，只能使用省电或主备（高级）模式。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showGoTunnelInfo = false }) {
+                    Text("知道了")
+                }
+            }
         )
     }
     }

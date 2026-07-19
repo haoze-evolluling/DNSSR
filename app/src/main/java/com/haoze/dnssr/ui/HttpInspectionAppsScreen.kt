@@ -36,8 +36,8 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var selectedPackages by remember { mutableStateOf(AppSettings.getHttpInspectionAppPackages(context)) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(AppListFilter.USER) }
-    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
+    var filter by remember { mutableStateOf(AppListFilter.entries.firstOrNull { it.name == AppSettings.getHttpInspectionAppsFilter(context) } ?: AppListFilter.USER) }
+    var sort by remember { mutableStateOf(AppListSort.entries.firstOrNull { it.name == AppSettings.getHttpInspectionAppsSort(context) } ?: AppListSort.LABEL_ASC) }
 
     val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
@@ -75,8 +75,8 @@ fun HttpInspectionAppsScreen(onBack: () -> Unit) {
             onSelectAll = { selectedPackages = selectedPackages + loadedPackageNames },
             onClear = { selectedPackages = emptySet() },
             onInvert = { selectedPackages = selectedPackages - loadedPackageNames + (loadedPackageNames - selectedPackages) },
-            onFilterChange = { filter = it },
-            onSortChange = { sort = it }
+            onFilterChange = { filter = it; AppSettings.setHttpInspectionAppsFilter(context, it.name) },
+            onSortChange = { sort = it; AppSettings.setHttpInspectionAppsSort(context, it.name) }
         )
     }) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {

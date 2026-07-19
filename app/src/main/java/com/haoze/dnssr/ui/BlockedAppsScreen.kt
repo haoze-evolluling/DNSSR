@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @Composable
-fun BlockedAppsScreen(onBack: () -> Unit) {
+fun BlockedAppsSettingsScreen(onBack: () -> Unit, onSelectApps: () -> Unit) {
     val context = LocalContext.current
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
         SettingsScaffold(title = "禁止联网应用", onBack = onBack) { padding ->
@@ -33,19 +33,67 @@ fun BlockedAppsScreen(onBack: () -> Unit) {
         }
         return
     }
+    var enabled by remember { mutableStateOf(AppSettings.isBlockedAppsEnabled(context)) }
+    var selectedCount by remember { mutableIntStateOf(AppSettings.getBlockedAppPackages(context).size) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                selectedCount = AppSettings.getBlockedAppPackages(context).size
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    SettingsScaffold(title = "禁止联网应用", onBack = onBack) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingsInfoText("通过本机 VPN 按 UID 阻止所选应用的全部网络连接。共享同一 UID 的应用会一并受影响。", Modifier.padding(top = 8.dp))
+            SettingsGroup {
+                SettingsSwitchItem(
+                    title = "启用禁止联网",
+                    subtitle = if (selectedCount == 0) "尚未选择应用；开启后不会阻断流量" else "已选择 $selectedCount 个应用",
+                    checked = enabled,
+                    onCheckedChange = {
+                        enabled = it
+                        AppSettings.setBlockedAppsEnabled(context, it)
+                        RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
+                    }
+                )
+                SettingsDivider()
+                SettingsNavigationItem(
+                    title = "选择禁止联网应用",
+                    subtitle = "选择需要阻止联网的应用",
+                    value = "$selectedCount 个",
+                    onClick = onSelectApps
+                )
+            }
+            SettingsInfoText("关闭后名单会保留，但不会阻断流量或启用 Go 隧道。")
+        }
+    }
+}
+
+@Composable
+fun BlockedAppsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        SettingsScaffold(title = "选择禁止联网应用", onBack = onBack) { padding ->
+            SettingsInfoText("此功能需要 Android 10 或更高版本。", Modifier.padding(padding).padding(top = 16.dp))
+        }
+        return
+    }
     var selectedPackages by remember { mutableStateOf(AppSettings.getBlockedAppPackages(context)) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(AppListFilter.USER) }
-    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
+    var filter by remember { mutableStateOf(AppListFilter.entries.firstOrNull { it.name == AppSettings.getBlockedAppsFilter(context) } ?: AppListFilter.USER) }
+    var sort by remember { mutableStateOf(AppListSort.entries.firstOrNull { it.name == AppSettings.getBlockedAppsSort(context) } ?: AppListSort.LABEL_ASC) }
     val access = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(access)
     val loadedApps = access.apps
     if (loadedApps == null) {
-        SettingsScaffold(title = "禁止联网应用", onBack = onBack) { AppListLoadingContent(Modifier.padding(it)) }
+        SettingsScaffold(title = "选择禁止联网应用", onBack = onBack) { AppListLoadingContent(Modifier.padding(it)) }
         return
     }
     if (access.unavailable) {
-        SettingsScaffold(title = "禁止联网应用", onBack = onBack) {
+        SettingsScaffold(title = "选择禁止联网应用", onBack = onBack) {
             AppListUnavailableContent(Modifier.padding(it), access.retry)
         }
         return
@@ -65,13 +113,14 @@ fun BlockedAppsScreen(onBack: () -> Unit) {
             }.sortedWith(sort.comparator)
         }
     }
-    SettingsScaffold(title = "禁止联网应用", onBack = onBack, actions = {
+    SettingsScaffold(title = "选择禁止联网应用", onBack = onBack, actions = {
         val packageNames = selectableApps.mapTo(mutableSetOf()) { it.packageName }
         AppListOverflowMenu(filter, sort,
             onSelectAll = { selectedPackages += packageNames },
             onClear = { selectedPackages = emptySet() },
             onInvert = { selectedPackages = selectedPackages - packageNames + (packageNames - selectedPackages) },
-            onFilterChange = { filter = it }, onSortChange = { sort = it })
+            onFilterChange = { filter = it; AppSettings.setBlockedAppsFilter(context, it.name) },
+            onSortChange = { sort = it; AppSettings.setBlockedAppsSort(context, it.name) })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingsInfoText("服务开启时，所选应用的全部网络连接将被阻止。共享同一 UID 的应用会一并受影响。", Modifier.padding(top = 8.dp))

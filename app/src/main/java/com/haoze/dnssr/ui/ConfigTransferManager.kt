@@ -91,6 +91,7 @@ class ConfigTransferManager(private val context: Context) {
             root.put("blockedApps", JSONArray().apply {
                 AppSettings.getBlockedAppPackages(context).forEach(::put)
             })
+            root.put("blockedAppsEnabled", AppSettings.isBlockedAppsEnabled(context))
         }
         return root.toString(2)
     }
@@ -240,6 +241,10 @@ class ConfigTransferManager(private val context: Context) {
             skipped += validPackages.size - newPackages.size + invalidCount
             config.blockedApps.forEach { packageName -> complete("禁止联网应用：$packageName") }
         }
+        if (AppSettings.isBlockedAppsEnabled(context) != config.blockedAppsEnabled) {
+            AppSettings.setBlockedAppsEnabled(context, config.blockedAppsEnabled)
+            blockedAppsUpdated = true
+        }
         return ConfigImportResult(added, skipped, failed, excludedAppsUpdated, blockedAppsUpdated)
     }
 
@@ -249,7 +254,8 @@ class ConfigTransferManager(private val context: Context) {
         } catch (_: Exception) {
             throw IllegalArgumentException("配置文件不是有效的 JSON")
         }
-        if (root.optInt("formatVersion", -1) !in SUPPORTED_FORMAT_VERSIONS) {
+        val formatVersion = root.optInt("formatVersion", -1)
+        if (formatVersion !in SUPPORTED_FORMAT_VERSIONS) {
             throw IllegalArgumentException("不支持的配置文件版本")
         }
 
@@ -293,7 +299,12 @@ class ConfigTransferManager(private val context: Context) {
         val blockedApps = root.optionalArray("blockedApps").mapStrings()
             .filter { it.isNotBlank() }
             .toSet()
-        return TransferConfig(providers, bootstrapIps, subscriptions, excludedApps, blockedApps)
+        val blockedAppsEnabled = when (formatVersion) {
+            4 -> root.optBoolean("blockedAppsEnabled", false)
+            3 -> blockedApps.isNotEmpty()
+            else -> false
+        }
+        return TransferConfig(providers, bootstrapIps, subscriptions, excludedApps, blockedApps, blockedAppsEnabled)
     }
 
     private fun providerKey(provider: DnsProvider): String = providerKey(
@@ -336,7 +347,8 @@ class ConfigTransferManager(private val context: Context) {
         val bootstrapIps: List<ImportedBootstrap>,
         val subscriptions: List<ImportedSubscription>,
         val excludedApps: Set<String>,
-        val blockedApps: Set<String>
+        val blockedApps: Set<String>,
+        val blockedAppsEnabled: Boolean
     )
 
     private data class ImportedProvider(
@@ -351,8 +363,8 @@ class ConfigTransferManager(private val context: Context) {
     private data class ImportedSubscription(val name: String, val url: String)
 
     companion object {
-        private const val FORMAT_VERSION = 3
-        private val SUPPORTED_FORMAT_VERSIONS = setOf(1, 2, FORMAT_VERSION)
+        private const val FORMAT_VERSION = 4
+        private val SUPPORTED_FORMAT_VERSIONS = setOf(1, 2, 3, FORMAT_VERSION)
     }
 }
 

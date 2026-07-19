@@ -106,6 +106,11 @@ data class HomeProviderVisibility(
     }
 }
 
+enum class GoTunnelReason(val displayName: String) {
+    HTTPS_INSPECTION("HTTPS 过滤"),
+    BLOCKED_APPS("禁止联网应用")
+}
+
 /**
  * 应用设置封装，基于 SharedPreferences。
  */
@@ -166,9 +171,15 @@ object AppSettings {
     private const val KEY_CUSTOM_BACKGROUND_URIS = "custom_background_uris"
     private const val KEY_EXCLUDED_APP_PACKAGES = "excluded_app_packages"
     private const val KEY_EXCLUDED_APPS_FILTER = "excluded_apps_filter"
+    private const val KEY_EXCLUDED_APPS_SORT = "excluded_apps_sort"
     private const val KEY_BLOCKED_APP_PACKAGES = "blocked_app_packages"
+    private const val KEY_BLOCKED_APPS_ENABLED = "blocked_apps_enabled"
+    private const val KEY_BLOCKED_APPS_FILTER = "blocked_apps_filter"
+    private const val KEY_BLOCKED_APPS_SORT = "blocked_apps_sort"
     private const val KEY_HTTP_INSPECTION_ENABLED = "http_inspection_enabled"
     private const val KEY_HTTP_INSPECTION_APP_PACKAGES = "http_inspection_app_packages"
+    private const val KEY_HTTP_INSPECTION_APPS_FILTER = "http_inspection_apps_filter"
+    private const val KEY_HTTP_INSPECTION_APPS_SORT = "http_inspection_apps_sort"
     private const val KEY_SETTINGS_GUIDE_ACKNOWLEDGED_IDS = "settings_guide_acknowledged_ids"
     private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
     private const val KEY_HTTPS_INSPECTION_CA_BACKEND = "https_inspection_ca_backend"
@@ -424,6 +435,26 @@ object AppSettings {
             .apply()
     }
 
+    fun getExcludedAppsSort(context: Context) = getAppListPreference(context, KEY_EXCLUDED_APPS_SORT, "LABEL_ASC")
+    fun setExcludedAppsSort(context: Context, sort: String) = setAppListPreference(context, KEY_EXCLUDED_APPS_SORT, sort)
+    fun getHttpInspectionAppsFilter(context: Context) =
+        getAppListPreference(context, KEY_HTTP_INSPECTION_APPS_FILTER, getExcludedAppsFilter(context))
+    fun setHttpInspectionAppsFilter(context: Context, filter: String) = setAppListPreference(context, KEY_HTTP_INSPECTION_APPS_FILTER, filter)
+    fun getHttpInspectionAppsSort(context: Context) = getAppListPreference(context, KEY_HTTP_INSPECTION_APPS_SORT, "LABEL_ASC")
+    fun setHttpInspectionAppsSort(context: Context, sort: String) = setAppListPreference(context, KEY_HTTP_INSPECTION_APPS_SORT, sort)
+    fun getBlockedAppsFilter(context: Context) =
+        getAppListPreference(context, KEY_BLOCKED_APPS_FILTER, getExcludedAppsFilter(context))
+    fun setBlockedAppsFilter(context: Context, filter: String) = setAppListPreference(context, KEY_BLOCKED_APPS_FILTER, filter)
+    fun getBlockedAppsSort(context: Context) = getAppListPreference(context, KEY_BLOCKED_APPS_SORT, "LABEL_ASC")
+    fun setBlockedAppsSort(context: Context, sort: String) = setAppListPreference(context, KEY_BLOCKED_APPS_SORT, sort)
+
+    private fun getAppListPreference(context: Context, key: String, default: String): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(key, default) ?: default
+
+    private fun setAppListPreference(context: Context, key: String, value: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(key, value).apply()
+    }
+
     fun getBlockedAppPackages(context: Context): Set<String> {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getStringSet(KEY_BLOCKED_APP_PACKAGES, emptySet())
@@ -432,10 +463,28 @@ object AppSettings {
             .toSet()
     }
 
-    fun isGoTunnelRequired(context: Context): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            ((isHttpInspectionEnabled(context) && getHttpInspectionAppPackages(context).isNotEmpty()) ||
-                getBlockedAppPackages(context).isNotEmpty())
+    fun isBlockedAppsEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_BLOCKED_APPS_ENABLED, false)
+
+    fun setBlockedAppsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_BLOCKED_APPS_ENABLED, enabled).apply()
+    }
+
+    fun getGoTunnelReasons(context: Context): Set<GoTunnelReason> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptySet()
+        return buildSet {
+            if (isHttpInspectionEnabled(context) && getHttpInspectionAppPackages(context).isNotEmpty()) {
+                add(GoTunnelReason.HTTPS_INSPECTION)
+            }
+            if (isBlockedAppsEnabled(context) && getBlockedAppPackages(context).isNotEmpty()) {
+                add(GoTunnelReason.BLOCKED_APPS)
+            }
+        }
+    }
+
+    fun isGoTunnelRequired(context: Context): Boolean = getGoTunnelReasons(context).isNotEmpty()
 
     fun setBlockedAppPackages(context: Context, packageNames: Set<String>) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

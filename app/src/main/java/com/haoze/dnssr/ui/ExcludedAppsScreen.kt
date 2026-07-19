@@ -43,7 +43,7 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
             } ?: AppListFilter.USER
         )
     }
-    var sort by remember { mutableStateOf(AppListSort.LABEL_ASC) }
+    var sort by remember { mutableStateOf(AppListSort.entries.firstOrNull { it.name == AppSettings.getExcludedAppsSort(context) } ?: AppListSort.LABEL_ASC) }
 
     val appListAccess = rememberAppListAccessState { loadInstalledApps(context) }
     AppListDisclosureDialog(appListAccess)
@@ -102,7 +102,7 @@ fun ExcludedAppsScreen(onBack: () -> Unit) {
                     filter = it
                     AppSettings.setExcludedAppsFilter(context, it.name)
                 },
-                onSortChange = { sort = it }
+                onSortChange = { sort = it; AppSettings.setExcludedAppsSort(context, it.name) }
             )
         }
     ) { innerPadding ->

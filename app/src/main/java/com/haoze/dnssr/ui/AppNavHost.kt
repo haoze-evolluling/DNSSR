@@ -49,6 +49,7 @@ object Routes {
     const val BLOCK_RESPONSE_SETTINGS = "block_response_settings"
     const val EXCLUDED_APPS = "excluded_apps"
     const val BLOCKED_APPS = "blocked_apps"
+    const val BLOCKED_APPS_SELECTION = "blocked_apps_selection"
     const val DATA_CLEANUP = "data_cleanup"
     const val CONFIG_TRANSFER = "config_transfer"
     const val CONFIG_IMPORT_EXPORT = "config_import_export"
@@ -313,6 +314,12 @@ fun AppNavHost(
             )
         }
         composable(ScreenDestinations.blockedApps.route) {
+            BlockedAppsSettingsScreen(
+                onBack = { navController.popWhenResumed() },
+                onSelectApps = { navController.navigateWhenResumed(Routes.BLOCKED_APPS_SELECTION) }
+            )
+        }
+        composable(Routes.BLOCKED_APPS_SELECTION) {
             BlockedAppsScreen(onBack = { navController.popWhenResumed() })
         }
         composable(ScreenDestinations.rewriteRuleList.route) {
