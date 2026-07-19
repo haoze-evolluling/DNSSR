@@ -32,6 +32,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,6 +61,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -68,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.haoze.dnssr.R
 import com.haoze.dnssr.ui.components.SettingsCheckboxItem
 import com.haoze.dnssr.ui.components.SettingsDivider
 import com.haoze.dnssr.ui.components.SettingsGroup
@@ -104,6 +107,7 @@ fun ResolutionModeHomeScreen(
     val context = LocalContext.current
     var showModeDialog by remember { mutableStateOf(false) }
     var showPresetDnsServiceDialog by remember { mutableStateOf(false) }
+    var showGoTunnelInfo by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.activate() }
     LaunchedEffect(message) { message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); viewModel.clearMessage() } }
 
@@ -132,7 +136,43 @@ fun ResolutionModeHomeScreen(
         )
     }
 
-    SettingsScaffold(title = "解析模式", onBack = onBack) { padding ->
+    if (showGoTunnelInfo) {
+        val reasons = AppSettings.getGoTunnelReasons(context)
+        AlertDialog(
+            onDismissRequest = { showGoTunnelInfo = false },
+            title = { Text("Go 隧道已启用") },
+            text = {
+                Text(
+                    "Go 隧道用于在本机 VPN 中接管 TCP、UDP、DNS 和 HTTP(S) 流量，使 DNSSR 能识别应用连接、检查 HTTPS 或按 UID 阻断联网。\n\n" +
+                        "当前触发功能：\n" + reasons.joinToString("\n") { "• ${it.displayName}" } +
+                        "\n\n启用期间，均衡和极速解析模式不可用，只能使用省电或主备（高级）模式。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showGoTunnelInfo = false }) { Text("知道了") }
+            }
+        )
+    }
+
+    SettingsScaffold(
+        title = "解析模式",
+        onBack = onBack,
+        titleTrailing = {
+            if (goTunnelRequired) {
+                IconButton(
+                    onClick = { showGoTunnelInfo = true },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_google_g),
+                        contentDescription = "查看 Go 隧道限制",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    ) { padding ->
         if (loading) return@SettingsScaffold SettingsLoadingContent(Modifier.padding(padding))
         LazyColumn(modifier = Modifier.padding(padding)) {
             item { SettingsGroupTitle("当前模式") }
