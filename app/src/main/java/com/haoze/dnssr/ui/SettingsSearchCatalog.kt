@@ -109,14 +109,14 @@ internal object SettingsSearchCatalog {
         option("通知常驻", "VPN 未运行时在通知栏常驻提醒", "运行行为", "前后台行为", Routes.FOREGROUND_BACKGROUND_SETTINGS, Icons.Filled.FlipToBack),
         option("忽略电池优化", "前往系统电池优化设置", "运行行为", "前后台行为", Routes.FOREGROUND_BACKGROUND_SETTINGS, Icons.Filled.FlipToBack, "后台运行"),
         page("排除应用", "指定使用系统 DNS 的应用", "运行行为", Routes.EXCLUDED_APPS, Icons.Filled.Apps, "应用列表", "系统 DNS"),
-        page("HTTP(S) 流量过滤", "按应用检查请求并应用域名规则", "运行行为", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "HTTPS", "HTTP3", "QUIC"),
-        option("启用所选应用的 HTTP(S) 检查", "打开所选应用的流量过滤", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),
-        option("选择过滤应用", "选择需要检查流量的应用", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_APPS, Icons.Filled.Http),
-        option("尝试检查 HTTP/3", "阻断 QUIC 并尝试回退到 TCP", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "QUIC"),
-        option("阻止过滤应用使用加密 DNS", "阻断所选应用的 DNS-over-TLS", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "DoT", "853"),
-        option("安装 HTTPS 根证书", "导出并安装流量检查证书", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "CA"),
-        option("查看 HTTPS 根证书", "查看根证书 SHA-256 指纹", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "证书指纹"),
-        option("重置 HTTPS 根证书", "废止并重新生成根证书", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),
+        page("HTTPS 过滤 (Beta)", "按应用检查请求并应用域名规则", "运行行为", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "HTTPS", "HTTP3", "QUIC"),
+        option("启用所选应用的 HTTP(S) 检查", "打开所选应用的流量过滤", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),
+        option("选择过滤应用", "选择需要检查流量的应用", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_APPS, Icons.Filled.Http),
+        option("尝试检查 HTTP/3", "阻断 QUIC 并尝试回退到 TCP", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "QUIC"),
+        option("阻止过滤应用使用加密 DNS", "阻断所选应用的 DNS-over-TLS", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "DoT", "853"),
+        option("安装 HTTPS 根证书", "导出并安装流量检查证书", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "CA"),
+        option("查看 HTTPS 根证书", "查看根证书 SHA-256 指纹", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "证书指纹"),
+        option("重置 HTTPS 根证书", "废止并重新生成根证书", "运行行为", "HTTPS 过滤 (Beta)", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),
 
         page("服务显示", "配置首页显示的协议和服务商", "外观", Routes.HOME_PROVIDER_VISIBILITY, Icons.Filled.Visibility, "DoH", "DoT", "全部服务"),
         page("外观设置", "设置应用的显示外观", "外观", Routes.APPEARANCE_SETTINGS, Icons.Filled.Palette),
@@ -188,7 +188,7 @@ object ScreenDestinations {
     val logRetentionSettings = main(Routes.LOG_RETENTION_SETTINGS, "日志模式", "选择 DNS 请求日志的记录范围", Icons.Filled.History, SettingsSection.PERFORMANCE)
     val foregroundBackgroundSettings = main(Routes.FOREGROUND_BACKGROUND_SETTINGS, "前后台行为", "后台隐藏、通知常驻", Icons.Filled.FlipToBack, SettingsSection.BEHAVIOR)
     val excludedApps = main(Routes.EXCLUDED_APPS, "排除应用", "指定使用系统 DNS 的应用", Icons.Filled.Apps, SettingsSection.BEHAVIOR)
-    val httpInspectionSettings = main(Routes.HTTP_INSPECTION_SETTINGS, "HTTP(S) 流量过滤", "按应用检查 HTTP(S) 请求并应用现有域名规则", Icons.Filled.Http, SettingsSection.BEHAVIOR, "HTTPS", "HTTP3", "QUIC")
+    val httpInspectionSettings = main(Routes.HTTP_INSPECTION_SETTINGS, "HTTPS 过滤 (Beta)", "按应用检查 HTTP(S) 请求并应用现有域名规则", Icons.Filled.Http, SettingsSection.BEHAVIOR, "HTTPS", "HTTP3", "QUIC")
     val homeProviderVisibility = main(Routes.HOME_PROVIDER_VISIBILITY, "服务显示", "配置首页解析服务列表中显示的协议和服务商", Icons.Filled.Visibility, SettingsSection.APPEARANCE)
     val appearanceSettings = main(Routes.APPEARANCE_SETTINGS, "外观设置", "设置应用的显示外观", Icons.Filled.Palette, SettingsSection.APPEARANCE)
     val configTransfer = main(Routes.CONFIG_TRANSFER, "导入与导出", "备份或恢复自定义服务与规则订阅", Icons.Filled.ImportExport, SettingsSection.DATA)

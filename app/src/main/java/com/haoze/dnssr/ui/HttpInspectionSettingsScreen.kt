@@ -122,7 +122,7 @@ fun HttpInspectionSettingsScreen(
     }
 
     SettingsScaffold(
-        title = "HTTP(S) 流量过滤",
+        title = "HTTPS 过滤 (Beta)",
         onBack = onBack,
         actions = {
             IconButton(onClick = {
