@@ -101,7 +101,7 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
             val success = rewriteRuleManager.addRule(domain, targetType, targetValue)
             if (success) RuntimeDnsSettingsRefresher.refreshIfRunning(getApplication(), "rewrite_rule_added")
             withContext(Dispatchers.Main) {
-                onResult(if (success) "已添加重写域名" else "域名、目标格式无效、规则冲突或已存在")
+                onResult(if (success) "已添加覆写域名" else "域名、目标格式无效、规则冲突或已存在")
                 loadRuleCount()
             }
         }

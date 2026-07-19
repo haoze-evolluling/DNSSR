@@ -226,7 +226,7 @@ enum class ManagedRuleKind(
 ) {
     BLOCK("屏蔽规则", "屏蔽规则"),
     ALLOW("放行规则", "白名单规则"),
-    REWRITE("重写域名规则", "重写规则")
+    REWRITE("覆写域名规则", "覆写规则")
 }
 
 data class RuleListItem(

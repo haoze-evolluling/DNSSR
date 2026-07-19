@@ -32,7 +32,7 @@ data class RuleImportSummary(
     val skippedCount: Int get() = duplicateCount + invalidCount + unsupportedCount
 
     fun displayMessage(prefix: String): String =
-        "$prefix：黑名单 $blockCount 条，白名单 $allowCount 条，重写 $rewriteCount 条，重复 $duplicateCount 条，" +
+        "$prefix：黑名单 $blockCount 条，白名单 $allowCount 条，覆写 $rewriteCount 条，重复 $duplicateCount 条，" +
             "无效/不支持 ${invalidCount + unsupportedCount} 条"
 }
 

@@ -52,7 +52,7 @@ import java.util.Locale
 private enum class HttpLogFilter(val label: String) {
     ALL("全部"),
     ALLOWED("放行"),
-    REWRITTEN("重写"),
+    REWRITTEN("覆写"),
     BLOCKED("拦截"),
     BYPASSED("直连")
 }
@@ -260,7 +260,7 @@ private data class HttpOutcomePresentation(val label: String, val color: Color)
 
 private fun httpOutcomePresentation(outcome: String): HttpOutcomePresentation = when (outcome) {
     "allowed" -> HttpOutcomePresentation("已放行", AllowedColor)
-    "rewritten" -> HttpOutcomePresentation("已重写", RewrittenColor)
+    "rewritten" -> HttpOutcomePresentation("已覆写", RewrittenColor)
     "blocked" -> HttpOutcomePresentation("已拦截", BlockedColor)
     "invalid" -> HttpOutcomePresentation("无效请求", BlockedColor)
     "decryption_failed" -> HttpOutcomePresentation("HTTPS 自动旁路", BypassedColor)

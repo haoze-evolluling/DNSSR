@@ -132,7 +132,7 @@ class DnsVpnService : VpnService() {
         allowListManager = AllowListManager(db.allowRuleDao(), ruleIndexDirectory)
         rewriteRuleManager = RewriteRuleManager(db.rewriteRuleDao(), ruleIndexDirectory)
         dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
-        httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope)
+        httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         raceLogger = RaceLogger(db.raceLogDao(), logRetentionDays, serviceScope)
         bootstrapLogger = BootstrapLogger(db.bootstrapLogDao(), logRetentionDays, serviceScope)
         providerHealthEngine = ProviderHealthEngine(this, serviceScope)

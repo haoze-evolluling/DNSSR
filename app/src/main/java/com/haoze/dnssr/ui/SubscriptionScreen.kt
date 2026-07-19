@@ -407,7 +407,7 @@ private fun SubscriptionItem(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
-                Text(if (subscription.kind == SubscriptionKind.REWRITE) "hosts 重写" else "DNS 过滤", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(if (subscription.kind == SubscriptionKind.REWRITE) "hosts 覆写" else "DNS 过滤", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) "本地文件" else subscription.url,
@@ -666,11 +666,11 @@ private fun AddSubscriptionChoiceDialog(
                     Text("本地 DNS 过滤文件")
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                Text("hosts 重写规则", style = MaterialTheme.typography.labelLarge)
+                Text("hosts 覆写规则", style = MaterialTheme.typography.labelLarge)
                 OutlinedButton(onClick = onAddRewriteRemote, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.CloudDownload, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("网络 hosts 重写订阅")
+                    Text("网络 hosts 覆写订阅")
                 }
                 OutlinedButton(onClick = onAddRewriteLocal, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null)

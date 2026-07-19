@@ -218,7 +218,7 @@ fun dnsRequestItem(log: DnsLogEntity): RequestLogItem {
     val message = log.message.orEmpty()
     val rewritten = message.contains("matched rewrite rule", ignoreCase = true) ||
         message.contains("blocked_by=rewrite=", ignoreCase = true) ||
-        message.contains("复写") || message.contains("重写")
+        message.contains("复写") || message.contains("覆写")
     return RequestLogItem(
         key = "dns-${log.id}",
         timestamp = log.timestamp,

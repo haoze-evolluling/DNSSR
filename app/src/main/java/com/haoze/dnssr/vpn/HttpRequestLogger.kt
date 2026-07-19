@@ -2,6 +2,7 @@ package com.haoze.dnssr.vpn
 
 import com.haoze.dnssr.data.dao.HttpRequestLogDao
 import com.haoze.dnssr.data.entity.HttpRequestLogEntity
+import com.haoze.dnssr.ui.DnsLogMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,7 +22,8 @@ enum class HttpRequestOutcome(val storageValue: String) {
 class HttpRequestLogger(
     private val dao: HttpRequestLogDao,
     private val retentionDays: Int,
-    private val flushScope: CoroutineScope? = null
+    private val flushScope: CoroutineScope? = null,
+    private val modeProvider: () -> DnsLogMode = { DnsLogMode.ALL }
 ) {
     private val mutex = Mutex()
     private val pending = ArrayList<HttpRequestLogEntity>(BATCH_SIZE)
@@ -35,6 +37,9 @@ class HttpRequestLogger(
         outcome: HttpRequestOutcome,
         matchedRule: String? = null
     ) {
+        val mode = modeProvider()
+        if (mode == DnsLogMode.OFF) return
+        if (mode == DnsLogMode.BLOCKED_AND_ERRORS && outcome == HttpRequestOutcome.ALLOWED) return
         mutex.withLock {
             if (pending.isEmpty()) scheduleFlush()
             pending += HttpRequestLogEntity(

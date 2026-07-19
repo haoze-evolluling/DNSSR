@@ -127,7 +127,7 @@ fun RuleManagementScreen(
         ) {
             item {
                 SettingsInfoText(
-                    text = "当前共有 $ruleCount 条屏蔽规则，$allowRuleCount 条白名单规则，$rewriteRuleCount 条重写规则。重写规则优先于黑白名单。",
+                    text = "当前共有 $ruleCount 条屏蔽规则，$allowRuleCount 条白名单规则，$rewriteRuleCount 条覆写规则。覆写规则优先于黑白名单。",
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
@@ -168,8 +168,8 @@ fun RuleManagementScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = "添加重写域名",
-                        subtitle = "将域名重写为 IPv4、IPv6 或 CNAME",
+                        title = "添加覆写域名",
+                        subtitle = "将域名覆写为 IPv4、IPv6 或 CNAME",
                         onClick = { rewriteDomain = ""; rewriteAddress = ""; rewriteTargetType = RewriteTargetType.IPV4; showAddRewriteRuleDialog = true }
                     )
                 }
@@ -217,11 +217,11 @@ fun RuleManagementScreen(
                         onClick = onNavigateToAllowRuleList
                     )
                     SettingsDivider()
-                    SettingsNavigationItem(title = "重写域名规则", subtitle = "查看、启用、停用或删除重写规则", value = "$rewriteRuleCount 条", onClick = onNavigateToRewriteRuleList)
+                    SettingsNavigationItem(title = "覆写域名规则", subtitle = "查看、启用、停用或删除覆写规则", value = "$rewriteRuleCount 条", onClick = onNavigateToRewriteRuleList)
                     SettingsDivider()
                     SettingsNavigationItem(
                         title = "规则订阅",
-                        subtitle = "管理 DNS 过滤与 hosts 重写订阅",
+                        subtitle = "管理 DNS 过滤与 hosts 覆写订阅",
                         onClick = onNavigateToSubscription
                     )
                 }
@@ -245,7 +245,7 @@ fun RuleManagementScreen(
     if (showClearAllRulesDialog) {
         ConfirmDialog(
             title = "删除全部规则",
-            text = "确定要删除全部域名规则吗？屏蔽、白名单和重写规则都会被移除。",
+            text = "确定要删除全部域名规则吗？屏蔽、白名单和覆写规则都会被移除。",
             onConfirm = {
                 showClearAllRulesDialog = false
                 scope.launch(Dispatchers.IO) {
@@ -368,7 +368,7 @@ fun RuleManagementScreen(
     if (showAddRewriteRuleDialog) {
         AlertDialog(
             onDismissRequest = { showAddRewriteRuleDialog = false },
-            title = { Text("添加重写域名") },
+            title = { Text("添加覆写域名") },
             text = {
                 androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = rewriteDomain, onValueChange = { rewriteDomain = it }, label = { Text("域名，如 example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -378,7 +378,7 @@ fun RuleManagementScreen(
                     OutlinedTextField(value = rewriteAddress, onValueChange = { rewriteAddress = it }, label = { Text(if (rewriteTargetType == RewriteTargetType.CNAME) "目标域名" else "$rewriteTargetType 地址") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
             },
-            confirmButton = { TextButton(onClick = { viewModel.addRewriteRule(rewriteDomain, rewriteTargetType, rewriteAddress) { message -> addResult = message; if (message == "已添加重写域名") showAddRewriteRuleDialog = false } }) { Text("确定") } },
+            confirmButton = { TextButton(onClick = { viewModel.addRewriteRule(rewriteDomain, rewriteTargetType, rewriteAddress) { message -> addResult = message; if (message == "已添加覆写域名") showAddRewriteRuleDialog = false } }) { Text("确定") } },
             dismissButton = { TextButton(onClick = { showAddRewriteRuleDialog = false }) { Text("取消") } }
         )
     }

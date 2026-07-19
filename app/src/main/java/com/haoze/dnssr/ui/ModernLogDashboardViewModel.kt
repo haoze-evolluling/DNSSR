@@ -66,13 +66,14 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             if (logMode == DnsLogMode.BLOCKED_AND_ERRORS) it.copy(passed = 0, cached = 0) else it
         }
         val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT, logMode)
-        val recentHttpLogs = database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
-        val httpStats = database.httpRequestLogDao().dailyStats(dayStartMillis())
+        val recentHttpLogs = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
+            .filter { logMode == DnsLogMode.ALL || it.outcome != "allowed" }
+        val httpStats = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().dailyStats(dayStartMillis())
         var httpPassed = 0
         var httpBlocked = 0
         var httpError = 0
         var httpBypassed = 0
-        httpStats.forEach { row ->
+        httpStats.filter { logMode == DnsLogMode.ALL || it.outcome != "allowed" }.forEach { row ->
             when (row.outcome) {
                 "allowed", "rewritten" -> httpPassed += row.count
                 "blocked", "invalid" -> httpBlocked += row.count
