@@ -16,7 +16,34 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.ui.graphics.vector.ImageVector
+
+enum class SettingsSection(val title: String, val order: Int) {
+    RESOLUTION("解析设置", 0), PERFORMANCE("性能优化", 1), BEHAVIOR("运行行为", 2),
+    APPEARANCE("外观", 3), DATA("数据管理", 4), ABOUT("关于应用", 5)
+}
+
+data class SettingsSearchItem(
+    val title: String,
+    val description: String,
+    val keywords: List<String> = emptyList(),
+    val targetRoute: String? = null
+)
+
+data class SettingsDestination(
+    val route: String,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val parentRoute: String? = null,
+    val mainSection: SettingsSection? = null,
+    val keywords: List<String> = emptyList(),
+    val searchable: Boolean = true,
+    val searchItems: List<SettingsSearchItem> = emptyList()
+)
 
 internal data class SettingsSearchEntry(
     val title: String,
@@ -144,4 +171,84 @@ internal object SettingsSearchCatalog {
         page("赞助者名单", "查看项目赞助者", "关于应用", Routes.SPONSOR_LIST, Icons.Filled.Info),
         page("共建者名单", "查看提出建议与帮助测试的共建者", "关于应用", Routes.CO_BUILDER_LIST, Icons.Filled.Info)
     )
+}
+
+object ScreenDestinations {
+    private fun main(route: String, title: String, description: String, icon: ImageVector, section: SettingsSection, vararg keywords: String) =
+        SettingsDestination(route, title, description, icon, mainSection = section, keywords = keywords.toList())
+    private fun child(route: String, title: String, description: String, icon: ImageVector, parent: SettingsDestination, searchable: Boolean = true, vararg keywords: String) =
+        SettingsDestination(route, title, description, icon, parentRoute = parent.route, searchable = searchable, keywords = keywords.toList())
+
+    val providerManagement = main(Routes.PROVIDER_MANAGEMENT, "服务商管理", "选择、添加或编辑 DoH/DoT 服务", Icons.Filled.Dns, SettingsSection.RESOLUTION, "DNS", "服务地址", "协议")
+    val bootstrapSettings = main(Routes.BOOTSTRAP_SETTINGS, "Bootstrap 设置", "配置全局 Bootstrap DNS 与智慧权重", Icons.Filled.Public, SettingsSection.RESOLUTION, "IP", "递归 DNS")
+    val raceModeLatency = main(Routes.RACE_MODE_LATENCY, "查询测速", "选择服务商并测试指定域名的实际解析耗时", Icons.Filled.Speed, SettingsSection.RESOLUTION, "延迟", "测速")
+    val cacheSettings = main(Routes.CACHE_SETTINGS, "缓存设置", "缓存已解析的域名，减少重复查询", Icons.Filled.Storage, SettingsSection.PERFORMANCE, "DNS 缓存")
+    val raceModeProviders = main(Routes.RACE_MODE_PROVIDERS, "解析模式", "选择省电、均衡、极速或主备解析策略", Icons.AutoMirrored.Filled.AltRoute, SettingsSection.PERFORMANCE, "DNS 策略")
+    val logRetentionSettings = main(Routes.LOG_RETENTION_SETTINGS, "日志模式", "选择 DNS 请求日志的记录范围", Icons.Filled.History, SettingsSection.PERFORMANCE)
+    val foregroundBackgroundSettings = main(Routes.FOREGROUND_BACKGROUND_SETTINGS, "前后台行为", "后台隐藏、通知常驻", Icons.Filled.FlipToBack, SettingsSection.BEHAVIOR)
+    val excludedApps = main(Routes.EXCLUDED_APPS, "排除应用", "指定使用系统 DNS 的应用", Icons.Filled.Apps, SettingsSection.BEHAVIOR)
+    val httpInspectionSettings = main(Routes.HTTP_INSPECTION_SETTINGS, "HTTP(S) 流量过滤", "按应用检查 HTTP(S) 请求并应用现有域名规则", Icons.Filled.Http, SettingsSection.BEHAVIOR, "HTTPS", "HTTP3", "QUIC")
+    val homeProviderVisibility = main(Routes.HOME_PROVIDER_VISIBILITY, "服务显示", "配置首页解析服务列表中显示的协议和服务商", Icons.Filled.Visibility, SettingsSection.APPEARANCE)
+    val appearanceSettings = main(Routes.APPEARANCE_SETTINGS, "外观设置", "设置应用的显示外观", Icons.Filled.Palette, SettingsSection.APPEARANCE)
+    val configTransfer = main(Routes.CONFIG_TRANSFER, "导入与导出", "备份或恢复自定义服务与规则订阅", Icons.Filled.ImportExport, SettingsSection.DATA)
+    val ruleManagement = main(Routes.RULE_MANAGEMENT, "域名规则", "添加屏蔽或白名单规则，导入规则订阅", Icons.AutoMirrored.Filled.Rule, SettingsSection.DATA)
+    val dataCleanup = main(Routes.DATA_CLEANUP, "数据清理", "删除缓存、日志或域名规则", Icons.Filled.DeleteSweep, SettingsSection.DATA)
+    val about = main(Routes.ABOUT, "应用信息", "查看软件说明、作者信息和项目仓库", Icons.Filled.Info, SettingsSection.ABOUT)
+    val sponsor = main(Routes.SPONSOR, "赞助", "请作者喝杯蜜雪，支持项目持续开发", Icons.Filled.Favorite, SettingsSection.ABOUT)
+    val sponsorList = main(Routes.SPONSOR_LIST, "赞助者名单", "感谢每一位支持 DNSSR 项目的朋友", Icons.Filled.WorkspacePremium, SettingsSection.ABOUT)
+    val coBuilderList = main(Routes.CO_BUILDER_LIST, "共建者名单", "感谢提出建议与帮助测试的共建者", Icons.Filled.Groups, SettingsSection.ABOUT)
+
+    val configImportExport = child(Routes.CONFIG_IMPORT_EXPORT, "设置配置", "选择配置内容并导入或导出", Icons.Filled.ImportExport, configTransfer)
+    val ruleExport = child(Routes.RULE_EXPORT, "规则导出", "将当前生效规则导出为 TXT 文件", Icons.Filled.ImportExport, configTransfer)
+    val blockResponseSettings = child(Routes.BLOCK_RESPONSE_SETTINGS, "拦截响应", "配置固定响应和动态策略", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val subscriptionManagement = child(Routes.SUBSCRIPTION_MANAGEMENT, "规则订阅", "管理 DNS 过滤与 hosts 覆写订阅", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val subscriptionAutoUpdate = child(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL, "自动更新设置", "设置规则订阅的自动更新开关和频率", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val ruleList = child(Routes.RULE_LIST, "黑名单规则", "查看、启用、停用或删除屏蔽规则", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val allowRuleList = child(Routes.ALLOW_RULE_LIST, "白名单规则", "查看、启用、停用或删除放行规则", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val rewriteRuleList = child(Routes.REWRITE_RULE_LIST, "覆写域名规则", "查看、启用、停用或删除覆写规则", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val resolutionSingle = child(Routes.RESOLUTION_SINGLE, "省电", "配置单一 DNS 服务商", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
+    val resolutionSmart = child(Routes.RESOLUTION_SMART, "均衡", "配置参与智能预测的服务商", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
+    val resolutionParallel = child(Routes.RESOLUTION_PARALLEL, "极速", "配置参与并行查询的服务商", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
+    val resolutionBackup = child(Routes.RESOLUTION_BACKUP, "主备（高级）", "配置服务商主备顺序", Icons.AutoMirrored.Filled.AltRoute, raceModeProviders)
+    val httpInspectionApps = child(Routes.HTTP_INSPECTION_APPS, "选择过滤应用", "选择需要检查流量的应用", Icons.Filled.Http, httpInspectionSettings)
+    val httpRequestLogs = child(Routes.HTTP_REQUEST_LOGS, "HTTP 请求记录", "查看 HTTP 请求记录", Icons.Filled.Http, httpInspectionSettings, searchable = false)
+    val dayNightMode = child(Routes.DAY_NIGHT_MODE, "日夜模式", "选择浅色、深色或跟随系统", Icons.Filled.Palette, appearanceSettings)
+    val themeColorSettings = child(Routes.THEME_COLOR_SETTINGS, "主题色配置", "选择应用界面的强调色", Icons.Filled.Palette, appearanceSettings)
+    val homeComponentOpacity = child(Routes.HOME_COMPONENT_OPACITY, "首页透明度", "调整首页按钮、选择框与文字透明度", Icons.Filled.Palette, appearanceSettings)
+    val homeSentenceSettings = child(Routes.HOME_SENTENCE_SETTINGS, "首页句子", "设置 DNS 服务开启和关闭时的句子", Icons.Filled.Palette, appearanceSettings)
+    val notificationTextSettings = child(Routes.NOTIFICATION_TEXT_SETTINGS, "通知栏文案", "设置 DNS 服务开启和关闭时的通知文案", Icons.Filled.Palette, appearanceSettings)
+    val customBackgroundSettings = child(Routes.CUSTOM_BACKGROUND_SETTINGS, "软件背景", "选取手机图片作为应用背景", Icons.Filled.Palette, appearanceSettings)
+    val serviceLightEffectSettings = child(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, "服务动态光影", "配置 DNS 服务运行时的动态光影", Icons.Filled.Palette, appearanceSettings)
+    val legacyIconSettings = child(Routes.LEGACY_ICON_SETTINGS, "旧版图标", "使用旧版应用图标", Icons.Filled.Palette, appearanceSettings)
+    val legacyLogPageSettings = child(Routes.LEGACY_LOG_PAGE_SETTINGS, "旧版日志页面", "使用旧版日志页面布局", Icons.Filled.Palette, appearanceSettings)
+
+    val all = listOf(providerManagement, bootstrapSettings, raceModeLatency, cacheSettings, raceModeProviders, logRetentionSettings,
+        foregroundBackgroundSettings, excludedApps, httpInspectionSettings, homeProviderVisibility, appearanceSettings,
+        configTransfer, ruleManagement, dataCleanup, about, sponsor, sponsorList, coBuilderList, configImportExport,
+        ruleExport, blockResponseSettings, subscriptionManagement, subscriptionAutoUpdate, ruleList, allowRuleList,
+        rewriteRuleList, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps,
+        httpRequestLogs, dayNightMode, themeColorSettings, homeComponentOpacity, homeSentenceSettings,
+        notificationTextSettings, customBackgroundSettings, serviceLightEffectSettings, legacyIconSettings, legacyLogPageSettings)
+    val mainEntries = all.filter { it.mainSection != null }.sortedWith(compareBy({ it.mainSection!!.order }, { all.indexOf(it) }))
+    private val byRoute = all.associateBy { it.route }
+
+    fun breadcrumbFor(destination: SettingsDestination): List<String> {
+        val parents = generateSequence(destination.parentRoute?.let(byRoute::get)) { it.parentRoute?.let(byRoute::get) }.toList().asReversed()
+        val section = (destination.mainSection ?: parents.firstOrNull()?.mainSection)?.title
+        return listOfNotNull(section) + parents.map { it.title } + destination.title
+    }
+
+    internal val searchEntries: List<SettingsSearchEntry> = all.filter { it.searchable }.flatMap { destination ->
+        listOf(SettingsSearchEntry(destination.title, destination.description, breadcrumbFor(destination), destination.route, destination.icon, destination.keywords)) +
+            destination.searchItems.map { item -> SettingsSearchEntry(item.title, item.description, breadcrumbFor(destination), item.targetRoute ?: destination.route, destination.icon, item.keywords) }
+    } + SettingsSearchCatalog.entries.filter { it.breadcrumb.lastOrNull() != it.title }
+
+    init {
+        require(byRoute.size == all.size) { "设置路由不得重复" }
+        all.forEach { destination ->
+            require((destination.mainSection != null) xor (destination.parentRoute != null)) { "设置页面必须是一级入口或具有父路由: ${destination.route}" }
+            require(destination.parentRoute == null || byRoute.containsKey(destination.parentRoute)) { "无效父路由: ${destination.parentRoute}" }
+            destination.searchItems.mapNotNull { it.targetRoute }.forEach { require(byRoute.containsKey(it)) { "搜索目标不是设置路由: $it" } }
+        }
+    }
 }

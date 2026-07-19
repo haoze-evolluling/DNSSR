@@ -85,38 +85,6 @@ object Routes {
     const val CO_BUILDER_LIST = "co_builder_list"
 }
 
-data class ScreenDestination(val route: String, val title: String)
-
-object ScreenDestinations {
-    val ruleManagement = ScreenDestination(Routes.RULE_MANAGEMENT, "域名规则")
-    val dataCleanup = ScreenDestination(Routes.DATA_CLEANUP, "数据清理")
-    val configTransfer = ScreenDestination(Routes.CONFIG_TRANSFER, "导入与导出")
-    val configImportExport = ScreenDestination(Routes.CONFIG_IMPORT_EXPORT, "设置配置")
-    val ruleExport = ScreenDestination(Routes.RULE_EXPORT, "规则导出")
-    val providerManagement = ScreenDestination(Routes.PROVIDER_MANAGEMENT, "服务商管理")
-    val homeProviderVisibility = ScreenDestination(Routes.HOME_PROVIDER_VISIBILITY, "服务显示")
-    val bootstrapSettings = ScreenDestination(Routes.BOOTSTRAP_SETTINGS, "Bootstrap 设置")
-    val raceModeLatency = ScreenDestination(Routes.RACE_MODE_LATENCY, "查询测速")
-    val raceModeProviders = ScreenDestination(Routes.RACE_MODE_PROVIDERS, "解析模式")
-    val cacheSettings = ScreenDestination(Routes.CACHE_SETTINGS, "缓存设置")
-    val logRetentionSettings = ScreenDestination(Routes.LOG_RETENTION_SETTINGS, "日志模式")
-    val foregroundBackgroundSettings = ScreenDestination(Routes.FOREGROUND_BACKGROUND_SETTINGS, "前后台行为")
-    val appearanceSettings = ScreenDestination(Routes.APPEARANCE_SETTINGS, "外观设置")
-    val about = ScreenDestination(Routes.ABOUT, "应用信息")
-    val sponsor = ScreenDestination(Routes.SPONSOR, "赞助")
-    val sponsorList = ScreenDestination(Routes.SPONSOR_LIST, "赞助者名单")
-    val coBuilderList = ScreenDestination(Routes.CO_BUILDER_LIST, "共建者名单")
-    val dayNightMode = ScreenDestination(Routes.DAY_NIGHT_MODE, "日夜模式")
-    val themeColorSettings = ScreenDestination(Routes.THEME_COLOR_SETTINGS, "主题色配置")
-    val homeComponentOpacity = ScreenDestination(Routes.HOME_COMPONENT_OPACITY, "首页透明度")
-    val homeSentenceSettings = ScreenDestination(Routes.HOME_SENTENCE_SETTINGS, "首页句子")
-    val notificationTextSettings = ScreenDestination(Routes.NOTIFICATION_TEXT_SETTINGS, "通知栏文案")
-    val customBackgroundSettings = ScreenDestination(Routes.CUSTOM_BACKGROUND_SETTINGS, "软件背景")
-    val serviceLightEffectSettings = ScreenDestination(Routes.SERVICE_LIGHT_EFFECT_SETTINGS, "服务动态光影")
-    val legacyIconSettings = ScreenDestination(Routes.LEGACY_ICON_SETTINGS, "旧版图标")
-    val legacyLogPageSettings = ScreenDestination(Routes.LEGACY_LOG_PAGE_SETTINGS, "旧版日志页面")
-}
-
 @Composable
 fun AppNavHost(
     mainScreen: @Composable (
@@ -253,32 +221,32 @@ fun AppNavHost(
                 RuleManagementScreen(
                 onBack = { navController.popWhenResumed() },
                 title = ScreenDestinations.ruleManagement.title,
-                onNavigateToRuleList = { navController.navigateWhenResumed(Routes.RULE_LIST) },
-                onNavigateToAllowRuleList = { navController.navigateWhenResumed(Routes.ALLOW_RULE_LIST) },
-                onNavigateToRewriteRuleList = { navController.navigateWhenResumed(Routes.REWRITE_RULE_LIST) },
-                onNavigateToSubscription = { navController.navigateWhenResumed(Routes.SUBSCRIPTION_MANAGEMENT) },
+                onNavigateToRuleList = { navController.navigateWhenResumed(ScreenDestinations.ruleList.route) },
+                onNavigateToAllowRuleList = { navController.navigateWhenResumed(ScreenDestinations.allowRuleList.route) },
+                onNavigateToRewriteRuleList = { navController.navigateWhenResumed(ScreenDestinations.rewriteRuleList.route) },
+                onNavigateToSubscription = { navController.navigateWhenResumed(ScreenDestinations.subscriptionManagement.route) },
                 onNavigateToAutoUpdateInterval = {
-                    navController.navigateWhenResumed(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL)
+                    navController.navigateWhenResumed(ScreenDestinations.subscriptionAutoUpdate.route)
                 },
                 onNavigateToBlockResponseSettings = {
-                    navController.navigateWhenResumed(Routes.BLOCK_RESPONSE_SETTINGS)
+                    navController.navigateWhenResumed(ScreenDestinations.blockResponseSettings.route)
                 },
                     onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
                 )
             }
         }
-        composable(Routes.EXCLUDED_APPS) {
+        composable(ScreenDestinations.excludedApps.route) {
             SettingsGuideHost(SettingsGuides.EXCLUDED_APPS) {
                 ExcludedAppsScreen(onBack = { navController.popWhenResumed() })
             }
         }
-        composable(Routes.BLOCK_RESPONSE_SETTINGS) {
+        composable(ScreenDestinations.blockResponseSettings.route) {
             BlockResponseSettingsScreen(
                 onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
-        composable(Routes.RULE_LIST) {
+        composable(ScreenDestinations.ruleList.route) {
             RuleListScreen(
                 onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
@@ -335,14 +303,14 @@ fun AppNavHost(
                 )
             }
         }
-        composable(Routes.ALLOW_RULE_LIST) {
+        composable(ScreenDestinations.allowRuleList.route) {
             RuleListScreen(
                 onBack = { navController.popWhenResumed() },
                 ruleKind = ManagedRuleKind.ALLOW,
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
-        composable(Routes.REWRITE_RULE_LIST) {
+        composable(ScreenDestinations.rewriteRuleList.route) {
             RuleListScreen(onBack = { navController.popWhenResumed() }, ruleKind = ManagedRuleKind.REWRITE, onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged)
         }
         composable(ScreenDestinations.bootstrapSettings.route) {
@@ -369,10 +337,10 @@ fun AppNavHost(
                 )
             }
         }
-        composable(Routes.RESOLUTION_SINGLE) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popWhenResumed() }) }
-        composable(Routes.RESOLUTION_SMART) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popWhenResumed() }) }
-        composable(Routes.RESOLUTION_PARALLEL) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popWhenResumed() }) }
-        composable(Routes.RESOLUTION_BACKUP) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popWhenResumed() }) }
+        composable(ScreenDestinations.resolutionSingle.route) { ResolutionModeConfigScreen(DnsResolutionMode.SINGLE, { navController.popWhenResumed() }) }
+        composable(ScreenDestinations.resolutionSmart.route) { ResolutionModeConfigScreen(DnsResolutionMode.SMART_PREDICTION, { navController.popWhenResumed() }) }
+        composable(ScreenDestinations.resolutionParallel.route) { ResolutionModeConfigScreen(DnsResolutionMode.PARALLEL_RACE, { navController.popWhenResumed() }) }
+        composable(ScreenDestinations.resolutionBackup.route) { ResolutionModeConfigScreen(DnsResolutionMode.PRIMARY_BACKUP, { navController.popWhenResumed() }) }
         composable(ScreenDestinations.cacheSettings.route) {
             SettingsGuideHost(SettingsGuides.CACHE) {
                 CacheSettingsScreen(
@@ -400,26 +368,26 @@ fun AppNavHost(
                 )
             }
         }
-        composable(Routes.HTTP_INSPECTION_SETTINGS) {
+        composable(ScreenDestinations.httpInspectionSettings.route) {
             HttpInspectionSettingsScreen(
                 onBack = { navController.popWhenResumed() },
-                onNavigateToRequestLogs = { navController.navigateWhenResumed(Routes.HTTP_REQUEST_LOGS) },
-                onNavigateToApps = { navController.navigateWhenResumed(Routes.HTTP_INSPECTION_APPS) }
+                onNavigateToRequestLogs = { navController.navigateWhenResumed(ScreenDestinations.httpRequestLogs.route) },
+                onNavigateToApps = { navController.navigateWhenResumed(ScreenDestinations.httpInspectionApps.route) }
             )
         }
-        composable(Routes.HTTP_INSPECTION_APPS) {
+        composable(ScreenDestinations.httpInspectionApps.route) {
             HttpInspectionAppsScreen(onBack = { navController.popWhenResumed() })
         }
-        composable(Routes.HTTP_REQUEST_LOGS) {
+        composable(ScreenDestinations.httpRequestLogs.route) {
             HttpRequestLogScreen(onBack = { navController.popWhenResumed() })
         }
-        composable(Routes.SUBSCRIPTION_MANAGEMENT) {
+        composable(ScreenDestinations.subscriptionManagement.route) {
             SubscriptionScreen(
                 onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
         }
-        composable(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL) {
+        composable(ScreenDestinations.subscriptionAutoUpdate.route) {
             SubscriptionAutoUpdateIntervalScreen(
                 onBack = { navController.popWhenResumed() }
             )
