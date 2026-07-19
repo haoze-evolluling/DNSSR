@@ -31,7 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -422,7 +422,7 @@ private fun WallpaperThumbnail(
                     .padding(4.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Check,
+                    imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "当前背景",
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(16.dp)
@@ -648,7 +648,7 @@ fun ThemeColorSettingsScreen(
                             ) {
                                 if (selectedStyle == style) {
                                     Icon(
-                                        imageVector = Icons.Filled.Check,
+                                        imageVector = Icons.Filled.CheckCircle,
                                         contentDescription = "已选中",
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)

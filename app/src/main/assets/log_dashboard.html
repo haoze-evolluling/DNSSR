@@ -388,8 +388,8 @@
 
     <section class="hero">
       <div>
-        <h1>DNS 日志仪表盘</h1>
-        <p>请求、缓存、竞速与规则拦截的实时概览</p>
+        <h1>请求日志仪表盘</h1>
+        <p>DNS、HTTPS、缓存、竞速与规则拦截的实时概览</p>
       </div>
     </section>
 
@@ -409,6 +409,10 @@
       <article class="card metric">
         <div class="label">缓存命中</div>
         <div id="cached" class="value accent-blue">0</div>
+      </article>
+      <article class="card metric">
+        <div class="label">HTTPS 旁路</div>
+        <div id="bypassed" class="value accent-amber">0</div>
       </article>
 
       <article class="card section wide">
@@ -560,17 +564,19 @@
       const passed = total ? stats.passed / total * 100 : 0;
       const blocked = total ? stats.blocked / total * 100 : 0;
       const error = total ? stats.error / total * 100 : 0;
+      const bypassed = total ? stats.bypassed / total * 100 : 0;
       const donut = $("resultDonut");
       donut.dataset.center = fmt.format(total);
       if (total === 0) {
         donut.style.background = "conic-gradient(var(--line) 0 100%)";
       } else {
-        donut.style.background = `conic-gradient(var(--green) 0 ${passed}%, var(--red) ${passed}% ${passed + blocked}%, var(--amber) ${passed + blocked}% ${passed + blocked + error}%, var(--line) ${passed + blocked + error}% 100%)`;
+        donut.style.background = `conic-gradient(var(--green) 0 ${passed}%, var(--red) ${passed}% ${passed + blocked}%, var(--amber) ${passed + blocked}% ${passed + blocked + error}%, var(--secondary) ${passed + blocked + error}% ${passed + blocked + error + bypassed}%, var(--line) ${passed + blocked + error + bypassed}% 100%)`;
       }
       $("resultLegend").innerHTML = [
         ["通过", stats.passed, "accent-green"],
         ["过滤", stats.blocked, "accent-red"],
         ["失败", stats.error, "accent-amber"],
+        ["旁路", stats.bypassed, "accent-violet"],
         ["缓存", stats.cached, "accent-blue"]
       ].map(([name, value, cls]) => `<div class="legend-row"><span>${name}</span><b class="${cls}">${fmt.format(value || 0)}</b></div>`).join("");
     }
@@ -584,6 +590,7 @@
       setMetric("passed", stats.passed);
       setMetric("blocked", stats.blocked);
       setMetric("cached", stats.cached);
+      setMetric("bypassed", stats.bypassed);
       renderDonut(stats);
 
       const race = data.race || {};
@@ -603,11 +610,9 @@
       $("cacheRate").textContent = `${pct(cacheRate)} · ${fmt.format(stats.cached || 0)} 次`;
       $("cacheBar").style.width = `${Math.max(0, Math.min(100, cacheRate * 100))}%`;
 
-      renderRows("recentLogs", data.recentLogs, "暂无 DNS 请求日志", item => {
-        const cls = item.result === "PASSED" ? "accent-green" : item.result === "BLOCKED" ? "accent-red" : "accent-amber";
-        const cache = item.cached ? " · 命中缓存" : "";
-        const msg = item.message ? ` · ${text(item.message)}` : "";
-        return `<div class="row"><div class="main">${text(item.queryName)}<div class="sub">${time(item.timestamp)} · ${text(item.queryType)}${cache}${msg}</div></div><span class="tag ${cls}">${text(item.resultLabel)}</span></div>`;
+      renderRows("recentLogs", data.recentLogs, "暂无请求日志", item => {
+        const cls = item.status === "passed" ? "accent-green" : item.status === "blocked" ? "accent-red" : item.status === "bypassed" ? "accent-violet" : "accent-amber";
+        return `<div class="row"><div class="main">${text(item.name)}<div class="sub">${time(item.timestamp)} · ${text(item.source)} · ${text(item.meta)}</div></div><span class="tag ${cls}">${text(item.resultLabel)}</span></div>`;
       });
 
       renderRows("cacheEntries", data.cacheEntries, "暂无有效缓存", item =>

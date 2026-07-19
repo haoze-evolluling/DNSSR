@@ -224,7 +224,7 @@ fun AppNavHost(
             )
         }
         composable(Routes.DNS_LOGS) {
-            LogScreen(
+            RequestLogScreen(
                 onBack = { navController.popWhenResumed() },
                 onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
             )
@@ -425,7 +425,10 @@ fun AppNavHost(
             HttpInspectionAppsScreen(onBack = { navController.popWhenResumed() })
         }
         composable(Routes.HTTP_REQUEST_LOGS) {
-            HttpRequestLogScreen(onBack = { navController.popWhenResumed() })
+            RequestLogScreen(
+                onBack = { navController.popWhenResumed() },
+                onRuntimeDnsSettingsChanged = onRuntimeDnsSettingsChanged
+            )
         }
         composable(Routes.SUBSCRIPTION_MANAGEMENT) {
             SubscriptionScreen(

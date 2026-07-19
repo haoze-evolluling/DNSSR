@@ -1,11 +1,5 @@
 package com.haoze.dnssr.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,11 +50,6 @@ import kotlin.math.max
 import kotlinx.coroutines.delay
 
 private val cacheTimeFormatter = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
-private val cacheTitleSlideSpec = tween<IntOffset>(
-    durationMillis = 200,
-    easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DnsCacheScreen(
@@ -91,15 +79,9 @@ fun DnsCacheScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    AnimatedContent(
-                        targetState = isSearchActive,
-                        transitionSpec = {
-                            slideInHorizontally(animationSpec = cacheTitleSlideSpec) { it / 4 }
-                                .togetherWith(slideOutHorizontally(animationSpec = cacheTitleSlideSpec) { -it / 4 })
-                        },
-                        label = "DnsCacheTitle"
-                    ) { searching ->
-                        if (searching) {
+                    // Keep the title slot at a stable width so toggling search does not animate its expansion.
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (isSearchActive) {
                             OutlinedTextField(
                                 value = params.query,
                                 onValueChange = viewModel::onSearchQueryChange,

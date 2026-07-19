@@ -25,7 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
@@ -127,7 +127,7 @@ internal fun AppListOverflowMenu(
                 AppListSubmenu.FILTER -> AppListFilter.entries.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option.label) },
-                        leadingIcon = { if (filter == option) Icon(Icons.Default.Check, null) },
+                        leadingIcon = { if (filter == option) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             onFilterChange(option)
                             submenu = null
@@ -138,7 +138,7 @@ internal fun AppListOverflowMenu(
                 AppListSubmenu.SORT -> AppListSort.entries.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option.label) },
-                        leadingIcon = { if (sort == option) Icon(Icons.Default.Check, null) },
+                        leadingIcon = { if (sort == option) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             onSortChange(option)
                             submenu = null

@@ -9,6 +9,7 @@ import com.haoze.dnssr.data.RaceStatsRange
 import com.haoze.dnssr.data.SubscriptionInterceptionStatsRange
 import com.haoze.dnssr.data.entity.DnsCacheEntity
 import com.haoze.dnssr.data.entity.DnsLogEntity
+import com.haoze.dnssr.data.entity.HttpRequestLogEntity
 import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.data.repository.BootstrapLogRepository
 import com.haoze.dnssr.data.repository.DnsCacheRepository
@@ -65,6 +66,20 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             if (logMode == DnsLogMode.BLOCKED_AND_ERRORS) it.copy(passed = 0, cached = 0) else it
         }
         val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT, logMode)
+        val recentHttpLogs = database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
+        val httpStats = database.httpRequestLogDao().dailyStats(dayStartMillis())
+        var httpPassed = 0
+        var httpBlocked = 0
+        var httpError = 0
+        var httpBypassed = 0
+        httpStats.forEach { row ->
+            when (row.outcome) {
+                "allowed", "rewritten" -> httpPassed += row.count
+                "blocked", "invalid" -> httpBlocked += row.count
+                "decryption_failed", "unsupported_protocol", "resource_bypass" -> httpBypassed += row.count
+                else -> httpError += row.count
+            }
+        }
         val recentCacheEntries = dnsCacheRepository.recentEntries(now, RECENT_CACHE_LIMIT)
         val raceStats = raceLogRepository.stats(RaceStatsRange.TODAY)
         val bootstrapStats = bootstrapLogRepository.stats(BootstrapStatsRange.TODAY)
@@ -91,7 +106,10 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             .sortedByDescending { it.optInt("hits") }
             .take(SUBSCRIPTION_LIST_LIMIT)
 
-        val totalLogs = dailyStats?.let { it.passed + it.blocked + it.error } ?: 0
+        val passed = (dailyStats?.passed ?: 0) + httpPassed
+        val blocked = (dailyStats?.blocked ?: 0) + httpBlocked
+        val errors = (dailyStats?.error ?: 0) + httpError
+        val totalLogs = passed + blocked + errors + httpBypassed
         return JSONObject()
             .put("generatedAt", now)
             .put("logMode", logMode.storageValue)
@@ -99,12 +117,13 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                 "dailyStats",
                 JSONObject()
                     .put("total", totalLogs)
-                    .put("passed", dailyStats?.passed ?: 0)
-                    .put("blocked", dailyStats?.blocked ?: 0)
-                    .put("error", dailyStats?.error ?: 0)
+                    .put("passed", passed)
+                    .put("blocked", blocked)
+                    .put("error", errors)
+                    .put("bypassed", httpBypassed)
                     .put("cached", dailyStats?.cached ?: 0)
             )
-            .put("recentLogs", recentLogs.toLogArray())
+            .put("recentLogs", mergedRequestLogs(recentLogs, recentHttpLogs))
             .put("cacheEntries", recentCacheEntries.toCacheArray(now))
             .put(
                 "race",
@@ -180,6 +199,40 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
                 )
             }
         }
+    }
+
+    private fun mergedRequestLogs(
+        dnsLogs: List<DnsLogEntity>,
+        httpLogs: List<HttpRequestLogEntity>
+    ): JSONArray {
+        val rows = dnsLogs.map { log ->
+            JSONObject()
+                .put("timestamp", log.timestamp)
+                .put("source", "DNS")
+                .put("name", log.queryName)
+                .put("meta", "${dnsTypeName(log.queryType)}${if (log.cached) " · 命中缓存" else ""}${log.message?.let { " · $it" } ?: ""}")
+                .put("status", when (log.result) {
+                    LogResult.PASSED.value -> "passed"
+                    LogResult.BLOCKED.value -> "blocked"
+                    else -> "error"
+                })
+                .put("resultLabel", resultLabel(log.result))
+        } + httpLogs.map { log ->
+            val status = when (log.outcome) {
+                "allowed", "rewritten" -> "passed"
+                "blocked", "invalid" -> "blocked"
+                "decryption_failed", "unsupported_protocol", "resource_bypass" -> "bypassed"
+                else -> "error"
+            }
+            JSONObject()
+                .put("timestamp", log.timestamp)
+                .put("source", "HTTPS")
+                .put("name", log.authority ?: "未取得 authority")
+                .put("meta", "${log.protocol} · ${log.packageName}${log.matchedRule?.let { " · $it" } ?: ""}")
+                .put("status", status)
+                .put("resultLabel", when (status) { "passed" -> "通过"; "blocked" -> "过滤"; "bypassed" -> "旁路"; else -> "失败" })
+        }
+        return JSONArray().also { array -> rows.sortedByDescending { it.optLong("timestamp") }.take(RECENT_LOG_LIMIT).forEach(array::put) }
     }
 
     private fun List<DnsCacheEntity>.toCacheArray(now: Long): JSONArray {

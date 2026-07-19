@@ -6,9 +6,12 @@ import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.haoze.dnssr.data.entity.DnsLogEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DnsLogDao {
+    @Query("SELECT * FROM dns_log ORDER BY timestamp DESC LIMIT 500")
+    fun observeRecentForRequests(): Flow<List<DnsLogEntity>>
     @Insert
     suspend fun insert(entity: DnsLogEntity)
 

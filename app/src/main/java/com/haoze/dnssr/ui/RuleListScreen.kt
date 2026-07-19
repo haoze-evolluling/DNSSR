@@ -16,7 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -292,8 +292,9 @@ private fun RuleSourceFilterMenuItem(
         trailingIcon = {
             if (selected) {
                 Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "已选中"
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "已选中",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }

@@ -14,9 +14,20 @@ interface HttpRequestLogDao {
     @Query("SELECT * FROM http_request_log ORDER BY timestamp DESC LIMIT :limit")
     fun observeRecent(limit: Int = 500): Flow<List<HttpRequestLogEntity>>
 
+    @Query("SELECT * FROM http_request_log ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<HttpRequestLogEntity>
+
+    @Query("SELECT outcome, COUNT(*) AS count FROM http_request_log WHERE timestamp >= :since GROUP BY outcome")
+    suspend fun dailyStats(since: Long): List<HttpDailyStatRow>
+
     @Query("DELETE FROM http_request_log WHERE timestamp < :before")
     suspend fun deleteBefore(before: Long)
 
     @Query("DELETE FROM http_request_log")
     suspend fun clearAll()
 }
+
+data class HttpDailyStatRow(
+    val outcome: String,
+    val count: Int
+)

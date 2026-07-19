@@ -41,7 +41,7 @@ fun LogHomeScreen(
             SettingsGroup {
                 SettingsNavigationItem(
                     title = "请求记录",
-                    subtitle = "查看 DNS 请求和处理结果",
+                    subtitle = "查看 DNS 与 HTTPS 请求和处理结果",
                     onClick = onNavigateToDnsLogs
                 )
                 SettingsDivider()

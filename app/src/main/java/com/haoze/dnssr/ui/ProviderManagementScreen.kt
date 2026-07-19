@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -270,7 +270,7 @@ private fun ProviderListItem(
     ) {
         if (selected) {
             Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = Icons.Default.CheckCircle,
                 contentDescription = "已选中",
                 tint = MaterialTheme.colorScheme.primary
             )
