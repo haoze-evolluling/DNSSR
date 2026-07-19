@@ -654,7 +654,7 @@ func (r *Resolver) Shutdown() {
 }
 
 // ResolveARecord resolves a domain's A record via a protected plain DNS query.
-// Used for SafeSearch IP resolution.
+// Used as the direct fallback for HTTPS passthrough host resolution.
 func (r *Resolver) ResolveARecord(domain, dnsServer string) (net.IP, error) {
 	msg := new(dns.Msg)
 	msg.SetQuestion(dns.Fqdn(domain), dns.TypeA)

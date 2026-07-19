@@ -112,15 +112,20 @@ class GoInspectionTunnel(
                 queryType: Long,
                 responseTimeMs: Long,
                 appName: String,
-                resolvedIP: String,
-                blockedBy: String
+                resolvedIPs: String,
+                blockedBy: String,
+                errorMessage: String
             ) {
                 scope.launch {
                     dnsLogger.log(
                         queryName = domain,
                         queryType = queryType.toInt(),
-                        result = if (blocked) LogResult.BLOCKED else LogResult.PASSED,
-                        message = buildDnsLogMessage(appName, resolvedIP, blockedBy, responseTimeMs)
+                        result = when {
+                            errorMessage.isNotBlank() -> LogResult.ERROR
+                            blocked -> LogResult.BLOCKED
+                            else -> LogResult.PASSED
+                        },
+                        message = buildDnsLogMessage(appName, resolvedIPs, blockedBy, errorMessage, responseTimeMs)
                     )
                 }
             }
@@ -233,13 +238,15 @@ data class HttpsDnsConfigSnapshot private constructor(
 
 private fun buildDnsLogMessage(
     appName: String,
-    resolvedIP: String,
+    resolvedIPs: String,
     blockedBy: String,
+    errorMessage: String,
     responseTimeMs: Long
 ): String? = listOfNotNull(
     appName.takeIf { it.isNotBlank() }?.let { "app=$it" },
-    resolvedIP.takeIf { it.isNotBlank() }?.let { "resolved=$it" },
+    resolvedIPs.takeIf { it.isNotBlank() }?.let { "resolved=$it" },
     blockedBy.takeIf { it.isNotBlank() }?.let { "blocked_by=$it" },
+    errorMessage.takeIf { it.isNotBlank() }?.let { "error=$it" },
     responseTimeMs.takeIf { it > 0 }?.let { "elapsed=${it}ms" }
 ).joinToString(", ").takeIf { it.isNotEmpty() }
 

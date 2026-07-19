@@ -83,6 +83,6 @@ func (e *Engine) logConnection(flow flowID, protocol int) {
 	// blockedBy = "connection" so the UI can distinguish it from DNS.
 	cb.OnDNSQuery(
 		fmt.Sprintf("%s %s:%d", proto, dest, flow.serverPort),
-		false, 0, 0, app, dest, "connection",
+		false, 0, 0, app, dest, "connection", "",
 	)
 }

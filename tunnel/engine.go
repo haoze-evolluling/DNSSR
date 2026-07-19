@@ -2,8 +2,7 @@
 //
 // This package is designed to be compiled with gomobile bind and used from
 // Android Kotlin code. It handles TUN packet processing, DNS query forwarding
-// (Plain/DoH/DoT/DoQ), domain blocking, SafeSearch enforcement, and
-// YouTube restricted mode.
+// (Plain/DoH/DoT/DoQ), domain blocking, and full-network filtering.
 //
 // The exported API uses only gomobile-compatible types (string, []byte, int, bool).
 package tunnel
@@ -27,7 +26,7 @@ import (
 // gomobile will generate the corresponding Java/Kotlin interface.
 type LogCallback interface {
 	// OnDNSQuery is called for each DNS query processed.
-	OnDNSQuery(domain string, blocked bool, queryType int, responseTimeMs int64, appName string, resolvedIP string, blockedBy string)
+	OnDNSQuery(domain string, blocked bool, queryType int, responseTimeMs int64, appName string, resolvedIPs string, blockedBy string, errorMessage string)
 }
 
 // HttpLogCallback receives the minimal metadata produced by the MITM path.
@@ -96,7 +95,6 @@ type Engine struct {
 	logCallback     LogCallback
 	httpLogCallback HttpLogCallback
 	resolver        *Resolver
-	safeSearch      *SafeSearch
 	domainChecker   DomainChecker
 	rewriteRules    map[string]string
 	firewallChecker FirewallChecker
@@ -187,7 +185,6 @@ type Stats struct {
 func NewEngine() *Engine {
 	router := NewRouter()
 	e := &Engine{
-		safeSearch:     NewSafeSearch(),
 		responseType:   ResponseCustomIP,
 		router:         router,
 		blockedUIDs:    make(map[int]struct{}),
@@ -400,16 +397,6 @@ func (e *Engine) SetBlockResponseType(responseType string) {
 	e.responseType = ParseResponseType(responseType)
 }
 
-// SetSafeSearch enables or disables SafeSearch enforcement.
-func (e *Engine) SetSafeSearch(enabled bool) {
-	e.safeSearch.SetEnabled(enabled)
-}
-
-// SetYouTubeRestricted enables or disables YouTube restricted mode.
-func (e *Engine) SetYouTubeRestricted(enabled bool) {
-	e.safeSearch.SetYouTubeRestricted(enabled)
-}
-
 // SetSplitDNSZones configures which domain zones should be resolved via the
 // WireGuard DNS server instead of the upstream DNS. Zones are comma-separated
 // suffixes (e.g., "internal,local,lan,corp"). The WireGuard DNS server is
@@ -614,8 +601,6 @@ func (e *Engine) Stop() {
 	oldResolver := e.resolver
 	e.resolver = nil
 	
-	e.safeSearch.ClearCache()
-
 	for _, t := range e.adTries {
 		if t != nil {
 			t.Close()
@@ -833,20 +818,7 @@ func (e *Engine) serveDNS(w dns.ResponseWriter, r *dns.Msg, appOverride string) 
 		}
 	}
 
-	// 2. SafeSearch / YouTube Check
-	ssResult := e.safeSearch.Check(domain, queryType)
-	if ssResult.Action == ActionRedirect {
-		if e.standaloneRedirect(w, r, ssResult.RedirectDomain, appName, startTime) {
-			return
-		}
-	}
-	if isYT, ytDomain := e.safeSearch.CheckYouTube(domain, queryType); isYT {
-		if e.standaloneRedirect(w, r, ytDomain, appName, startTime) {
-			return
-		}
-	}
-
-	// 3. Fast Native Go Tries (Security then Ads)
+	// 2. Fast Native Go Tries (Security then Ads)
 	e.mu.Lock()
 	secBlooms := e.secBlooms
 	secTries := e.secTries
@@ -887,7 +859,7 @@ func (e *Engine) serveDNS(w dns.ResponseWriter, r *dns.Msg, appOverride string) 
 		return
 	}
 
-	// 4. Fallback Kotlin DomainChecker
+	// 3. Fallback Kotlin DomainChecker
 	if e.domainChecker != nil && e.domainChecker.IsBlocked(domain) {
 		reason := e.domainChecker.GetBlockReason(domain)
 		if reason == "" {
@@ -897,7 +869,7 @@ func (e *Engine) serveDNS(w dns.ResponseWriter, r *dns.Msg, appOverride string) 
 		return
 	}
 
-	// 5. Forward to Upstream
+	// 4. Forward to Upstream
 	e.standaloneForward(w, r, appName, startTime)
 }
 
@@ -991,7 +963,7 @@ func (e *Engine) standaloneBlock(w dns.ResponseWriter, r *dns.Msg, blockedBy, ap
 	e.totalQueries.Add(1)
 	e.blockedQueries.Add(1)
 	elapsed := time.Since(startTime).Milliseconds()
-	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), true, r.Question[0].Qtype, elapsed, appName, "", blockedBy)
+	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), true, r.Question[0].Qtype, elapsed, appName, "", blockedBy, "")
 }
 
 func (e *Engine) standaloneForward(w dns.ResponseWriter, r *dns.Msg, appName string, startTime time.Time) {
@@ -1016,13 +988,15 @@ func (e *Engine) standaloneForward(w dns.ResponseWriter, r *dns.Msg, appName str
 		dns.HandleFailed(w, r)
 		e.totalQueries.Add(1)
 		elapsed := time.Since(startTime).Milliseconds()
-		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, elapsed, appName, "", "")
+		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, elapsed, appName, "", "", err.Error())
 		return
 	}
 
 	var respMsg dns.Msg
 	if err := respMsg.Unpack(respRaw); err != nil {
 		dns.HandleFailed(w, r)
+		e.totalQueries.Add(1)
+		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, time.Since(startTime).Milliseconds(), appName, "", "", err.Error())
 		return
 	}
 
@@ -1030,11 +1004,11 @@ func (e *Engine) standaloneForward(w dns.ResponseWriter, r *dns.Msg, appName str
 		e.totalQueries.Add(1)
 		e.blockedQueries.Add(1)
 		elapsed := time.Since(startTime).Milliseconds()
-		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), true, r.Question[0].Qtype, elapsed, appName, "", "upstream_dns")
+		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), true, r.Question[0].Qtype, elapsed, appName, "", "upstream_dns", "")
 	} else {
 		e.totalQueries.Add(1)
 		elapsed := time.Since(startTime).Milliseconds()
-		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, elapsed, appName, "", "")
+		e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, elapsed, appName, resolvedAddresses(respRaw), "", "")
 	}
 
 	respMsg.Id = r.Id
@@ -1101,42 +1075,7 @@ func (e *Engine) standaloneRewrite(w dns.ResponseWriter, r *dns.Msg, target, app
 	}
 	_ = w.WriteMsg(response)
 	e.totalQueries.Add(1)
-	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, qtype, time.Since(startTime).Milliseconds(), appName, resolvedIP, "rewrite="+target)
-	return true
-}
-
-func (e *Engine) standaloneRedirect(w dns.ResponseWriter, r *dns.Msg, redirectDomain, appName string, startTime time.Time) bool {
-	ip := e.safeSearch.GetCachedIP(redirectDomain)
-	if ip == nil {
-		// Grab resolver snapshot under lock to avoid nil dereference during shutdown
-		e.mu.Lock()
-		resolver := e.resolver
-		e.mu.Unlock()
-		if resolver == nil {
-			return false
-		}
-
-		var err error
-		ip, err = resolver.ResolveARecord(redirectDomain, e.primaryDNS)
-		if err != nil {
-			return false
-		}
-		e.safeSearch.CacheIP(redirectDomain, ip)
-	}
-
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Rcode = dns.RcodeSuccess
-
-	if r.Question[0].Qtype == dns.TypeA {
-		rr, _ := dns.NewRR(fmt.Sprintf("%s 300 IN A %s", r.Question[0].Name, ip.String()))
-		m.Answer = append(m.Answer, rr)
-	}
-
-	_ = w.WriteMsg(m)
-	e.totalQueries.Add(1)
-	elapsed := time.Since(startTime).Milliseconds()
-	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, r.Question[0].Qtype, elapsed, appName, ip.String(), "")
+	e.notifyLog(strings.TrimSuffix(r.Question[0].Name, "."), false, qtype, time.Since(startTime).Milliseconds(), appName, resolvedIP, "rewrite="+target, "")
 	return true
 }
 
@@ -1697,7 +1636,7 @@ func (e *Engine) handleDNSQuery(queryInfo *DNSQueryInfo) {
 				response := buildRewriteIPResponse(queryInfo, ip)
 				e.writeToTUN(response)
 				e.totalQueries.Add(1)
-				e.notifyLog(domain, false, queryInfo.QueryType, time.Since(startTime).Milliseconds(), appName, ip.String(), "rewrite="+target)
+				e.notifyLog(domain, false, queryInfo.QueryType, time.Since(startTime).Milliseconds(), appName, ip.String(), "rewrite="+target, "")
 				return
 			}
 		}
@@ -1725,22 +1664,6 @@ func (e *Engine) handleDNSQuery(queryInfo *DNSQueryInfo) {
 		if splitDNS != "" && len(splitZones) > 0 && resolver.matchesSplitZone(domain) {
 			// Route this DNS packet through the WireGuard tunnel via the router
 			e.handleSplitDNSForward(queryInfo, appName, startTime)
-			return
-		}
-	}
-
-	// SafeSearch check
-	ssResult := e.safeSearch.Check(domain, queryInfo.QueryType)
-	if ssResult.Action == ActionRedirect {
-		if e.handleSafeSearchRedirect(queryInfo, ssResult.RedirectDomain, appName, startTime) {
-			return
-		}
-		// If redirect IP resolution failed, fall through to normal resolution
-	}
-
-	// YouTube restricted mode check
-	if isYT, ytDomain := e.safeSearch.CheckYouTube(domain, queryInfo.QueryType); isYT {
-		if e.handleSafeSearchRedirect(queryInfo, ytDomain, appName, startTime) {
 			return
 		}
 	}
@@ -1848,39 +1771,6 @@ func buildRewriteIPResponse(queryInfo *DNSQueryInfo, ip net.IP) []byte {
 	return buildIPUDPPacket(queryInfo, packed)
 }
 
-// handleSafeSearchRedirect handles a SafeSearch/YouTube redirect.
-func (e *Engine) handleSafeSearchRedirect(queryInfo *DNSQueryInfo, redirectDomain, appName string, startTime time.Time) bool {
-	// Check cache first
-	ip := e.safeSearch.GetCachedIP(redirectDomain)
-	if ip == nil {
-		// Grab resolver snapshot under lock to avoid nil dereference during shutdown
-		e.mu.Lock()
-		resolver := e.resolver
-		e.mu.Unlock()
-		if resolver == nil {
-			return false
-		}
-
-		// Lazy resolve
-		var err error
-		ip, err = resolver.ResolveARecord(redirectDomain, e.primaryDNS)
-		if err != nil {
-			logf("SafeSearch resolve failed for %s: %v", redirectDomain, err)
-			return false
-		}
-		e.safeSearch.CacheIP(redirectDomain, ip)
-		logf("SafeSearch resolved: %s → %s", redirectDomain, ip.String())
-	}
-
-	response := BuildRedirectResponse(queryInfo, ip)
-	e.writeToTUN(response)
-	e.totalQueries.Add(1)
-
-	elapsed := time.Since(startTime).Milliseconds()
-	e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, ip.String(), "")
-	return true
-}
-
 // handleFirewallBlock handles a DNS query blocked by the per-app firewall.
 func (e *Engine) handleFirewallBlock(queryInfo *DNSQueryInfo, appName string, startTime time.Time) {
 	var response []byte
@@ -1899,7 +1789,7 @@ func (e *Engine) handleFirewallBlock(queryInfo *DNSQueryInfo, appName string, st
 
 	elapsed := time.Since(startTime).Milliseconds()
 	logf("BLOCKED: %s (by: firewall, app: %s)", queryInfo.Domain, appName)
-	e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", "firewall")
+	e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", "firewall", "")
 }
 
 // handleBlockedDomain handles a blocked domain.
@@ -1920,7 +1810,7 @@ func (e *Engine) handleBlockedDomain(queryInfo *DNSQueryInfo, blockedBy, appName
 
 	elapsed := time.Since(startTime).Milliseconds()
 	logf("BLOCKED: %s (by: %s, app: %s)", queryInfo.Domain, blockedBy, appName)
-	e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", blockedBy)
+	e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", blockedBy, "")
 }
 
 // handleForward forwards a DNS query to upstream and writes the response.
@@ -1942,7 +1832,7 @@ func (e *Engine) handleForward(queryInfo *DNSQueryInfo, appName string, startTim
 		e.totalQueries.Add(1)
 
 		elapsed := time.Since(startTime).Milliseconds()
-		e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, "", "")
+		e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, "", "", err.Error())
 		return
 	}
 
@@ -1955,7 +1845,7 @@ func (e *Engine) handleForward(queryInfo *DNSQueryInfo, appName string, startTim
 
 		elapsed := time.Since(startTime).Milliseconds()
 		logf("BLOCKED: %s (by: upstream_dns, app: %s)", queryInfo.Domain, appName)
-		e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", "upstream_dns")
+		e.notifyLog(queryInfo.Domain, true, queryInfo.QueryType, elapsed, appName, "", "upstream_dns", "")
 		return
 	}
 
@@ -1964,7 +1854,7 @@ func (e *Engine) handleForward(queryInfo *DNSQueryInfo, appName string, startTim
 	e.totalQueries.Add(1)
 
 	elapsed := time.Since(startTime).Milliseconds()
-	e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, "", "")
+	e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, resolvedAddresses(resp), "", "")
 }
 
 // handleSplitDNSForward forwards a DNS query through the WireGuard tunnel
@@ -2018,7 +1908,7 @@ func (e *Engine) handleSplitDNSForward(queryInfo *DNSQueryInfo, appName string, 
 	e.totalQueries.Add(1)
 	elapsed := time.Since(startTime).Milliseconds()
 	logf("Split-DNS: forwarded %s to %s via WireGuard", queryInfo.Domain, splitDNS)
-	e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, "", "")
+	e.notifyLog(queryInfo.Domain, false, queryInfo.QueryType, elapsed, appName, "", "", "")
 }
 
 // isUpstreamBlocked checks if a DNS response indicates the domain was blocked
@@ -2080,9 +1970,36 @@ func (e *Engine) writeToTUN(data []byte) {
 }
 
 // notifyLog sends a DNS query event to the Kotlin callback.
-func (e *Engine) notifyLog(domain string, blocked bool, queryType uint16, responseTimeMs int64, appName, resolvedIP, blockedBy string) {
+func resolvedAddresses(rawResponse []byte) string {
+	var response dns.Msg
+	if err := response.Unpack(rawResponse); err != nil {
+		return ""
+	}
+	seen := make(map[string]struct{})
+	addresses := make([]string, 0, len(response.Answer))
+	for _, answer := range response.Answer {
+		var address string
+		switch record := answer.(type) {
+		case *dns.A:
+			address = record.A.String()
+		case *dns.AAAA:
+			address = record.AAAA.String()
+		}
+		if address == "" {
+			continue
+		}
+		if _, exists := seen[address]; exists {
+			continue
+		}
+		seen[address] = struct{}{}
+		addresses = append(addresses, address)
+	}
+	return strings.Join(addresses, ",")
+}
+
+func (e *Engine) notifyLog(domain string, blocked bool, queryType uint16, responseTimeMs int64, appName, resolvedIPs, blockedBy, errorMessage string) {
 	if e.logCallback != nil {
-		e.logCallback.OnDNSQuery(domain, blocked, int(queryType), responseTimeMs, appName, resolvedIP, blockedBy)
+		e.logCallback.OnDNSQuery(domain, blocked, int(queryType), responseTimeMs, appName, resolvedIPs, blockedBy, errorMessage)
 	}
 }
 
