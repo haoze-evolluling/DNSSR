@@ -171,6 +171,7 @@ object AppSettings {
     private const val KEY_HTTPS_INSPECTION_READY = "https_inspection_ready"
     private const val KEY_HTTPS_INSPECTION_CA_BACKEND = "https_inspection_ca_backend"
     private const val KEY_HTTP3_INSPECTION_ENABLED = "http3_inspection_enabled"
+    private const val KEY_ENCRYPTED_DNS_BLOCKING_ENABLED = "encrypted_dns_blocking_enabled"
 
     private const val MIN_CACHE_SECONDS = 30L
     private const val MAX_CACHE_SECONDS = 86_400L
@@ -418,6 +419,17 @@ object AppSettings {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_HTTP3_INSPECTION_ENABLED, enabled)
+            .apply()
+    }
+
+    fun isEncryptedDnsBlockingEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ENCRYPTED_DNS_BLOCKING_ENABLED, false)
+
+    fun setEncryptedDnsBlockingEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ENCRYPTED_DNS_BLOCKING_ENABLED, enabled)
             .apply()
     }
 

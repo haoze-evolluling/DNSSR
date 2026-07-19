@@ -40,14 +40,6 @@ func newProtectedTcpHandler(uidr UIDResolver, protectFn func(fd int) bool) TcpFl
 			return
 		}
 
-		// Close DNS-over-TLS (port 853) fast so Android falls back to
-		// plaintext DNS on port 53 (the engine's filterable path) instead
-		// of stalling on a dial to the fake DNS server. See the matching
-		// gate in newMitmTcpHandler.
-		if flow.serverPort == 853 {
-			return
-		}
-
 		dst := net.JoinHostPort(flow.serverIP.String(), fmt.Sprintf("%d", flow.serverPort))
 		dialer := &net.Dialer{
 			Timeout: flowDialTimeout,

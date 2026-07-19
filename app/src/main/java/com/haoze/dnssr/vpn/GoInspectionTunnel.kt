@@ -34,13 +34,12 @@ class GoInspectionTunnel(
     private val scope: CoroutineScope,
     private var dnsConfig: HttpsDnsConfigSnapshot,
     private val selectedPackages: Set<String>,
-    private val policy: HttpDomainPolicy,
-    private val allowListManager: AllowListManager,
-    private val blockListManager: BlockListManager,
+    private val policy: DomainPolicy,
     private val rewriteRuleManager: RewriteRuleManager,
     private val dnsLogger: DnsLogger,
     private val httpRequestLogger: HttpRequestLogger,
-    private val filterHttp3: Boolean
+    private val filterHttp3: Boolean,
+    private val blockEncryptedDns: Boolean
 ) {
     private val engine = Engine()
     private var startJob: Job? = null
@@ -94,14 +93,14 @@ class GoInspectionTunnel(
         )
         updateRewriteRules()
         engine.setDomainChecker(object : DomainChecker {
-            override fun isBlocked(domain: String): Boolean = policy.evaluate(domain) is HttpDomainDecision.Block
+            override fun isBlocked(domain: String): Boolean = policy.evaluate(domain) is DomainDecision.Block
 
             override fun getBlockReason(domain: String): String =
-                (policy.evaluate(domain) as? HttpDomainDecision.Block)?.matchedRule.orEmpty()
+                (policy.evaluate(domain) as? DomainDecision.Block)?.matchedRule.orEmpty()
 
-            override fun hasCustomRule(domain: String): Long = when (policy.evaluate(domain)) {
-                is HttpDomainDecision.Block -> 1L
-                is HttpDomainDecision.Allow -> if (allowListManager.findMatch(domain) != null) 0L else -1L
+            override fun hasCustomRule(domain: String): Long = when (val decision = policy.evaluate(domain)) {
+                is DomainDecision.Block -> 1L
+                is DomainDecision.Allow -> if (decision.matchedRule != null) 0L else -1L
             }
         })
         engine.setLogCallback(object : LogCallback {
@@ -151,6 +150,7 @@ class GoInspectionTunnel(
             runCatching { context.packageManager.getPackageUid(packageName, 0) }.getOrNull()
         }.joinToString(","))
         engine.setFilterHttp3(filterHttp3)
+        engine.setBlockEncryptedDns(blockEncryptedDns)
         context.assets.open("https_passthrough.txt").bufferedReader().use {
             engine.setExtraPassthroughSuffixes(it.readText())
         }

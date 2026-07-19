@@ -52,6 +52,10 @@ class BlockRuleCache(private val indexFile: File? = null) {
      * "ad.example.com" → "example.com" → "com"
      */
     fun findMatch(qname: String): BlockRuleMatch? {
+        return findCustomMatch(qname) ?: findSubscriptionMatch(qname)
+    }
+
+    fun findCustomMatch(qname: String): BlockRuleMatch? {
         val domain = qname.lowercase().trimEnd('.')
         val custom = customRules
         custom[domain]?.let { source ->
@@ -65,6 +69,11 @@ class BlockRuleCache(private val indexFile: File? = null) {
             }
             pos = domain.indexOf('.', pos + 1)
         }
+        return null
+    }
+
+    fun findSubscriptionMatch(qname: String): BlockRuleMatch? {
+        val domain = qname.lowercase().trimEnd('.')
         subscriptionIndex?.find(domain)?.let { source -> return BlockRuleMatch(domain, source) }
         val subscriptions = subscriptionFallback
         subscriptions[domain]?.let { source -> return BlockRuleMatch(domain, source) }

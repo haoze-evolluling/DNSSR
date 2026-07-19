@@ -41,6 +41,9 @@ class BlockListManager(
         return cache.findMatch(qname)
     }
 
+    fun findCustomMatch(qname: String): BlockRuleMatch? = cache.findCustomMatch(qname)
+    fun findSubscriptionMatch(qname: String): BlockRuleMatch? = cache.findSubscriptionMatch(qname)
+
     suspend fun allRules(): List<BlockRuleEntity> = dao.all()
 
     /**

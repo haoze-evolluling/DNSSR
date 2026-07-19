@@ -113,6 +113,7 @@ internal object SettingsSearchCatalog {
         option("启用所选应用的 HTTP(S) 检查", "打开所选应用的流量过滤", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),
         option("选择过滤应用", "选择需要检查流量的应用", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_APPS, Icons.Filled.Http),
         option("尝试检查 HTTP/3", "阻断 QUIC 并尝试回退到 TCP", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "QUIC"),
+        option("阻止过滤应用使用加密 DNS", "阻断所选应用的 DNS-over-TLS", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "DoT", "853"),
         option("安装 HTTPS 根证书", "导出并安装流量检查证书", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "CA"),
         option("查看 HTTPS 根证书", "查看根证书 SHA-256 指纹", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http, "证书指纹"),
         option("重置 HTTPS 根证书", "废止并重新生成根证书", "运行行为", "HTTP(S) 流量过滤", Routes.HTTP_INSPECTION_SETTINGS, Icons.Filled.Http),

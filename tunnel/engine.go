@@ -140,6 +140,7 @@ type Engine struct {
 	// (default), QUIC is relayed so pages load fully/smoothly; DNS-level
 	// ad-blocking still applies. Toggled from the UI via SetFilterHttp3.
 	quicDrop atomic.Bool
+	blockEncryptedDNS atomic.Bool
 
 	// Stack-mode MITM state (Phase D). When both are non-nil, the stack
 	// uses the MITM TCP handler; otherwise the Phase C direct-dial

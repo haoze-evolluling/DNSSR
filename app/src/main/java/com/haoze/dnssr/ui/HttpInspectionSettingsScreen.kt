@@ -54,6 +54,7 @@ fun HttpInspectionSettingsScreen(
     var enabled by remember { mutableStateOf(AppSettings.isHttpInspectionEnabled(context) && supported) }
     var httpsReady by remember { mutableStateOf(AppSettings.isHttpsInspectionReady(context)) }
     var filterHttp3 by remember { mutableStateOf(AppSettings.isHttp3InspectionEnabled(context)) }
+    var blockEncryptedDns by remember { mutableStateOf(AppSettings.isEncryptedDnsBlockingEnabled(context)) }
     var caFingerprint by remember { mutableStateOf<String?>(null) }
     var caBusy by remember { mutableStateOf(false) }
     var showInstallConfirmation by remember { mutableStateOf(false) }
@@ -172,6 +173,18 @@ fun HttpInspectionSettingsScreen(
                     onCheckedChange = { checked ->
                         filterHttp3 = checked
                         AppSettings.setHttp3InspectionEnabled(context, checked)
+                        RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
+                    }
+                )
+                com.haoze.dnssr.ui.components.SettingsDivider()
+                SettingsSwitchItem(
+                    title = "阻止过滤应用使用加密 DNS",
+                    subtitle = "仅阻断所选应用的 DNS-over-TLS（TCP 853），防止其绕过域名规则",
+                    checked = blockEncryptedDns,
+                    enabled = supported,
+                    onCheckedChange = { checked ->
+                        blockEncryptedDns = checked
+                        AppSettings.setEncryptedDnsBlockingEnabled(context, checked)
                         RuntimeDnsSettingsRefresher.refreshAppExclusionsIfRunning(context)
                     }
                 )

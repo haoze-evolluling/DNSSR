@@ -274,6 +274,12 @@ func (e *Engine) SetFilterHttp3(enabled bool) {
 	logf("SetFilterHttp3: HTTP/3 (QUIC) filtering = %t", enabled)
 }
 
+// SetBlockEncryptedDns controls whether selected HTTPS-filtered apps may use
+// DNS-over-TLS. Non-selected and UID-unknown flows are always passed through.
+func (e *Engine) SetBlockEncryptedDns(enabled bool) {
+	e.blockEncryptedDNS.Store(enabled)
+}
+
 // dnsUDPIdleTimeout bounds how long a DNS UDP flow is kept open waiting
 // for another query on the same 5-tuple before the handler goroutine
 // exits. Most resolvers use a fresh source port per query (one query per

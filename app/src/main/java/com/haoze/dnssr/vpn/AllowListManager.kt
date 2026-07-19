@@ -25,6 +25,8 @@ class AllowListManager(
     }
 
     fun findMatch(qname: String): String? = cache.findMatch(qname)
+    fun findCustomMatch(qname: String): String? = cache.findCustomMatch(qname)
+    fun findSubscriptionMatch(qname: String): String? = cache.findSubscriptionMatch(qname)
 
     suspend fun allRules(): List<AllowRuleEntity> = dao.all()
 

@@ -23,7 +23,8 @@ import (
 // (mitm_proxy.go handleConnect) but operates on terminated TCP flows
 // from the userspace stack rather than HTTP CONNECT requests:
 //
-//   Gate 0: loopback / private IP → passthrough
+//   Gate 0: selected app DoT policy
+//   Gate 1: loopback / private IP → passthrough
 //   Gate 1: port != 443/80        → passthrough
 //   Gate 2: UID not in allowlist  → passthrough
 //   Gate 3: peek first bytes      → classify TLS / HTTP, extract SNI / Host
@@ -76,14 +77,10 @@ func newMitmTcpHandler(
 			eng.logConnection(flow, ProtocolTCP)
 		}
 
-		// Gate -1 — DNS-over-TLS (port 853). Under full-tunnel routing the
-		// system's Private DNS resolver probes DoT against our fake DNS
-		// server (10.0.0.1 / fd00::1), which isn't a real host — the dial
-		// would hang for flowDialTimeout (10s) and stall all DNS. Close
-		// immediately so Android falls back to plaintext DNS on port 53,
-		// which the engine intercepts and filters. Mirrors the fake-DNS /
-		// force-port-53 approach already used in WireGuard mode.
-		if flow.serverPort == 853 {
+		// Resolve UID first. DoT is blocked only for explicitly selected apps
+		// and only when the user enabled the anti-bypass setting.
+		if flow.serverPort == 853 && eng != nil && eng.blockEncryptedDNS.Load() &&
+			uid != UIDUnknown && filter.IsUIDAllowed(uid) {
 			return
 		}
 
@@ -136,11 +133,13 @@ func newMitmTcpHandler(
 		}
 		hostname = strings.ToLower(strings.TrimSpace(hostname))
 
-		// Gate 4 — ad-block blocker. Close the flow; the app's error
-		// surface is equivalent to a network failure (browser shows
-		// ERR_CONNECTION_REFUSED). No fabricated TLS error needed.
-		if blocker != nil && blocker.IsDomainBlocked(hostname) {
-			eng.logHTTPEvent(flow, hostname, protocolName(classification), "blocked", eng.httpBlockReason(hostname))
+		// Internal hosts precede all rewrite, allow, and block rules.
+		if IsLocalAssetHost(hostname) {
+			if classification == classTLS {
+				serveLocalAssetTLS(conn, peekedReader, certMgr, hostname)
+			} else {
+				serveLocalAssetPlaintext(conn, peekedReader)
+			}
 			return
 		}
 
@@ -158,21 +157,18 @@ func newMitmTcpHandler(
 			}
 		}
 
+		// The shared Kotlin policy applies explicit allow, explicit block,
+		// subscription allow, then subscription block.
+		if blocker != nil && blocker.IsDomainBlocked(hostname) {
+			eng.logHTTPEvent(flow, hostname, protocolName(classification), "blocked", eng.httpBlockReason(hostname))
+			return
+		}
+
 		// Gate 5 — sensitive / cert-pinned domain → passthrough so the
 		// client's own TLS validation succeeds.
 		if !filter.IsInterceptionAllowed(hostname) {
 			eng.logHTTPEvent(flow, hostname, protocolName(classification), "decryption_failed", "passthrough")
 			relayDirectPeeked(conn, peekedReader, flow, hostname, blocker, protectFn)
-			return
-		}
-
-		// Gate 6 — local asset server (served entirely from memory).
-		if IsLocalAssetHost(hostname) {
-			if classification == classTLS {
-				serveLocalAssetTLS(conn, peekedReader, certMgr, hostname)
-			} else {
-				serveLocalAssetPlaintext(conn, peekedReader)
-			}
 			return
 		}
 

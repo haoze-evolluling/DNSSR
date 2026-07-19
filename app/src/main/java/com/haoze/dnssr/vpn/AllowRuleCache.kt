@@ -37,6 +37,10 @@ class AllowRuleCache(private val indexFile: File? = null) {
     }
 
     fun findMatch(qname: String): String? {
+        return findCustomMatch(qname) ?: findSubscriptionMatch(qname)
+    }
+
+    fun findCustomMatch(qname: String): String? {
         val domain = qname.lowercase().trimEnd('.')
         val rules = customRules
         if (rules.contains(domain)) return domain
@@ -46,6 +50,11 @@ class AllowRuleCache(private val indexFile: File? = null) {
             if (rules.contains(suffix)) return suffix
             pos = domain.indexOf('.', pos + 1)
         }
+        return null
+    }
+
+    fun findSubscriptionMatch(qname: String): String? {
+        val domain = qname.lowercase().trimEnd('.')
         subscriptionIndex?.find(domain)?.let { return it }
         val subscriptions = subscriptionFallback
         if (subscriptions.contains(domain)) return domain

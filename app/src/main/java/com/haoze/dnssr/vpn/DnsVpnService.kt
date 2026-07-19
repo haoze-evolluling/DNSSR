@@ -93,6 +93,7 @@ class DnsVpnService : VpnService() {
     private lateinit var blockListManager: BlockListManager
     private lateinit var allowListManager: AllowListManager
     private lateinit var rewriteRuleManager: RewriteRuleManager
+    private lateinit var domainPolicy: DomainPolicy
     private lateinit var dnsLogger: DnsLogger
     private lateinit var httpRequestLogger: HttpRequestLogger
     private lateinit var raceLogger: RaceLogger
@@ -135,6 +136,7 @@ class DnsVpnService : VpnService() {
         blockListManager = BlockListManager(db.blockRuleDao(), ruleIndexDirectory)
         allowListManager = AllowListManager(db.allowRuleDao(), ruleIndexDirectory)
         rewriteRuleManager = RewriteRuleManager(db.rewriteRuleDao(), ruleIndexDirectory)
+        domainPolicy = DomainPolicy(allowListManager, blockListManager)
         dnsLogger = DnsLogger(db.dnsLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         httpRequestLogger = HttpRequestLogger(db.httpRequestLogDao(), logRetentionDays, serviceScope) { activeDnsLogMode }
         raceLogger = RaceLogger(db.raceLogDao(), logRetentionDays, serviceScope)
@@ -252,13 +254,12 @@ class DnsVpnService : VpnService() {
                     activeDynamicBlockResponseConfig
                 ),
                 selectedPackages = activeInspectionPackages,
-                policy = HttpDomainPolicy(allowListManager, blockListManager),
-                allowListManager = allowListManager,
-                blockListManager = blockListManager,
+                policy = domainPolicy,
                 rewriteRuleManager = rewriteRuleManager,
                 dnsLogger = dnsLogger,
                 httpRequestLogger = httpRequestLogger,
-                filterHttp3 = AppSettings.isHttp3InspectionEnabled(this)
+                filterHttp3 = AppSettings.isHttp3InspectionEnabled(this),
+                blockEncryptedDns = AppSettings.isEncryptedDnsBlockingEnabled(this)
             )
             if (!tunnel.start(vpnInterface!!.fd)) {
                 Log.e(TAG, "Go inspection tunnel failed to start; falling back to DNS-only mode")
@@ -679,9 +680,8 @@ class DnsVpnService : VpnService() {
                 dnsLogger.log(qname, qtype, LogResult.REWRITTEN, "matched rewrite rule; local response")
                 return
             }
-            val allowListed = qname != null && allowListManager.isAllowed(qname)
-            val blockMatch = qname?.takeIf { !allowListed }?.let(blockListManager::findMatch)
-            if (qname != null && blockMatch != null) {
+            val domainDecision = qname?.let(domainPolicy::evaluate)
+            if (qname != null && domainDecision is DomainDecision.Block) {
                 val dynamicConfig = activeDynamicBlockResponseConfig
                 val blockResponseMode = if (dynamicConfig.enabled) {
                     dynamicBlockResponseTracker.responseModeFor(qname, dynamicConfig)
@@ -695,7 +695,7 @@ class DnsVpnService : VpnService() {
                     qtype,
                     LogResult.BLOCKED,
                     "matched block rule; response=${blockResponseMode.storageValue}",
-                    blockSubscriptionId = blockMatch.source.subscriptionIdOrNull()
+                    blockSubscriptionId = domainDecision.source.subscriptionIdOrNull()
                 )
                 return
             }
@@ -729,7 +729,7 @@ class DnsVpnService : VpnService() {
 
             writeResponse(dnsInfo, cacheResult.response, output)
             val message = when {
-                allowListed -> "matched allow rule"
+                domainDecision is DomainDecision.Allow && domainDecision.matchedRule != null -> "matched allow rule"
                 cacheResult.stale -> "used expired cache after resolver failure"
                 else -> null
             }
