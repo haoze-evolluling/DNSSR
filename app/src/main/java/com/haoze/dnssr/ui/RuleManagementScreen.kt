@@ -76,6 +76,7 @@ fun RuleManagementScreen(
     var showClearAllRulesDialog by remember { mutableStateOf(false) }
     var addRuleError by remember { mutableStateOf<String?>(null) }
     var addAllowRuleError by remember { mutableStateOf<String?>(null) }
+    var addRewriteRuleError by remember { mutableStateOf<String?>(null) }
 
     fun openAddRuleDialog() {
         newRule = ""
@@ -97,6 +98,19 @@ fun RuleManagementScreen(
     fun closeAddAllowRuleDialog() {
         showAddAllowRuleDialog = false
         addAllowRuleError = null
+    }
+
+    fun openAddRewriteRuleDialog() {
+        rewriteDomain = ""
+        rewriteAddress = ""
+        rewriteTargetType = RewriteTargetType.IPV4
+        addRewriteRuleError = null
+        showAddRewriteRuleDialog = true
+    }
+
+    fun closeAddRewriteRuleDialog() {
+        showAddRewriteRuleDialog = false
+        addRewriteRuleError = null
     }
 
     NavigationSettledEffect {
@@ -170,7 +184,7 @@ fun RuleManagementScreen(
                     SettingsNavigationItem(
                         title = "添加覆写域名",
                         subtitle = "将域名覆写为 IPv4、IPv6 或 CNAME",
-                        onClick = { rewriteDomain = ""; rewriteAddress = ""; rewriteTargetType = RewriteTargetType.IPV4; showAddRewriteRuleDialog = true }
+                        onClick = ::openAddRewriteRuleDialog
                     )
                 }
             }
@@ -367,19 +381,35 @@ fun RuleManagementScreen(
 
     if (showAddRewriteRuleDialog) {
         AlertDialog(
-            onDismissRequest = { showAddRewriteRuleDialog = false },
+            onDismissRequest = ::closeAddRewriteRuleDialog,
             title = { Text("添加覆写域名") },
             text = {
                 androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = rewriteDomain, onValueChange = { rewriteDomain = it }, label = { Text("域名，如 example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(RewriteTargetType.IPV4, RewriteTargetType.IPV6, RewriteTargetType.CNAME).forEach { type -> FilterChip(selected = rewriteTargetType == type, onClick = { rewriteTargetType = type; rewriteAddress = "" }, label = { Text(type) }) }
+                    OutlinedTextField(value = rewriteDomain, onValueChange = { rewriteDomain = it; addRewriteRuleError = null }, label = { Text("域名，如 example.com") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(RewriteTargetType.IPV4, RewriteTargetType.IPV6, RewriteTargetType.CNAME).forEach { type -> FilterChip(selected = rewriteTargetType == type, onClick = { rewriteTargetType = type; rewriteAddress = ""; addRewriteRuleError = null }, label = { Text(type) }, modifier = Modifier.weight(1f)) }
                     }
-                    OutlinedTextField(value = rewriteAddress, onValueChange = { rewriteAddress = it }, label = { Text(if (rewriteTargetType == RewriteTargetType.CNAME) "目标域名" else "$rewriteTargetType 地址") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = rewriteAddress,
+                        onValueChange = { rewriteAddress = it; addRewriteRuleError = null },
+                        label = { Text(if (rewriteTargetType == RewriteTargetType.CNAME) "目标域名" else "$rewriteTargetType 地址") },
+                        supportingText = addRewriteRuleError?.let { error -> { Text(error) } },
+                        isError = addRewriteRuleError != null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
-            confirmButton = { TextButton(onClick = { viewModel.addRewriteRule(rewriteDomain, rewriteTargetType, rewriteAddress) { message -> addResult = message; if (message == "已添加覆写域名") showAddRewriteRuleDialog = false } }) { Text("确定") } },
-            dismissButton = { TextButton(onClick = { showAddRewriteRuleDialog = false }) { Text("取消") } }
+            confirmButton = { TextButton(onClick = { viewModel.addRewriteRule(rewriteDomain, rewriteTargetType, rewriteAddress) { message ->
+                if (message == "已添加覆写域名") {
+                    addResult = message
+                    closeAddRewriteRuleDialog()
+                } else {
+                    addRewriteRuleError = message
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+            } }) { Text("确定") } },
+            dismissButton = { TextButton(onClick = ::closeAddRewriteRuleDialog) { Text("取消") } }
         )
     }
 }
