@@ -75,24 +75,17 @@ import com.haoze.dnssr.vpn.VpnMonitorService
 fun AppearanceSettingsScreen(
     onBack: () -> Unit,
     title: String,
-    onNavigateToDayNightMode: (String) -> Unit,
-    onNavigateToThemeColorSettings: (String) -> Unit,
-    onNavigateToHomeComponentOpacity: (String) -> Unit,
-    onNavigateToHomeSentence: (String) -> Unit,
-    onNavigateToNotificationText: (String) -> Unit,
-    onNavigateToCustomBackground: (String) -> Unit,
-    onNavigateToServiceLightEffect: (String) -> Unit
+    onNavigateToDayNightMode: () -> Unit,
+    onNavigateToThemeColorSettings: () -> Unit,
+    onNavigateToHomeComponentOpacity: () -> Unit,
+    onNavigateToHomeSentence: () -> Unit,
+    onNavigateToNotificationText: () -> Unit,
+    onNavigateToCustomBackground: () -> Unit,
+    onNavigateToServiceLightEffect: () -> Unit
 ) {
     val context = LocalContext.current
     val mode = AppSettings.getAppThemeMode(context)
-    val dayNightTitle = "日夜模式"
-    val colorSettingsTitle = "主题色配置"
     val colorStyle = AppSettings.getThemeColorStyle(context)
-    val homeComponentOpacityTitle = "首页透明度"
-    val homeSentenceTitle = "首页句子"
-    val notificationTextTitle = "通知栏文案"
-    val customBackgroundTitle = "软件背景"
-    val serviceLightEffectTitle = "服务动态光影"
 
     SettingsScaffold(title = title, onBack = onBack) { innerPadding ->
         LazyColumn(
@@ -103,23 +96,23 @@ fun AppearanceSettingsScreen(
             item {
                 SettingsGroup {
                     SettingsNavigationItem(
-                        title = dayNightTitle,
+                        title = ScreenDestinations.dayNightMode.title,
                         subtitle = "选择应用使用的浅色或深色外观",
                         value = mode.displayName,
-                        onClick = { onNavigateToDayNightMode(dayNightTitle) }
+                        onClick = onNavigateToDayNightMode
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = colorSettingsTitle,
+                        title = ScreenDestinations.themeColorSettings.title,
                         subtitle = "选择应用界面的强调色",
                         value = colorStyle.displayName,
-                        onClick = { onNavigateToThemeColorSettings(colorSettingsTitle) }
+                        onClick = onNavigateToThemeColorSettings
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = homeComponentOpacityTitle,
+                        title = ScreenDestinations.homeComponentOpacity.title,
                         subtitle = "分别调整首页按钮、选择框与文字的透明度",
-                        onClick = { onNavigateToHomeComponentOpacity(homeComponentOpacityTitle) }
+                        onClick = onNavigateToHomeComponentOpacity
                     )
                 }
             }
@@ -127,27 +120,27 @@ fun AppearanceSettingsScreen(
             item {
                 SettingsGroup {
                     SettingsNavigationItem(
-                        title = homeSentenceTitle,
+                        title = ScreenDestinations.homeSentenceSettings.title,
                         subtitle = "分别设置 DNS 服务开启和关闭时的句子",
-                        onClick = { onNavigateToHomeSentence(homeSentenceTitle) }
+                        onClick = onNavigateToHomeSentence
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = notificationTextTitle,
+                        title = ScreenDestinations.notificationTextSettings.title,
                         subtitle = "分别设置 DNS 服务开启和关闭时的通知栏文案",
-                        onClick = { onNavigateToNotificationText(notificationTextTitle) }
+                        onClick = onNavigateToNotificationText
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = customBackgroundTitle,
+                        title = ScreenDestinations.customBackgroundSettings.title,
                         subtitle = "选取手机图片作为应用背景",
-                        onClick = { onNavigateToCustomBackground(customBackgroundTitle) }
+                        onClick = onNavigateToCustomBackground
                     )
                     SettingsDivider()
                     SettingsNavigationItem(
-                        title = serviceLightEffectTitle,
+                        title = ScreenDestinations.serviceLightEffectSettings.title,
                         subtitle = "设置服务启动和关闭时的动态光影效果",
-                        onClick = { onNavigateToServiceLightEffect(serviceLightEffectTitle) }
+                        onClick = onNavigateToServiceLightEffect
                     )
                 }
             }
