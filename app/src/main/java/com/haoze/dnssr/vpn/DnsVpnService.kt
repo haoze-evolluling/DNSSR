@@ -320,7 +320,7 @@ class DnsVpnService : VpnService() {
                 }
 
                 newResolvers.fold(
-                    onSuccess = { updatedResolvers ->
+                    onSuccess = success@{ updatedResolvers ->
                         val goSyncError = goInspectionTunnel?.let { tunnel ->
                             runCatching {
                                 tunnel.syncDnsConfig(
@@ -340,7 +340,7 @@ class DnsVpnService : VpnService() {
                             closeResolverList(updatedResolvers)
                             startForeground(NOTIFICATION_ID, buildForegroundNotification())
                             Log.w(TAG, "Failed to refresh Go DNS upstream; keeping current snapshot", goSyncError)
-                            return@onSuccess
+                            return@success
                         }
                         activeRaceModeStrategy = newRaceModeStrategy
                         activeResolutionMode = newResolutionMode
