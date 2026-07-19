@@ -629,7 +629,7 @@ class DnsVpnService : VpnService() {
                 val response = if (cname != null) DnsMessageUtils.buildCnameRewriteResponse(query, cname.targetValue)
                     else DnsMessageUtils.buildRewriteResponse(query, rewriteAnswers.map { it.targetValue })
                 writeResponse(dnsInfo, response, output)
-                dnsLogger.log(qname, qtype, LogResult.PASSED, "matched rewrite rule; local response")
+                dnsLogger.log(qname, qtype, LogResult.REWRITTEN, "matched rewrite rule; local response")
                 return
             }
             val allowListed = qname != null && allowListManager.isAllowed(qname)

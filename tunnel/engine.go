@@ -1675,6 +1675,20 @@ func (e *Engine) handleDNSQuery(queryInfo *DNSQueryInfo) {
 		)
 	}
 
+	// Apply literal-IP hosts rewrites in the userspace DNS path used by HTTPS
+	// inspection. This path does not go through the standalone resolver.
+	if target := e.rewriteTarget(domain); target != "" {
+		if ip := net.ParseIP(target); ip != nil && (queryInfo.QueryType == dns.TypeA || queryInfo.QueryType == dns.TypeAAAA) {
+			if (queryInfo.QueryType == dns.TypeA && ip.To4() != nil) || (queryInfo.QueryType == dns.TypeAAAA && ip.To4() == nil) {
+				response := buildRewriteIPResponse(queryInfo, ip)
+				e.writeToTUN(response)
+				e.totalQueries.Add(1)
+				e.notifyLog(domain, false, queryInfo.QueryType, time.Since(startTime).Milliseconds(), appName, ip.String(), "rewrite="+target)
+				return
+			}
+		}
+	}
+
 	// Firewall check (per-app blocking via Kotlin callback)
 	if e.firewallChecker != nil && appName != "" {
 		if e.firewallChecker.ShouldBlock(appName) {
@@ -1800,6 +1814,24 @@ func (e *Engine) handleDNSQuery(queryInfo *DNSQueryInfo) {
 
 	// Forward to upstream DNS
 	e.handleForward(queryInfo, appName, startTime)
+}
+
+func buildRewriteIPResponse(queryInfo *DNSQueryInfo, ip net.IP) []byte {
+	var msg dns.Msg
+	_ = msg.Unpack(queryInfo.RawDNSPayload)
+	resp := new(dns.Msg)
+	resp.SetReply(&msg)
+	resp.RecursionAvailable = true
+	if len(msg.Question) > 0 {
+		q := msg.Question[0]
+		if q.Qtype == dns.TypeA {
+			resp.Answer = append(resp.Answer, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 300}, A: ip.To4()})
+		} else if q.Qtype == dns.TypeAAAA {
+			resp.Answer = append(resp.Answer, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 300}, AAAA: ip})
+		}
+	}
+	packed, _ := resp.Pack()
+	return buildIPUDPPacket(queryInfo, packed)
 }
 
 // handleSafeSearchRedirect handles a SafeSearch/YouTube redirect.

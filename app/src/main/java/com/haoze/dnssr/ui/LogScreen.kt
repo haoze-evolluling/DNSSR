@@ -540,6 +540,7 @@ private fun LogItem(
     val (label, color) = remember(log.result) {
         when (log.result) {
             LogResult.PASSED.value -> "通过" to Color(0xFF2E7D32)
+            LogResult.REWRITTEN.value -> "覆写" to Color(0xFF1565C0)
             LogResult.BLOCKED.value -> "屏蔽" to Color(0xFFC62828)
             else -> "失败" to Color(0xFF757575)
         }

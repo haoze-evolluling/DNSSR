@@ -48,11 +48,11 @@ class RewriteRuleManager(
 
     fun cnameRedirects(): Map<String, String> = buildMap {
         subscriptionFallbackRules.forEach { (pattern, answers) ->
-            answers.firstOrNull { it.targetType == RewriteTargetType.CNAME }
+            answers.firstOrNull()
                 ?.let { put(pattern, it.targetValue) }
         }
         manualRules.forEach { (pattern, answers) ->
-            answers.firstOrNull { it.targetType == RewriteTargetType.CNAME }
+            answers.firstOrNull()
                 ?.let { put(pattern, it.targetValue) }
         }
     }

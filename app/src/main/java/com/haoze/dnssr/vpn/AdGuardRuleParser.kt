@@ -161,7 +161,18 @@ object AdGuardRuleParser {
         return ascii
     }
 
-    fun normalizeDomainForRewrite(value: String): String? = normalizeDomain(value)
+    fun normalizeDomainForRewrite(value: String): String? {
+        val candidate = value.trim().trimEnd('.')
+        if (candidate.isEmpty()) return null
+
+        // Rewrite sources may be literal IPv4/IPv6 addresses as well as host names.
+        // Keep the broader domain-rule validator unchanged so IPs are not accepted
+        // accidentally by block/allow list parsing.
+        if (looksLikeIp(candidate)) {
+            return runCatching { InetAddress.getByName(candidate).hostAddress?.lowercase() }.getOrNull()
+        }
+        return normalizeDomain(candidate)
+    }
 
     fun parseHostsRewrite(text: String): List<RewriteRule> {
         val rules = LinkedHashMap<String, RewriteRule>()

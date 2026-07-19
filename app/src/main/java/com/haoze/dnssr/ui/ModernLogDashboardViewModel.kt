@@ -259,6 +259,7 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
     private fun resultLabel(result: String): String {
         return when (result) {
             LogResult.PASSED.value -> "通过"
+            LogResult.REWRITTEN.value -> "覆写"
             LogResult.BLOCKED.value -> "过滤"
             LogResult.ERROR.value -> "失败"
             else -> result
