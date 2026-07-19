@@ -147,7 +147,7 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("拦截响应")
+                SettingsGroupTitle("拦截策略")
             }
             item {
                 SettingsGroup {
@@ -165,7 +165,7 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("手动添加域名")
+                SettingsGroupTitle("快速添加")
             }
             item {
                 SettingsGroup {
@@ -200,10 +200,16 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("自动更新")
+                SettingsGroupTitle("订阅与更新")
             }
             item {
                 SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "规则订阅",
+                        subtitle = "管理 DNS 过滤与 hosts 覆写订阅",
+                        onClick = onNavigateToSubscription
+                    )
+                    SettingsDivider()
                     SettingsNavigationItem(
                         title = "自动更新设置",
                         subtitle = "设置规则订阅的自动更新开关和频率",
@@ -213,7 +219,7 @@ fun RuleManagementScreen(
             }
 
             item {
-                SettingsGroupTitle("规则列表与订阅")
+                SettingsGroupTitle("规则管理")
             }
             item {
                 SettingsGroup {
@@ -232,17 +238,11 @@ fun RuleManagementScreen(
                     )
                     SettingsDivider()
                     SettingsNavigationItem(title = "覆写域名规则", subtitle = "查看、启用、停用或删除覆写规则", value = "$rewriteRuleCount 条", onClick = onNavigateToRewriteRuleList)
-                    SettingsDivider()
-                    SettingsNavigationItem(
-                        title = "规则订阅",
-                        subtitle = "管理 DNS 过滤与 hosts 覆写订阅",
-                        onClick = onNavigateToSubscription
-                    )
                 }
             }
 
             item {
-                SettingsGroupTitle("规则修复")
+                SettingsGroupTitle("维护工具")
             }
             item {
                 SettingsGroup {
