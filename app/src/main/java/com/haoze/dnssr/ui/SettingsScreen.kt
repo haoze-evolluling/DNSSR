@@ -1,7 +1,5 @@
 package com.haoze.dnssr.ui
 
-import android.os.Build
-
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -63,7 +61,6 @@ fun SettingsScreen(onBack: () -> Unit, onNavigateToRoute: (String) -> Unit) {
                                 title = setting.title,
                                 subtitle = setting.resultSubtitle,
                                 leadingIcon = setting.icon,
-                                enabled = setting.route != Routes.BLOCKED_APPS || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
                                 onClick = { onNavigateToRoute(setting.route) }
                             )
                         }
@@ -82,7 +79,6 @@ fun SettingsScreen(onBack: () -> Unit, onNavigateToRoute: (String) -> Unit) {
                                 title = destination.title,
                                 subtitle = destination.description,
                                 leadingIcon = destination.icon,
-                                enabled = destination.route != Routes.BLOCKED_APPS || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q,
                                 onClick = { onNavigateToRoute(destination.route) }
                             )
                         }

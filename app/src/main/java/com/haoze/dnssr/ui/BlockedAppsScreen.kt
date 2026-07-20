@@ -27,13 +27,8 @@ import java.util.Locale
 @Composable
 fun BlockedAppsSettingsScreen(onBack: () -> Unit, onSelectApps: () -> Unit) {
     val context = LocalContext.current
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-        SettingsScaffold(title = "禁止联网应用", onBack = onBack) { padding ->
-            SettingsInfoText("此功能需要 Android 10 或更高版本。", Modifier.padding(padding).padding(top = 16.dp))
-        }
-        return
-    }
-    var enabled by remember { mutableStateOf(AppSettings.isBlockedAppsEnabled(context)) }
+    val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+    var enabled by remember { mutableStateOf(AppSettings.isBlockedAppsEnabled(context) && supported) }
     var selectedCount by remember { mutableIntStateOf(AppSettings.getBlockedAppPackages(context).size) }
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -47,12 +42,20 @@ fun BlockedAppsSettingsScreen(onBack: () -> Unit, onSelectApps: () -> Unit) {
     }
     SettingsScaffold(title = "禁止联网应用", onBack = onBack) { padding ->
         Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SettingsInfoText("通过本机 VPN 按 UID 阻止所选应用的全部网络连接。共享同一 UID 的应用会一并受影响。", Modifier.padding(top = 8.dp))
+            SettingsInfoText(
+                if (supported) {
+                    "通过本机 VPN 按 UID 阻止所选应用的全部网络连接。共享同一 UID 的应用会一并受影响。"
+                } else {
+                    "此功能需要 Android 10 或更高版本，当前设备不满足运行条件，因此无法启用。"
+                },
+                Modifier.padding(top = 8.dp)
+            )
             SettingsGroup {
                 SettingsSwitchItem(
                     title = "启用禁止联网",
                     subtitle = if (selectedCount == 0) "尚未选择应用；开启后不会阻断流量" else "已选择 $selectedCount 个应用",
                     checked = enabled,
+                    enabled = supported,
                     onCheckedChange = {
                         enabled = it
                         AppSettings.setBlockedAppsEnabled(context, it)
@@ -64,10 +67,17 @@ fun BlockedAppsSettingsScreen(onBack: () -> Unit, onSelectApps: () -> Unit) {
                     title = "选择禁止联网应用",
                     subtitle = "选择需要阻止联网的应用",
                     value = "$selectedCount 个",
+                    enabled = supported,
                     onClick = onSelectApps
                 )
             }
-            SettingsInfoText("关闭后名单会保留，但不会阻断流量或启用 Go 隧道。")
+            SettingsInfoText(
+                if (supported) {
+                    "关闭后名单会保留，但不会阻断流量或启用 Go 隧道。"
+                } else {
+                    "DNS 解析、域名规则和其他基础功能不会受到影响。"
+                }
+            )
         }
     }
 }
