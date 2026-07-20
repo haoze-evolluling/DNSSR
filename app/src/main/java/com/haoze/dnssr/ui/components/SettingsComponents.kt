@@ -60,8 +60,7 @@ fun SettingsScaffold(
                 TopAppBar(
                     title = {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(title)
                             titleTrailing()

@@ -27,7 +27,9 @@ data class SubscriptionEntity(
     val httpLastModified: String? = null,
     val ruleSetHash: String? = null,
     val lastAttemptAt: Long = 0,
-    val consecutiveFailureCount: Int = 0
+    val consecutiveFailureCount: Int = 0,
+    val mirrorTemplate: String? = null,
+    val mirrorFallback: Boolean = true
 )
 
 object SubscriptionSourceType {

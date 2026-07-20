@@ -61,6 +61,8 @@ object RuleOperationScheduler {
     const val KEY_MESSAGE = "message"
     const val KEY_SUCCESS = "success"
     const val KEY_KIND = "kind"
+    const val KEY_MIRROR_TEMPLATE = "mirror_template"
+    const val KEY_MIRROR_FALLBACK = "mirror_fallback"
 
     private const val UNIQUE_WORK_NAME = "manual_rule_operation_queue"
 
@@ -72,7 +74,9 @@ object RuleOperationScheduler {
         name: String? = null,
         uri: Uri? = null,
         pattern: String? = null,
-        kind: String? = null
+        kind: String? = null,
+        mirrorTemplate: String? = null,
+        mirrorFallback: Boolean = true
     ): OneTimeWorkRequest {
         val input = Data.Builder()
             .putString(KEY_TYPE, type.name)
@@ -82,6 +86,8 @@ object RuleOperationScheduler {
             .putString(KEY_URI, uri?.toString())
             .putString(KEY_PATTERN, pattern)
             .putString(KEY_KIND, kind)
+            .putString(KEY_MIRROR_TEMPLATE, mirrorTemplate)
+            .putBoolean(KEY_MIRROR_FALLBACK, mirrorFallback)
             .build()
         val builder = OneTimeWorkRequestBuilder<RuleOperationWorker>()
             .setInputData(input)
@@ -202,7 +208,9 @@ class RuleOperationWorker(
             val result = subscriptionManager.addSubscription(
                 inputData.getString(RuleOperationScheduler.KEY_URL).orEmpty(),
                 inputData.getString(RuleOperationScheduler.KEY_NAME),
-                inputData.getString(RuleOperationScheduler.KEY_KIND) ?: com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK
+                inputData.getString(RuleOperationScheduler.KEY_KIND) ?: com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK,
+                inputData.getString(RuleOperationScheduler.KEY_MIRROR_TEMPLATE),
+                inputData.getBoolean(RuleOperationScheduler.KEY_MIRROR_FALLBACK, true)
             )
             result.getOrThrow()
             subscriptionManager.latestImportSummary()?.displayMessage("导入成功") ?: "导入成功"
@@ -221,7 +229,9 @@ class RuleOperationWorker(
             subscriptionManager.editSubscription(
                 subscriptionId,
                 inputData.getString(RuleOperationScheduler.KEY_URL).orEmpty(),
-                inputData.getString(RuleOperationScheduler.KEY_NAME).orEmpty()
+                inputData.getString(RuleOperationScheduler.KEY_NAME).orEmpty(),
+                inputData.getString(RuleOperationScheduler.KEY_MIRROR_TEMPLATE),
+                inputData.getBoolean(RuleOperationScheduler.KEY_MIRROR_FALLBACK, true)
             ).getOrThrow()
             subscriptionManager.latestImportSummary()?.displayMessage("订阅已保存") ?: "订阅已保存"
         }

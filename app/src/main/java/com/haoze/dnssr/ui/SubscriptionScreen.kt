@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,6 +42,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.MirrorTemplateEntity
 import com.haoze.dnssr.data.entity.SubscriptionKind
 import com.haoze.dnssr.data.entity.SubscriptionImportState
 import com.haoze.dnssr.data.entity.SubscriptionSourceType
@@ -64,7 +70,10 @@ import com.haoze.dnssr.ui.components.SettingsCornerShape
 import com.haoze.dnssr.ui.components.SettingsGroup
 import com.haoze.dnssr.ui.components.SettingsGroupTitle
 import com.haoze.dnssr.ui.components.SettingsInfoText
+import com.haoze.dnssr.ui.components.SettingsDivider
+import com.haoze.dnssr.ui.components.SettingsItem
 import com.haoze.dnssr.ui.components.SettingsScaffold
+import com.haoze.dnssr.ui.components.SettingsSwitchItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,6 +106,7 @@ fun SubscriptionScreen(
 ) {
     val context = LocalContext.current
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
+    val mirrorTemplates by viewModel.mirrorTemplates.collectAsStateWithLifecycle(initialValue = emptyList())
     val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val importingSubscriptionId by viewModel.importingSubscriptionId.collectAsStateWithLifecycle()
@@ -257,8 +267,9 @@ fun SubscriptionScreen(
     if (showAddDialog) {
         AddSubscriptionDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { url, name ->
-                viewModel.addSubscription(url, name, pendingKind)
+            mirrorTemplates = mirrorTemplates,
+            onConfirm = { url, name, mirrorTemplate, mirrorFallback ->
+                viewModel.addSubscription(url, name, pendingKind, mirrorTemplate, mirrorFallback)
                 showAddDialog = false
             }
         )
@@ -267,8 +278,14 @@ fun SubscriptionScreen(
     if (showPresetImportDialog) {
         PresetSubscriptionImportDialog(
             onDismiss = { showPresetImportDialog = false },
-            onSelect = { preset ->
-                viewModel.addSubscription(preset.url, preset.name)
+            mirrorTemplates = mirrorTemplates,
+            onConfirm = { preset, mirrorTemplate, mirrorFallback ->
+                viewModel.addSubscription(
+                    preset.url,
+                    preset.name,
+                    mirrorTemplate = mirrorTemplate,
+                    mirrorFallback = mirrorFallback
+                )
                 showPresetImportDialog = false
             }
         )
@@ -288,14 +305,17 @@ fun SubscriptionScreen(
     showUrlDialog?.let { sub ->
         AlertDialog(
             onDismissRequest = { showUrlDialog = null },
+            modifier = Modifier.subscriptionDialogHeightLimit(),
             title = { Text("订阅地址") },
             text = {
-                SelectionContainer {
-                    Text(
-                        text = sub.url,
-                        style = MaterialTheme.typography.bodyMedium,
-                        softWrap = true
-                    )
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    SelectionContainer {
+                        Text(
+                            text = sub.url,
+                            style = MaterialTheme.typography.bodyMedium,
+                            softWrap = true
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -337,9 +357,10 @@ fun SubscriptionScreen(
     showEditDialog?.let { sub ->
         EditSubscriptionDialog(
             subscription = sub,
+            mirrorTemplates = mirrorTemplates,
             onDismiss = { showEditDialog = null },
-            onConfirm = { url, name ->
-                viewModel.editSubscription(sub.id, url, name)
+            onConfirm = { url, name, mirrorTemplate, mirrorFallback ->
+                viewModel.editSubscription(sub.id, url, name, mirrorTemplate, mirrorFallback)
                 showEditDialog = null
             }
         )
@@ -360,8 +381,13 @@ fun SubscriptionScreen(
     showDeleteDialog?.let { sub ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
+            modifier = Modifier.subscriptionDialogHeightLimit(),
             title = { Text("删除规则订阅") },
-            text = { Text("确定删除「${sub.name}」及其导入的所有规则吗？") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("确定删除「${sub.name}」及其导入的所有规则吗？")
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteSubscription(sub.id)
@@ -407,7 +433,14 @@ private fun SubscriptionItem(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
-                Text(if (subscription.kind == SubscriptionKind.REWRITE) "hosts 覆写" else "DNS 过滤", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = buildString {
+                        append(if (subscription.kind == SubscriptionKind.REWRITE) "hosts 覆写" else "DNS 过滤")
+                        if (subscription.mirrorTemplate != null) append(" · 自定义镜像")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (subscription.sourceType == SubscriptionSourceType.LOCAL) "本地文件" else subscription.url,
@@ -520,9 +553,13 @@ private fun SubscriptionActionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text(subscription.name) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (subscription.sourceType == SubscriptionSourceType.REMOTE) {
                     OutlinedButton(
                         onClick = onUpdate,
@@ -580,16 +617,21 @@ private fun SubscriptionActionDialog(
 @Composable
 private fun AddSubscriptionDialog(
     onDismiss: () -> Unit,
-    onConfirm: (url: String, name: String) -> Unit
+    mirrorTemplates: List<MirrorTemplateEntity>,
+    onConfirm: (url: String, name: String, mirrorTemplate: String?, mirrorFallback: Boolean) -> Unit
 ) {
     var url by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var useMirror by remember { mutableStateOf(false) }
+    var mirrorTemplate by remember { mutableStateOf("") }
+    var mirrorFallback by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("添加规则订阅") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = "输入 AdGuard DNS 规则订阅地址，导入时会自动区分黑名单和白名单规则。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -617,12 +659,24 @@ private fun AddSubscriptionDialog(
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
+                MirrorEditor(
+                    originalUrl = url,
+                    mirrorTemplates = mirrorTemplates,
+                    enabled = useMirror,
+                    template = mirrorTemplate,
+                    fallback = mirrorFallback,
+                    onEnabledChange = { useMirror = it },
+                    onTemplateChange = { mirrorTemplate = it },
+                    onFallbackChange = { mirrorFallback = it }
+                )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(url.trim(), name.trim()) },
-                enabled = url.trim().startsWith("http")
+                onClick = {
+                    onConfirm(url.trim(), name.trim(), mirrorTemplate.trim().takeIf { useMirror }, mirrorFallback)
+                },
+                enabled = url.trim().startsWith("http") && (!useMirror || validMirrorTemplate(mirrorTemplate))
             ) {
                 Text("导入规则")
             }
@@ -646,37 +700,31 @@ private fun AddSubscriptionChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("添加规则订阅") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("DNS 过滤规则", style = MaterialTheme.typography.labelLarge)
-                OutlinedButton(onClick = onAddRemote, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.CloudDownload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("网络 DNS 过滤订阅")
-                }
-                OutlinedButton(onClick = onAddPreset, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.PlaylistAdd, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("预设 DNS 过滤订阅")
-                }
-                OutlinedButton(onClick = onAddLocal, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("本地 DNS 过滤文件")
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                Text("hosts 覆写规则", style = MaterialTheme.typography.labelLarge)
-                OutlinedButton(onClick = onAddRewriteRemote, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.CloudDownload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("网络 hosts 覆写订阅")
-                }
-                OutlinedButton(onClick = onAddRewriteLocal, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("本地 hosts 文件订阅")
-                }
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "DNS 过滤规则",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+                SettingsItem(title = "网络 DNS 过滤订阅", leadingIcon = Icons.Default.CloudDownload, onClick = onAddRemote)
+                SettingsDivider()
+                SettingsItem(title = "预设 DNS 过滤订阅", leadingIcon = Icons.Default.PlaylistAdd, onClick = onAddPreset)
+                SettingsDivider()
+                SettingsItem(title = "本地 DNS 过滤文件", leadingIcon = Icons.Default.FolderOpen, onClick = onAddLocal)
+                SettingsDivider()
+                Text(
+                    text = "hosts 覆写规则",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+                SettingsItem(title = "网络 hosts 覆写订阅", leadingIcon = Icons.Default.CloudDownload, onClick = onAddRewriteRemote)
+                SettingsDivider()
+                SettingsItem(title = "本地 hosts 文件订阅", leadingIcon = Icons.Default.FolderOpen, onClick = onAddRewriteLocal)
             }
         },
         confirmButton = {
@@ -688,31 +736,59 @@ private fun AddSubscriptionChoiceDialog(
 @Composable
 private fun PresetSubscriptionImportDialog(
     onDismiss: () -> Unit,
-    onSelect: (PresetSubscription) -> Unit
+    mirrorTemplates: List<MirrorTemplateEntity>,
+    onConfirm: (PresetSubscription, String?, Boolean) -> Unit
 ) {
+    var selectedPreset by remember { mutableStateOf<PresetSubscription?>(null) }
+    var useMirror by remember { mutableStateOf(false) }
+    var mirrorTemplate by remember { mutableStateOf("") }
+    var mirrorFallback by remember { mutableStateOf(true) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("从预设导入") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                presetSubscriptions.forEach { preset ->
-                    OutlinedButton(
-                        onClick = { onSelect(preset) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(text = preset.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = preset.url,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                presetSubscriptions.forEachIndexed { index, preset ->
+                    SubscriptionRadioItem(
+                        title = preset.name,
+                        subtitle = preset.url,
+                        selected = selectedPreset == preset,
+                        onClick = { selectedPreset = preset }
+                    )
+                    if (index < presetSubscriptions.lastIndex) SettingsDivider()
                 }
+                SettingsDivider()
+                MirrorEditor(
+                    originalUrl = selectedPreset?.url.orEmpty(),
+                    mirrorTemplates = mirrorTemplates,
+                    enabled = useMirror,
+                    template = mirrorTemplate,
+                    fallback = mirrorFallback,
+                    onEnabledChange = { useMirror = it },
+                    onTemplateChange = { mirrorTemplate = it },
+                    onFallbackChange = { mirrorFallback = it }
+                )
             }
         },
         confirmButton = {
+            TextButton(
+                onClick = {
+                    selectedPreset?.let { preset ->
+                        onConfirm(
+                            preset,
+                            mirrorTemplate.trim().takeIf { useMirror },
+                            mirrorFallback
+                        )
+                    }
+                },
+                enabled = selectedPreset != null && (!useMirror || validMirrorTemplate(mirrorTemplate))
+            ) { Text("导入规则") }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
@@ -727,9 +803,13 @@ private fun LocalSubscriptionImportDialog(
     var name by remember(initialName) { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("导入本地规则订阅") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = "本地文件导入后无法更新，但可在订阅列表中重命名、启用、禁用或删除。",
                     style = MaterialTheme.typography.bodySmall,
@@ -759,17 +839,24 @@ private fun LocalSubscriptionImportDialog(
 @Composable
 private fun EditSubscriptionDialog(
     subscription: SubscriptionEntity,
+    mirrorTemplates: List<MirrorTemplateEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (String, String, String?, Boolean) -> Unit
 ) {
     var name by remember(subscription.id) { mutableStateOf(subscription.name) }
     var url by remember(subscription.id) { mutableStateOf(subscription.url) }
+    var useMirror by remember(subscription.id) { mutableStateOf(subscription.mirrorTemplate != null) }
+    var mirrorTemplate by remember(subscription.id) { mutableStateOf(subscription.mirrorTemplate.orEmpty()) }
+    var mirrorFallback by remember(subscription.id) { mutableStateOf(subscription.mirrorFallback) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("编辑规则订阅") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     text = subscription.url,
                     style = MaterialTheme.typography.bodySmall,
@@ -777,6 +864,7 @@ private fun EditSubscriptionDialog(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
@@ -787,6 +875,18 @@ private fun EditSubscriptionDialog(
                     shape = SettingsCornerShape,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                MirrorEditor(
+                    originalUrl = url,
+                    mirrorTemplates = mirrorTemplates,
+                    enabled = useMirror,
+                    template = mirrorTemplate,
+                    fallback = mirrorFallback,
+                    onEnabledChange = { useMirror = it },
+                    onTemplateChange = { mirrorTemplate = it },
+                    onFallbackChange = { mirrorFallback = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -799,8 +899,11 @@ private fun EditSubscriptionDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(url.trim(), name.trim()) },
-                enabled = url.trim().isNotEmpty() && name.trim().isNotEmpty()
+                onClick = {
+                    onConfirm(url.trim(), name.trim(), mirrorTemplate.trim().takeIf { useMirror }, mirrorFallback)
+                },
+                enabled = url.trim().isNotEmpty() && name.trim().isNotEmpty() &&
+                    (!useMirror || validMirrorTemplate(mirrorTemplate))
             ) {
                 Text("保存")
             }
@@ -814,6 +917,97 @@ private fun EditSubscriptionDialog(
 }
 
 @Composable
+private fun MirrorEditor(
+    originalUrl: String,
+    mirrorTemplates: List<MirrorTemplateEntity>,
+    enabled: Boolean,
+    template: String,
+    fallback: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onTemplateChange: (String) -> Unit,
+    onFallbackChange: (Boolean) -> Unit
+) {
+    SettingsSwitchItem(
+        title = "使用自定义镜像",
+        checked = enabled,
+        onCheckedChange = onEnabledChange
+    )
+    if (enabled) {
+        SettingsDivider()
+        if (mirrorTemplates.isEmpty()) {
+            SettingsItem(
+                title = "选择镜像站模板",
+                subtitle = "暂无模板，请先在域名规则 → 镜像站模板中添加。",
+                titleColor = MaterialTheme.colorScheme.error
+            )
+        } else {
+            Column {
+                mirrorTemplates.forEachIndexed { index, item ->
+                    SubscriptionRadioItem(
+                        title = item.name,
+                        selected = template == item.template,
+                        onClick = { onTemplateChange(item.template) }
+                    )
+                    if (index < mirrorTemplates.lastIndex) SettingsDivider()
+                }
+            }
+        }
+        mirrorPreview(template, originalUrl)?.let { preview ->
+            SettingsDivider()
+            SettingsItem(
+                title = "请求预览",
+                subtitle = preview
+            )
+        }
+        SettingsDivider()
+        SettingsSwitchItem(
+            title = "失败后回退直连",
+            checked = fallback,
+            onCheckedChange = onFallbackChange
+        )
+    }
+}
+
+@Composable
+private fun SubscriptionRadioItem(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    subtitle: String? = null
+) {
+    SettingsItem(
+        title = title,
+        subtitle = subtitle,
+        onClick = onClick
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null
+        )
+    }
+}
+
+private fun validMirrorTemplate(template: String): Boolean {
+    val trimmed = template.trim()
+    return (trimmed.startsWith("https://") || trimmed.startsWith("http://")) &&
+        listOf("{url}", "{urlEncoded}", "{scheme}", "{host}", "{path}", "{pathAndQuery}").any { it in trimmed }
+}
+
+private fun mirrorPreview(template: String, originalUrl: String): String? {
+    if (!validMirrorTemplate(template) || originalUrl.isBlank()) return null
+    val uri = runCatching { Uri.parse(originalUrl.trim()) }.getOrNull() ?: return null
+    val path = uri.encodedPath?.takeIf { it.isNotEmpty() } ?: "/"
+    val pathAndQuery = path + (uri.encodedQuery?.let { "?$it" } ?: "")
+    return template.trim()
+        .replace("{urlEncoded}", Uri.encode(originalUrl.trim()))
+        .replace("{url}", originalUrl.trim())
+        .replace("{scheme}", uri.scheme.orEmpty())
+        .replace("{host}", uri.host.orEmpty())
+        .replace("{pathAndQuery}", pathAndQuery)
+        .replace("{path}", path)
+}
+
+@Composable
 private fun RenameSubscriptionDialog(
     subscription: SubscriptionEntity,
     onDismiss: () -> Unit,
@@ -822,16 +1016,19 @@ private fun RenameSubscriptionDialog(
     var name by remember(subscription.id) { mutableStateOf(subscription.name) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("重命名规则订阅") },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("订阅名称") },
-                singleLine = true,
-                shape = SettingsCornerShape,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("订阅名称") },
+                    singleLine = true,
+                    shape = SettingsCornerShape,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) { Text("保存") }
@@ -840,6 +1037,12 @@ private fun RenameSubscriptionDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
+}
+
+@Composable
+private fun Modifier.subscriptionDialogHeightLimit(): Modifier {
+    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * (2f / 3f)
+    return heightIn(max = maxHeight)
 }
 
 private fun android.content.Context.displayNameFor(uri: Uri): String {

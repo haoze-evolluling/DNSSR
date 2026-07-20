@@ -29,6 +29,8 @@ import com.haoze.dnssr.data.entity.RewriteRuleSourceEntity
 import com.haoze.dnssr.data.dao.RewriteRuleDao
 import com.haoze.dnssr.data.entity.SubscriptionEntity
 import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
+import com.haoze.dnssr.data.entity.MirrorTemplateEntity
+import com.haoze.dnssr.data.dao.MirrorTemplateDao
 
 @Database(
     entities = [
@@ -43,9 +45,9 @@ import com.haoze.dnssr.data.entity.SubscriptionAutoUpdateItemEntity
         SubscriptionEntity::class,
         SubscriptionAutoUpdateItemEntity::class,
         HttpRequestLogEntity::class
-        ,RewriteRuleEntity::class, RewriteRuleSourceEntity::class
+        ,RewriteRuleEntity::class, RewriteRuleSourceEntity::class, MirrorTemplateEntity::class
     ],
-    version = 20,
+    version = 22,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -58,6 +60,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun allowRuleDao(): AllowRuleDao
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun subscriptionAutoUpdateDao(): SubscriptionAutoUpdateDao
+    abstract fun mirrorTemplateDao(): MirrorTemplateDao
     abstract fun rewriteRuleDao(): RewriteRuleDao
 
     companion object {
@@ -80,7 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_15_16,
                         MIGRATION_16_17,
                         MIGRATION_17_18
-                        ,MIGRATION_18_19, MIGRATION_19_20
+                        ,MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -286,6 +289,14 @@ abstract class AppDatabase : RoomDatabase() {
             db.execSQL("INSERT INTO rewrite_rule_source SELECT ruleId,source,enabled FROM rewrite_rule_source_backup")
             db.execSQL("DROP TABLE rewrite_rule_source_backup")
             db.execSQL("CREATE UNIQUE INDEX `index_rewrite_rule_pattern_targetType_targetValue` ON `rewrite_rule` (`pattern`,`targetType`,`targetValue`)")
+        }}
+        private val MIGRATION_20_21 = object : Migration(20, 21) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `subscription` ADD COLUMN `mirrorTemplate` TEXT")
+            db.execSQL("ALTER TABLE `subscription` ADD COLUMN `mirrorFallback` INTEGER NOT NULL DEFAULT 1")
+        }}
+        private val MIGRATION_21_22 = object : Migration(21, 22) { override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS `mirror_template` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `template` TEXT NOT NULL, `addedAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_mirror_template_name` ON `mirror_template` (`name`)")
         }}
     }
 }

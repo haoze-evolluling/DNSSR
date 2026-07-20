@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.haoze.dnssr.data.AppDatabase
+import com.haoze.dnssr.data.entity.MirrorTemplateEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.RuleOperationScheduler
@@ -40,6 +41,7 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
     val allowRuleCount: StateFlow<Int> = _allowRuleCount.asStateFlow()
     private val _rewriteRuleCount = MutableStateFlow(0)
     val rewriteRuleCount: StateFlow<Int> = _rewriteRuleCount.asStateFlow()
+    val mirrorTemplates = AppDatabase.getInstance(application).mirrorTemplateDao().observeAll()
 
     private var activated = false
 
@@ -104,6 +106,26 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
                 onResult(if (success) "已添加覆写域名" else "域名、目标格式无效、规则冲突或已存在")
                 loadRuleCount()
             }
+        }
+    }
+
+    fun addMirrorTemplate(name: String, template: String, onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                require(name.trim().isNotEmpty()) { "镜像站名称不能为空" }
+                require(template.trim().startsWith("http://") || template.trim().startsWith("https://")) { "模板必须使用 HTTP 或 HTTPS" }
+                require(listOf("{url}", "{urlEncoded}", "{scheme}", "{host}", "{path}", "{pathAndQuery}").any { it in template }) { "模板缺少 URL 占位符" }
+                AppDatabase.getInstance(getApplication<Application>()).mirrorTemplateDao().insert(
+                    MirrorTemplateEntity(name = name.trim(), template = template.trim())
+                )
+            }
+            withContext(Dispatchers.Main) { onResult(if (result.isSuccess) "已添加镜像站模板" else result.exceptionOrNull()?.message ?: "添加失败") }
+        }
+    }
+
+    fun deleteMirrorTemplate(template: MirrorTemplateEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            AppDatabase.getInstance(getApplication<Application>()).mirrorTemplateDao().delete(template)
         }
     }
 

@@ -16,6 +16,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
+import java.net.URLEncoder
 import java.net.URI
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -80,6 +81,9 @@ class SubscriptionManager(
     companion object {
         private const val TAG = "SubscriptionManager"
         private const val CHUNK_SIZE = 500
+        private val MIRROR_PLACEHOLDERS = setOf(
+            "{url}", "{urlEncoded}", "{scheme}", "{host}", "{path}", "{pathAndQuery}"
+        )
     }
 
     private val client = OkHttpClient.Builder()
@@ -107,7 +111,9 @@ class SubscriptionManager(
     suspend fun addSubscription(
         url: String,
         name: String? = null,
-        kind: String = SubscriptionKind.BLOCK
+        kind: String = SubscriptionKind.BLOCK,
+        mirrorTemplate: String? = null,
+        mirrorFallback: Boolean = true
     ): Result<SubscriptionEntity> = withContext(Dispatchers.IO) {
         if (_importing.value) return@withContext Result.failure(IllegalStateException("正在导入中"))
         val trimmedUrl = url.trim()
@@ -118,6 +124,7 @@ class SubscriptionManager(
             return@withContext Result.failure(IllegalArgumentException("该订阅链接已存在"))
         }
         val normalizedKind = kind
+        val normalizedMirror = normalizeMirrorTemplate(mirrorTemplate)
 
         _importing.value = true
         var saved: SubscriptionEntity? = null
@@ -132,7 +139,9 @@ class SubscriptionManager(
                 ruleCount = 0,
                 lastUpdated = 0,
                 addedAt = System.currentTimeMillis(),
-                importState = SubscriptionImportState.IMPORTING
+                importState = SubscriptionImportState.IMPORTING,
+                mirrorTemplate = normalizedMirror,
+                mirrorFallback = mirrorFallback
             )
             val id = subscriptionDao.insert(subscription)
             saved = subscription.copy(id = id)
@@ -304,10 +313,17 @@ class SubscriptionManager(
     /**
      * 更新订阅（删除旧规则后重新下载导入）。
      */
-    suspend fun editSubscription(id: Long, url: String, name: String): Result<SubscriptionEntity> =
+    suspend fun editSubscription(
+        id: Long,
+        url: String,
+        name: String,
+        mirrorTemplate: String? = null,
+        mirrorFallback: Boolean = true
+    ): Result<SubscriptionEntity> =
         withContext(Dispatchers.IO) {
             val trimmedName = name.trim()
             val trimmedUrl = url.trim()
+            val normalizedMirror = normalizeMirrorTemplate(mirrorTemplate)
             if (trimmedName.isEmpty() || trimmedUrl.isEmpty()) {
                 return@withContext Result.failure(IllegalArgumentException("Subscription name and URL are required"))
             }
@@ -323,7 +339,10 @@ class SubscriptionManager(
             if (subscription.sourceType == SubscriptionSourceType.LOCAL) {
                 return@withContext Result.failure(IllegalStateException("本地文件订阅仅支持重命名"))
             }
-            if (subscription.url == trimmedUrl) {
+            if (subscription.url == trimmedUrl &&
+                subscription.mirrorTemplate == normalizedMirror &&
+                subscription.mirrorFallback == mirrorFallback
+            ) {
                 subscriptionDao.setName(id, trimmedName)
                 return@withContext Result.success(subscription.copy(name = trimmedName))
             }
@@ -338,6 +357,8 @@ class SubscriptionManager(
             try {
                 val download = downloadRules(subscription.copy(
                     url = trimmedUrl,
+                    mirrorTemplate = normalizedMirror,
+                    mirrorFallback = mirrorFallback,
                     httpEtag = null,
                     httpLastModified = null,
                     ruleSetHash = null
@@ -351,6 +372,8 @@ class SubscriptionManager(
                 val updated = subscription.copy(
                         name = trimmedName,
                         url = trimmedUrl,
+                        mirrorTemplate = normalizedMirror,
+                        mirrorFallback = mirrorFallback,
                         ruleCount = summary.importedCount,
                         lastUpdated = updatedAt,
                         importState = SubscriptionImportState.READY,
@@ -545,7 +568,24 @@ class SubscriptionManager(
     }
 
     private fun executeDownload(subscription: SubscriptionEntity, useValidators: Boolean): DownloadResult {
-        val request = Request.Builder().url(subscription.url).apply {
+        val mirrorUrl = subscription.mirrorTemplate?.let { buildMirrorUrl(it, subscription.url) }
+        if (mirrorUrl != null) {
+            try {
+                return executeDownloadAt(subscription, mirrorUrl, useValidators)
+            } catch (e: Exception) {
+                if (!subscription.mirrorFallback || e is CancellationException) throw e
+                Log.w(TAG, "镜像下载失败，回退原始订阅地址: $mirrorUrl", e)
+            }
+        }
+        return executeDownloadAt(subscription, subscription.url, useValidators)
+    }
+
+    private fun executeDownloadAt(
+        subscription: SubscriptionEntity,
+        requestUrl: String,
+        useValidators: Boolean
+    ): DownloadResult {
+        val request = Request.Builder().url(requestUrl).apply {
             if (useValidators) {
                 subscription.httpEtag?.let { header("If-None-Match", it) }
                 subscription.httpLastModified?.let { header("If-Modified-Since", it) }
@@ -559,7 +599,7 @@ class SubscriptionManager(
                 )
             }
             if (response.code == 412 && useValidators) {
-                return@use executeDownload(subscription, useValidators = false)
+                return@use executeDownloadAt(subscription, requestUrl, useValidators = false)
             }
             if (!response.isSuccessful) throw httpFailure(response)
             val body = response.body?.string()
@@ -581,6 +621,35 @@ class SubscriptionManager(
                 lastModified = response.header("Last-Modified")
             )
         }
+    }
+
+    private fun normalizeMirrorTemplate(template: String?): String? {
+        val normalized = template?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        require(MIRROR_PLACEHOLDERS.any { it in normalized }) {
+            "镜像模板必须包含 {url}、{urlEncoded}、{scheme}、{host}、{path} 或 {pathAndQuery}"
+        }
+        buildMirrorUrl(normalized, "https://example.com/rules.txt")
+        return normalized
+    }
+
+    private fun buildMirrorUrl(template: String, originalUrl: String): String {
+        val encoded = URLEncoder.encode(originalUrl, Charsets.UTF_8.name()).replace("+", "%20")
+        val uri = runCatching { URI(originalUrl) }.getOrElse {
+            throw IllegalArgumentException("原始订阅地址格式无效", it)
+        }
+        val path = uri.rawPath?.takeIf { it.isNotEmpty() } ?: "/"
+        val pathAndQuery = path + (uri.rawQuery?.let { "?$it" } ?: "")
+        val result = template
+            .replace("{urlEncoded}", encoded)
+            .replace("{url}", originalUrl)
+            .replace("{scheme}", uri.scheme.orEmpty())
+            .replace("{host}", uri.host.orEmpty())
+            .replace("{pathAndQuery}", pathAndQuery)
+            .replace("{path}", path)
+        require(result.startsWith("https://") || result.startsWith("http://")) {
+            "镜像模板生成的地址必须使用 HTTP 或 HTTPS"
+        }
+        return result
     }
 
     private fun httpFailure(response: Response): SubscriptionUpdateException {

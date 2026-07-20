@@ -13,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.haoze.dnssr.data.entity.RewriteTargetType
+import com.haoze.dnssr.data.entity.MirrorTemplateEntity
 
 @Composable
 fun RuleManagementScreen(
@@ -51,6 +53,7 @@ fun RuleManagementScreen(
     onNavigateToAllowRuleList: () -> Unit,
     onNavigateToRewriteRuleList: () -> Unit,
     onNavigateToSubscription: () -> Unit,
+    onNavigateToMirrorTemplates: () -> Unit,
     onNavigateToAutoUpdateInterval: () -> Unit,
     onNavigateToBlockResponseSettings: () -> Unit,
     onRuntimeDnsSettingsChanged: () -> Unit = {},
@@ -62,6 +65,7 @@ fun RuleManagementScreen(
     val ruleCount by viewModel.ruleCount.collectAsStateWithLifecycle()
     val allowRuleCount by viewModel.allowRuleCount.collectAsStateWithLifecycle()
     val rewriteRuleCount by viewModel.rewriteRuleCount.collectAsStateWithLifecycle()
+    val mirrorTemplates by viewModel.mirrorTemplates.collectAsStateWithLifecycle(initialValue = emptyList())
 
     var newRule by remember { mutableStateOf("") }
     var newAllowRule by remember { mutableStateOf("") }
@@ -204,6 +208,15 @@ fun RuleManagementScreen(
             }
             item {
                 SettingsGroup {
+                    SettingsNavigationItem(
+                        title = "镜像站模板",
+                        subtitle = "维护订阅下载镜像，可在添加订阅时直接选择",
+                        value = "${mirrorTemplates.size} 个",
+                        onClick = {
+                            onNavigateToMirrorTemplates()
+                        }
+                    )
+                    SettingsDivider()
                     SettingsNavigationItem(
                         title = "规则订阅",
                         subtitle = "管理 DNS 过滤与 hosts 覆写订阅",

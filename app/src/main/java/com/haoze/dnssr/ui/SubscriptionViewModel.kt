@@ -9,6 +9,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.haoze.dnssr.data.AppDatabase
 import com.haoze.dnssr.data.entity.SubscriptionEntity
+import com.haoze.dnssr.data.entity.MirrorTemplateEntity
 import com.haoze.dnssr.vpn.AllowListManager
 import com.haoze.dnssr.vpn.BlockListManager
 import com.haoze.dnssr.vpn.SubscriptionManager
@@ -46,6 +47,7 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
 
     private val _subscriptions = MutableStateFlow<List<SubscriptionEntity>>(emptyList())
     val subscriptions: StateFlow<List<SubscriptionEntity>> = _subscriptions.asStateFlow()
+    val mirrorTemplates = AppDatabase.getInstance(application).mirrorTemplateDao().observeAll()
 
     private val _importProgress = MutableStateFlow(-1 to 0)
     val importProgress: StateFlow<Pair<Int, Int>> = _importProgress.asStateFlow()
@@ -89,10 +91,17 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun addSubscription(url: String, name: String? = null, kind: String = com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK) {
+    fun addSubscription(
+        url: String,
+        name: String? = null,
+        kind: String = com.haoze.dnssr.data.entity.SubscriptionKind.BLOCK,
+        mirrorTemplate: String? = null,
+        mirrorFallback: Boolean = true
+    ) {
         enqueueAndObserve(
             RuleOperationScheduler.enqueue(
-                getApplication(), RuleOperationType.ADD_SUBSCRIPTION, url = url, name = name, kind = kind
+                getApplication(), RuleOperationType.ADD_SUBSCRIPTION, url = url, name = name, kind = kind,
+                mirrorTemplate = mirrorTemplate, mirrorFallback = mirrorFallback
             ).id
         )
     }
@@ -125,11 +134,18 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun editSubscription(id: Long, url: String, name: String) {
+    fun editSubscription(
+        id: Long,
+        url: String,
+        name: String,
+        mirrorTemplate: String?,
+        mirrorFallback: Boolean
+    ) {
         enqueueAndObserve(
             RuleOperationScheduler.enqueue(
                 getApplication(), RuleOperationType.EDIT_SUBSCRIPTION,
-                subscriptionId = id, url = url, name = name
+                subscriptionId = id, url = url, name = name,
+                mirrorTemplate = mirrorTemplate, mirrorFallback = mirrorFallback
             ).id
         )
     }

@@ -41,6 +41,8 @@ object Routes {
     const val RACE_STATS = "race_stats"
     const val BOOTSTRAP_STATS = "bootstrap_stats"
     const val SUBSCRIPTION_INTERCEPTION_STATS = "subscription_interception_stats"
+    const val MIRROR_TEMPLATES = "mirror_templates"
+    const val MIRROR_FORMAT_GUIDE = "mirror_format_guide"
     const val PROVIDER_HEALTH = "provider_health"
     const val RULE_MANAGEMENT = "rule_management"
     const val RULE_LIST = "rule_list"
@@ -228,6 +230,7 @@ fun AppNavHost(
                 onNavigateToAllowRuleList = { navController.navigateWhenResumed(ScreenDestinations.allowRuleList.route) },
                 onNavigateToRewriteRuleList = { navController.navigateWhenResumed(ScreenDestinations.rewriteRuleList.route) },
                 onNavigateToSubscription = { navController.navigateWhenResumed(ScreenDestinations.subscriptionManagement.route) },
+                onNavigateToMirrorTemplates = { navController.navigateWhenResumed(ScreenDestinations.mirrorTemplates.route) },
                 onNavigateToAutoUpdateInterval = {
                     navController.navigateWhenResumed(ScreenDestinations.subscriptionAutoUpdate.route)
                 },
@@ -485,6 +488,15 @@ fun AppNavHost(
                 onBack = { navController.popWhenResumed() },
                 title = ScreenDestinations.serviceLightEffectSettings.title
             )
+        }
+        composable(ScreenDestinations.mirrorTemplates.route) {
+            MirrorTemplateScreen(
+                onBack = { navController.popWhenResumed() },
+                onNavigateToFormatGuide = { navController.navigateWhenResumed(ScreenDestinations.mirrorFormatGuide.route) }
+            )
+        }
+        composable(ScreenDestinations.mirrorFormatGuide.route) {
+            MirrorFormatGuideScreen(onBack = { navController.popWhenResumed() })
         }
         composable(ScreenDestinations.legacyIconSettings.route) {
             LegacyIconSettingsScreen(

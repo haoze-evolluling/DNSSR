@@ -206,6 +206,8 @@ object ScreenDestinations {
     val ruleExport = child(Routes.RULE_EXPORT, "规则导出", "将当前生效规则导出为 TXT 文件", Icons.Filled.ImportExport, configTransfer)
     val blockResponseSettings = child(Routes.BLOCK_RESPONSE_SETTINGS, "拦截响应", "配置固定响应和动态策略", Icons.AutoMirrored.Filled.Rule, ruleManagement)
     val subscriptionManagement = child(Routes.SUBSCRIPTION_MANAGEMENT, "规则订阅", "管理 DNS 过滤与 hosts 覆写订阅", Icons.AutoMirrored.Filled.Rule, ruleManagement)
+    val mirrorTemplates = child(Routes.MIRROR_TEMPLATES, "镜像站模板", "维护订阅下载镜像模板", Icons.Filled.Storage, ruleManagement)
+    val mirrorFormatGuide = child(Routes.MIRROR_FORMAT_GUIDE, "镜像站格式示例", "了解镜像模板占位符和地址写法", Icons.Filled.Info, ruleManagement, true, "镜像模板", "占位符", "格式")
     val subscriptionAutoUpdate = child(Routes.SUBSCRIPTION_AUTO_UPDATE_INTERVAL, "自动更新设置", "设置规则订阅的自动更新开关和频率", Icons.AutoMirrored.Filled.Rule, ruleManagement)
     val ruleList = child(Routes.RULE_LIST, "黑名单规则", "查看、启用、停用或删除屏蔽规则", Icons.AutoMirrored.Filled.Rule, ruleManagement)
     val allowRuleList = child(Routes.ALLOW_RULE_LIST, "白名单规则", "查看、启用、停用或删除放行规则", Icons.AutoMirrored.Filled.Rule, ruleManagement)
@@ -231,7 +233,7 @@ object ScreenDestinations {
         foregroundBackgroundSettings, excludedApps, blockedApps, httpInspectionSettings, homeProviderVisibility, appearanceSettings,
         configTransfer, ruleManagement, dataCleanup, about, sponsor, sponsorList, coBuilderList, configImportExport,
         ruleExport, blockResponseSettings, subscriptionManagement, subscriptionAutoUpdate, ruleList, allowRuleList,
-        rewriteRuleList, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps, caCertificateGuide,
+        rewriteRuleList, mirrorTemplates, mirrorFormatGuide, resolutionSingle, resolutionSmart, resolutionParallel, resolutionBackup, httpInspectionApps, caCertificateGuide,
         httpRequestLogs, dayNightMode, themeColorSettings, homeComponentOpacity, homeSentenceSettings,
         notificationTextSettings, customBackgroundSettings, serviceLightEffectSettings, legacyIconSettings, legacyLogPageSettings)
     val mainEntries = all.filter { it.mainSection != null }.sortedWith(compareBy({ it.mainSection!!.order }, { all.indexOf(it) }))
