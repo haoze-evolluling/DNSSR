@@ -15,7 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material3.AlertDialog
+import com.haoze.dnssr.ui.components.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -257,7 +257,7 @@ fun HttpInspectionSettingsScreen(
             onDismissRequest = {},
             title = { Text(SettingsGuides.HTTP_INSPECTION.title) },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     if (supported) {
                         Text(
                             buildAnnotatedString {

@@ -12,12 +12,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,7 +31,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
+import com.haoze.dnssr.ui.components.AppAlertDialog as AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -305,10 +301,9 @@ fun SubscriptionScreen(
     showUrlDialog?.let { sub ->
         AlertDialog(
             onDismissRequest = { showUrlDialog = null },
-            modifier = Modifier.subscriptionDialogHeightLimit(),
             title = { Text("订阅地址") },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     SelectionContainer {
                         Text(
                             text = sub.url,
@@ -381,10 +376,9 @@ fun SubscriptionScreen(
     showDeleteDialog?.let { sub ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            modifier = Modifier.subscriptionDialogHeightLimit(),
             title = { Text("删除规则订阅") },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     Text("确定删除「${sub.name}」及其导入的所有规则吗？")
                 }
             },
@@ -553,11 +547,9 @@ private fun SubscriptionActionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text(subscription.name) },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (subscription.sourceType == SubscriptionSourceType.REMOTE) {
@@ -628,10 +620,9 @@ private fun AddSubscriptionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("添加规则订阅") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 Text(
                     text = "输入 AdGuard DNS 规则订阅地址，导入时会自动区分黑名单和白名单规则。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -700,10 +691,9 @@ private fun AddSubscriptionChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("添加规则订阅") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 Text(
                     text = "DNS 过滤规则",
                     style = MaterialTheme.typography.labelLarge,
@@ -746,12 +736,9 @@ private fun PresetSubscriptionImportDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("从预设导入") },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
+            Column {
                 presetSubscriptions.forEachIndexed { index, preset ->
                     SubscriptionRadioItem(
                         title = preset.name,
@@ -803,11 +790,9 @@ private fun LocalSubscriptionImportDialog(
     var name by remember(initialName) { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("导入本地规则订阅") },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
@@ -851,12 +836,9 @@ private fun EditSubscriptionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("编辑规则订阅") },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
+            Column {
                 Text(
                     text = subscription.url,
                     style = MaterialTheme.typography.bodySmall,
@@ -1016,10 +998,9 @@ private fun RenameSubscriptionDialog(
     var name by remember(subscription.id) { mutableStateOf(subscription.name) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.subscriptionDialogHeightLimit(),
         title = { Text("重命名规则订阅") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1037,12 +1018,6 @@ private fun RenameSubscriptionDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
-}
-
-@Composable
-private fun Modifier.subscriptionDialogHeightLimit(): Modifier {
-    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * (2f / 3f)
-    return heightIn(max = maxHeight)
 }
 
 private fun android.content.Context.displayNameFor(uri: Uri): String {
