@@ -257,26 +257,30 @@ fun HttpInspectionSettingsScreen(
             onDismissRequest = {},
             title = { Text(SettingsGuides.HTTP_INSPECTION.title) },
             text = {
-                if (supported) {
-                    Text(
-                        buildAnnotatedString {
-                            withStyle(SpanStyle(color = androidx.compose.material3.MaterialTheme.colorScheme.error)) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (supported) {
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = androidx.compose.material3.MaterialTheme.colorScheme.error)) {
+                                    append(
+                                        "此功能不适合没有相关经验的用户。安装、卸载或重新安装 CA 证书需要一定操作能力，操作不当可能导致部分应用无法联网；仅在你能自行处理这些问题时使用。"
+                                    )
+                                }
+                                append("\n\n")
                                 append(
-                                    "此功能不适合没有相关经验的用户。安装、卸载或重新安装 CA 证书需要一定操作能力，操作不当可能导致部分应用无法联网；仅在你能自行处理这些问题时使用。"
+                                    "开启后，仅对明确选择的应用进行 HTTP(S) 流量检查，其他应用透明转发。HTTPS 仅在应用信任 DNSSR 根证书且未使用证书固定或自定义校验时才能解密。"
+                                )
+                                append("\n\n")
+                                append(
+                                    "不兼容的连接会自动旁路并直接转发。HTTP/3（QUIC）默认直连；开启“尝试检查 HTTP/3”后，会阻断所选应用的 UDP 443，促使支持回退的客户端改用 TCP。"
                                 )
                             }
-                            append("\n\n")
-                            append(
-                                "开启后，仅对明确选择的应用进行 HTTP(S) 流量检查，其他应用透明转发。HTTPS 仅在应用信任 DNSSR 根证书且未使用证书固定或自定义校验时才能解密。"
-                            )
-                            append("\n\n")
-                            append(
-                                "不兼容的连接会自动旁路并直接转发。HTTP/3（QUIC）默认直连；开启“尝试检查 HTTP/3”后，会阻断所选应用的 UDP 443，促使支持回退的客户端改用 TCP。"
-                            )
-                        }
-                    )
-                } else {
-                    Text("HTTP(S) 流量检查需要 Android 10 或更高版本。当前设备将继续使用 DNS-only 模式。")
+                        )
+                    } else {
+                        Text(
+                            "HTTP(S) 流量检查需要 Android 10 或更高版本，当前设备不满足运行条件，因此本页功能无法启用，DNSSR 将继续使用 DNS-only 模式。DNS 解析、域名规则和其他基础功能不会受到影响，也不需要安装根证书。若以后升级到受支持的系统，请在启用前了解证书安装、应用信任和 HTTPS 解密的限制；配置不当可能导致部分应用无法联网，证书固定或自定义校验的连接也可能无法被检查。"
+                        )
+                    }
                 }
             },
             confirmButton = {

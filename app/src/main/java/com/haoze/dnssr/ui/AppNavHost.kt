@@ -317,10 +317,12 @@ fun AppNavHost(
             )
         }
         composable(ScreenDestinations.blockedApps.route) {
-            BlockedAppsSettingsScreen(
-                onBack = { navController.popWhenResumed() },
-                onSelectApps = { navController.navigateWhenResumed(Routes.BLOCKED_APPS_SELECTION) }
-            )
+            SettingsGuideHost(SettingsGuides.BLOCKED_APPS) {
+                BlockedAppsSettingsScreen(
+                    onBack = { navController.popWhenResumed() },
+                    onSelectApps = { navController.navigateWhenResumed(Routes.BLOCKED_APPS_SELECTION) }
+                )
+            }
         }
         composable(Routes.BLOCKED_APPS_SELECTION) {
             BlockedAppsScreen(onBack = { navController.popWhenResumed() })
@@ -412,20 +414,16 @@ fun AppNavHost(
             )
         }
         composable(ScreenDestinations.about.route) {
-            SettingsGuideHost(SettingsGuides.ABOUT) {
-                AboutScreen(
+            AboutScreen(
                 onBack = { navController.popWhenResumed() },
-                    title = ScreenDestinations.about.title
-                )
-            }
+                title = ScreenDestinations.about.title
+            )
         }
         composable(ScreenDestinations.sponsor.route) {
-            SettingsGuideHost(SettingsGuides.SPONSOR) {
-                SponsorScreen(
+            SponsorScreen(
                 onBack = { navController.popWhenResumed() },
-                    title = ScreenDestinations.sponsor.title
-                )
-            }
+                title = ScreenDestinations.sponsor.title
+            )
         }
         composable(ScreenDestinations.appearanceSettings.route) {
             SettingsGuideHost(SettingsGuides.APPEARANCE) {
@@ -511,20 +509,16 @@ fun AppNavHost(
             )
         }
         composable(ScreenDestinations.sponsorList.route) {
-            SettingsGuideHost(SettingsGuides.SPONSOR_LIST) {
-                SponsorListScreen(
+            SponsorListScreen(
                 onBack = { navController.popWhenResumed() },
-                    title = ScreenDestinations.sponsorList.title
-                )
-            }
+                title = ScreenDestinations.sponsorList.title
+            )
         }
         composable(ScreenDestinations.coBuilderList.route) {
-            SettingsGuideHost(SettingsGuides.CO_BUILDER_LIST) {
-                CoBuilderListScreen(
+            CoBuilderListScreen(
                 onBack = { navController.popWhenResumed() },
-                    title = ScreenDestinations.coBuilderList.title
-                )
-            }
+                title = ScreenDestinations.coBuilderList.title
+            )
         }
     }
 }
