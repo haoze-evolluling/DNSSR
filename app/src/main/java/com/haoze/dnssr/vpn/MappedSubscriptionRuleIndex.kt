@@ -27,7 +27,7 @@ internal class MappedSubscriptionRuleIndex private constructor(
     private val sourceOffset: Int
 ) : AutoCloseable {
 
-    fun find(domainInput: String): String? {
+    fun find(domainInput: String, overrides: Map<String, String?> = emptyMap()): String? {
         val domain = domainInput.lowercase().trimEnd('.')
         if (domain.isEmpty() || !mightContainDomainOrParent(domain)) return null
         var node = 0
@@ -37,8 +37,13 @@ internal class MappedSubscriptionRuleIndex private constructor(
             val start = dot + 1
             val child = findChild(node, domain, start, end) ?: return null
             node = child
-            val terminalSource = nodeInt(node, 0)
-            if (terminalSource >= 0) return readSource(terminalSource)
+            val pattern = domain.substring(start)
+            if (overrides.containsKey(pattern)) {
+                overrides[pattern]?.let { return it }
+            } else {
+                val terminalSource = nodeInt(node, 0)
+                if (terminalSource >= 0) return readSource(terminalSource)
+            }
             end = dot
         }
         return null

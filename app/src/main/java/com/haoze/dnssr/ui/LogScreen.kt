@@ -192,7 +192,7 @@ fun LogScreen(
                     val success = manager.addRule(domain)
                     withContext(Dispatchers.Main) {
                         if (success) {
-                            onRuntimeDnsSettingsChanged()
+                            RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "block", domain)
                         }
                         Toast.makeText(
                             context,
@@ -209,7 +209,7 @@ fun LogScreen(
                     val success = manager.addRule(domain)
                     withContext(Dispatchers.Main) {
                         if (success) {
-                            onRuntimeDnsSettingsChanged()
+                            RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "allow", domain)
                         }
                         Toast.makeText(
                             context,

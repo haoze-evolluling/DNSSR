@@ -171,7 +171,31 @@ class RuleOperationWorker(
             val message = SubscriptionUpdateCoordinator.runManual {
                 execute(type, subscriptionId, blockManager, allowManager, rewriteManager, subscriptionManager)
             }
-            RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "rule_operation_completed")
+            when (type) {
+                RuleOperationType.ADD_BLOCK_RULE -> RuntimeDnsSettingsRefresher.syncRuleIfRunning(
+                    applicationContext, "block", AdGuardRuleParser.parseLine(inputData.getString(RuleOperationScheduler.KEY_PATTERN).orEmpty())?.pattern.orEmpty()
+                )
+                RuleOperationType.ADD_ALLOW_RULE -> RuntimeDnsSettingsRefresher.syncRuleIfRunning(
+                    applicationContext, "allow", AdGuardRuleParser.parseAllowLine(inputData.getString(RuleOperationScheduler.KEY_PATTERN).orEmpty())?.pattern.orEmpty()
+                )
+                RuleOperationType.IMPORT_HOSTS_RULES -> RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(
+                    applicationContext, false, false, true
+                )
+                RuleOperationType.ADD_SUBSCRIPTION,
+                RuleOperationType.ADD_LOCAL_SUBSCRIPTION -> {
+                    val isRewrite = inputData.getString(RuleOperationScheduler.KEY_KIND) == com.haoze.dnssr.data.entity.SubscriptionKind.REWRITE
+                    RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(applicationContext, !isRewrite, !isRewrite, isRewrite)
+                }
+                RuleOperationType.EDIT_SUBSCRIPTION,
+                RuleOperationType.UPDATE_SUBSCRIPTION -> {
+                    val isRewrite = database.subscriptionDao().byId(subscriptionId)?.kind == com.haoze.dnssr.data.entity.SubscriptionKind.REWRITE
+                    RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(applicationContext, !isRewrite, !isRewrite, isRewrite)
+                }
+                RuleOperationType.UPDATE_ALL_SUBSCRIPTIONS -> RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(
+                    applicationContext, true, true, true
+                )
+                else -> RuntimeDnsSettingsRefresher.refreshIfRunning(applicationContext, "rule_operation_completed")
+            }
             showFinishedNotification("$title 已完成", message)
             Result.success(
                 workDataOf(

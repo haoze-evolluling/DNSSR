@@ -109,11 +109,13 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
                 rewriteRuleManager.deleteRule(id)
                 RuntimeDnsSettingsRefresher.refreshIfRunning(context, "rewrite_rule_deleted")
             } else if (ruleKind == ManagedRuleKind.ALLOW) {
-                allowListManager.deleteRule(id)
-                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "allow_rule_deleted")
+                allowListManager.deleteRule(id)?.let {
+                    RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "allow", it)
+                }
             } else {
-                blockListManager.deleteRule(id)
-                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "block_rule_deleted")
+                blockListManager.deleteRule(id)?.let {
+                    RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "block", it)
+                }
             }
             loadPage(_currentPage.value)
         }
@@ -126,11 +128,13 @@ class RuleListViewModel(application: Application) : AndroidViewModel(application
                 rewriteRuleManager.toggleRule(id, enabled)
                 RuntimeDnsSettingsRefresher.refreshIfRunning(context, "rewrite_rule_toggled")
             } else if (ruleKind == ManagedRuleKind.ALLOW) {
-                allowListManager.toggleRule(id, enabled)
-                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "allow_rule_toggled")
+                allowListManager.toggleRule(id, enabled)?.let {
+                    RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "allow", it)
+                }
             } else {
-                blockListManager.toggleRule(id, enabled)
-                RuntimeDnsSettingsRefresher.refreshIfRunning(context, "block_rule_toggled")
+                blockListManager.toggleRule(id, enabled)?.let {
+                    RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, "block", it)
+                }
             }
             loadPage(_currentPage.value)
         }

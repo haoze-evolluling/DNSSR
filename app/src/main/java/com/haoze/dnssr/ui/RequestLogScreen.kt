@@ -178,7 +178,11 @@ fun RequestLogScreen(onBack: () -> Unit, onRuntimeDnsSettingsChanged: () -> Unit
         }, { allow ->
             scope.launch(Dispatchers.IO) {
                 val success = if (allow) AllowListManager(database.allowRuleDao()).addRule(domain) else BlockListManager(database.blockRuleDao()).addRule(domain)
-                withContext(Dispatchers.Main) { if (success) onRuntimeDnsSettingsChanged(); Toast.makeText(context, if (success) "已添加规则" else "规则格式无效", Toast.LENGTH_SHORT).show(); pendingDomain = null }
+                withContext(Dispatchers.Main) {
+                    if (success) RuntimeDnsSettingsRefresher.syncRuleIfRunning(context, if (allow) "allow" else "block", domain)
+                    Toast.makeText(context, if (success) "已添加规则" else "规则格式无效", Toast.LENGTH_SHORT).show()
+                    pendingDomain = null
+                }
             }
         })
     }

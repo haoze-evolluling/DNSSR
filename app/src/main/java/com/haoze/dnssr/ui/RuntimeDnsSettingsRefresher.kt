@@ -18,6 +18,28 @@ object RuntimeDnsSettingsRefresher {
         }
     }
 
+    fun syncRuleIfRunning(context: Context, ruleType: String, pattern: String) {
+        val appContext = context.applicationContext
+        if (!DnsVpnService.isRunning(appContext)) return
+        runCatching {
+            appContext.startService(DnsVpnService.syncRuleIntent(appContext, ruleType, pattern))
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to request incremental rule cache sync", error)
+        }
+    }
+
+    fun refreshRuleIndexesIfRunning(context: Context, refreshBlock: Boolean, refreshAllow: Boolean, refreshRewrite: Boolean) {
+        val appContext = context.applicationContext
+        if (!DnsVpnService.isRunning(appContext)) return
+        runCatching {
+            appContext.startService(
+                DnsVpnService.refreshRuleIndexesIntent(appContext, refreshBlock, refreshAllow, refreshRewrite)
+            )
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to request rule index refresh", error)
+        }
+    }
+
     fun refreshAppExclusionsIfRunning(context: Context) {
         val appContext = context.applicationContext
         if (!DnsVpnService.isRunning(appContext)) return

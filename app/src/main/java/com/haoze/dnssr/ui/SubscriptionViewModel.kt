@@ -170,10 +170,11 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         _operationMessage.value = "正在删除规则订阅..."
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val subscription = AppDatabase.getInstance(getApplication<Application>()).subscriptionDao().byId(id)
                 subscriptionManager.deleteSubscription(id)
-                RuntimeDnsSettingsRefresher.refreshIfRunning(
-                    getApplication<Application>(),
-                    "subscription_deleted"
+                val isRewrite = subscription?.kind == com.haoze.dnssr.data.entity.SubscriptionKind.REWRITE
+                RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(
+                    getApplication<Application>(), !isRewrite, !isRewrite, isRewrite
                 )
                 loadSubscriptionsIntoState()
                 withContext(Dispatchers.Main) {
@@ -197,11 +198,12 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val subscription = AppDatabase.getInstance(getApplication<Application>()).subscriptionDao().byId(id)
                 val result = subscriptionManager.setSubscriptionEnabled(id, enabled)
                 if (result.isSuccess) {
-                    RuntimeDnsSettingsRefresher.refreshIfRunning(
-                        getApplication<Application>(),
-                        "subscription_toggled"
+                    val isRewrite = subscription?.kind == com.haoze.dnssr.data.entity.SubscriptionKind.REWRITE
+                    RuntimeDnsSettingsRefresher.refreshRuleIndexesIfRunning(
+                        getApplication<Application>(), !isRewrite, !isRewrite, isRewrite
                     )
                     loadSubscriptionsIntoState()
                 }

@@ -26,6 +26,8 @@ class BlockRuleCache(private val indexFile: File? = null) {
     @Volatile
     private var subscriptionFallback: Map<String, String> = emptyMap()
     @Volatile
+    private var subscriptionOverrides: Map<String, String?> = emptyMap()
+    @Volatile
     private var subscriptionIndex: MappedSubscriptionRuleIndex? = null
 
     /**
@@ -43,6 +45,7 @@ class BlockRuleCache(private val indexFile: File? = null) {
             customRules = custom
             subscriptionFallback = fallback
             subscriptionIndex = mapped
+            subscriptionOverrides = emptyMap()
         }
     }
 
@@ -74,13 +77,18 @@ class BlockRuleCache(private val indexFile: File? = null) {
 
     fun findSubscriptionMatch(qname: String): BlockRuleMatch? {
         val domain = qname.lowercase().trimEnd('.')
-        subscriptionIndex?.find(domain)?.let { source -> return BlockRuleMatch(domain, source) }
+        subscriptionIndex?.find(domain, subscriptionOverrides)?.let { source -> return BlockRuleMatch(domain, source) }
         val subscriptions = subscriptionFallback
-        subscriptions[domain]?.let { source -> return BlockRuleMatch(domain, source) }
+        fun sourceFor(pattern: String): String? = if (subscriptionOverrides.containsKey(pattern)) {
+            subscriptionOverrides[pattern]
+        } else {
+            subscriptions[pattern]
+        }
+        sourceFor(domain)?.let { source -> return BlockRuleMatch(domain, source) }
         var subscriptionPos = domain.indexOf('.')
         while (subscriptionPos >= 0 && subscriptionPos < domain.length - 1) {
             val suffix = domain.substring(subscriptionPos + 1)
-            subscriptions[suffix]?.let { source -> return BlockRuleMatch(suffix, source) }
+            sourceFor(suffix)?.let { source -> return BlockRuleMatch(suffix, source) }
             subscriptionPos = domain.indexOf('.', subscriptionPos + 1)
         }
         return null
@@ -99,10 +107,23 @@ class BlockRuleCache(private val indexFile: File? = null) {
         }
     }
 
+    fun syncPattern(pattern: String, source: String?) {
+        synchronized(this) {
+            customRules = HashMap(customRules).apply {
+                remove(pattern)
+                if (source != null && !source.startsWith("sub_")) put(pattern, source)
+            }
+            subscriptionOverrides = HashMap(subscriptionOverrides).apply {
+                if (source == null || source.startsWith("sub_")) put(pattern, source) else remove(pattern)
+            }
+        }
+    }
+
     fun clear() {
         synchronized(this) {
             customRules = emptyMap()
             subscriptionFallback = emptyMap()
+            subscriptionOverrides = emptyMap()
             subscriptionIndex?.close()
             subscriptionIndex = null
         }

@@ -86,6 +86,16 @@ interface BlockRuleDao {
     @Query("SELECT COUNT(*) FROM block_rule")
     suspend fun count(): Int
 
+    @Query("SELECT pattern FROM block_rule WHERE id = :id")
+    suspend fun patternById(id: Long): String?
+
+    @Query(
+        "SELECT r.pattern, MIN(s.source) AS source FROM block_rule r " +
+            "JOIN block_rule_source s ON s.ruleId = r.id " +
+            "WHERE r.pattern = :pattern AND r.enabled = 1 AND s.enabled = 1 GROUP BY r.pattern"
+    )
+    suspend fun enabledRuleByPattern(pattern: String): EnabledBlockRule?
+
     @Query("DELETE FROM block_rule WHERE id = :id")
     suspend fun deleteById(id: Long)
 

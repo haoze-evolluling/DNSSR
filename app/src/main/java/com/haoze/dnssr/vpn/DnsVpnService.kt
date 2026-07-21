@@ -88,6 +88,8 @@ class DnsVpnService : VpnService() {
     private var resolvers: List<ActiveDnsResolver> = emptyList()
     private var startIntent: Intent? = null
     private var wasStopped = false
+    private val pendingRuleSyncs = mutableMapOf<String, MutableSet<String>>()
+    private var ruleSyncJob: Job? = null
 
     private lateinit var dnsCache: DnsResponseCache
     private lateinit var blockListManager: BlockListManager
@@ -170,6 +172,15 @@ class DnsVpnService : VpnService() {
                     ?: "runtime_config"
             )
             ACTION_REFRESH_NOTIFICATION -> refreshForegroundNotification()
+            ACTION_SYNC_RULE -> scheduleRuleSync(
+                intent.getStringExtra(EXTRA_RULE_TYPE).orEmpty(),
+                intent.getStringExtra(EXTRA_RULE_PATTERN).orEmpty()
+            )
+            ACTION_REFRESH_RULE_INDEXES -> refreshRuleIndexes(
+                intent.getBooleanExtra(EXTRA_REFRESH_BLOCK, false),
+                intent.getBooleanExtra(EXTRA_REFRESH_ALLOW, false),
+                intent.getBooleanExtra(EXTRA_REFRESH_REWRITE, false)
+            )
             else -> startVpn(intent)
         }
         return START_STICKY
@@ -530,6 +541,38 @@ class DnsVpnService : VpnService() {
             }
         }
         return listOf(DnsProvider.loadSelected(this))
+    }
+
+    private fun scheduleRuleSync(ruleType: String, pattern: String) {
+        if (pattern.isBlank() || ruleType !in setOf(RULE_TYPE_BLOCK, RULE_TYPE_ALLOW)) return
+        synchronized(pendingRuleSyncs) {
+            pendingRuleSyncs.getOrPut(ruleType) { linkedSetOf() }.add(pattern)
+            ruleSyncJob?.cancel()
+            ruleSyncJob = serviceScope.launch {
+                delay(RULE_SYNC_DEBOUNCE_MS)
+                val pending = synchronized(pendingRuleSyncs) {
+                    pendingRuleSyncs.mapValues { it.value.toSet() }.also { pendingRuleSyncs.clear() }
+                }
+                refreshMutex.withLock {
+                    pending[RULE_TYPE_BLOCK].orEmpty().forEach { blockListManager.syncCachedPattern(it) }
+                    pending[RULE_TYPE_ALLOW].orEmpty().forEach { allowListManager.syncCachedPattern(it) }
+                }
+            }
+        }
+    }
+
+    private fun refreshRuleIndexes(refreshBlock: Boolean, refreshAllow: Boolean, refreshRewrite: Boolean) {
+        serviceScope.launch {
+            refreshMutex.withLock {
+                if (refreshBlock) runCatching { blockListManager.refreshCache() }
+                    .onFailure { Log.w(TAG, "Failed to refresh block list cache", it) }
+                if (refreshAllow) runCatching { allowListManager.refreshCache() }
+                    .onFailure { Log.w(TAG, "Failed to refresh allow list cache", it) }
+                if (refreshRewrite) runCatching { rewriteRuleManager.refreshCache() }
+                    .onSuccess { goInspectionTunnel?.updateRewriteRules() }
+                    .onFailure { Log.w(TAG, "Failed to refresh rewrite rule cache", it) }
+            }
+        }
     }
 
     private fun DnsResolutionMode.isGoTunnelCompatible(): Boolean =
@@ -1251,9 +1294,19 @@ class DnsVpnService : VpnService() {
         private const val ACTION_REFRESH_RACE_MODE_STRATEGY = "com.haoze.dnssr.REFRESH_RACE_MODE_STRATEGY"
         private const val ACTION_REFRESH_RUNTIME_CONFIG = "com.haoze.dnssr.REFRESH_RUNTIME_CONFIG"
         private const val ACTION_REFRESH_NOTIFICATION = "com.haoze.dnssr.REFRESH_NOTIFICATION"
+        private const val ACTION_SYNC_RULE = "com.haoze.dnssr.SYNC_RULE"
+        private const val ACTION_REFRESH_RULE_INDEXES = "com.haoze.dnssr.REFRESH_RULE_INDEXES"
         const val ACTION_VPN_STATUS_CHANGED = "com.haoze.dnssr.VPN_STATUS_CHANGED"
         const val EXTRA_VPN_RUNNING = "vpn_running"
         private const val EXTRA_REFRESH_REASON = "refresh_reason"
+        private const val EXTRA_RULE_TYPE = "rule_type"
+        private const val EXTRA_RULE_PATTERN = "rule_pattern"
+        private const val EXTRA_REFRESH_BLOCK = "refresh_block"
+        private const val EXTRA_REFRESH_ALLOW = "refresh_allow"
+        private const val EXTRA_REFRESH_REWRITE = "refresh_rewrite"
+        private const val RULE_TYPE_BLOCK = "block"
+        private const val RULE_TYPE_ALLOW = "allow"
+        private const val RULE_SYNC_DEBOUNCE_MS = 250L
         private const val CHANNEL_ID = "dns_vpn_channel"
         private const val NOTIFICATION_ID = 1
         private const val VPN_ADDRESS_V4 = "10.0.0.2"
@@ -1313,6 +1366,24 @@ class DnsVpnService : VpnService() {
                 .setAction(ACTION_REFRESH_RUNTIME_CONFIG)
                 .putExtra(EXTRA_REFRESH_REASON, reason)
         }
+
+        fun syncRuleIntent(context: android.content.Context, ruleType: String, pattern: String): Intent {
+            return Intent(context, DnsVpnService::class.java)
+                .setAction(ACTION_SYNC_RULE)
+                .putExtra(EXTRA_RULE_TYPE, ruleType)
+                .putExtra(EXTRA_RULE_PATTERN, pattern)
+        }
+
+        fun refreshRuleIndexesIntent(
+            context: android.content.Context,
+            refreshBlock: Boolean,
+            refreshAllow: Boolean,
+            refreshRewrite: Boolean
+        ): Intent = Intent(context, DnsVpnService::class.java)
+            .setAction(ACTION_REFRESH_RULE_INDEXES)
+            .putExtra(EXTRA_REFRESH_BLOCK, refreshBlock)
+            .putExtra(EXTRA_REFRESH_ALLOW, refreshAllow)
+            .putExtra(EXTRA_REFRESH_REWRITE, refreshRewrite)
 
         fun refreshAppExclusionsIntent(context: android.content.Context): Intent {
             return Intent(context, DnsVpnService::class.java).setAction(ACTION_REFRESH_APP_EXCLUSIONS)

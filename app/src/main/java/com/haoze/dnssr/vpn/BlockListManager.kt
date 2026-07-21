@@ -63,7 +63,7 @@ class BlockListManager(
             sourceEnabled = true
         )
         if (!inserted) return false
-        cache.reload(dao)
+        cache.syncPattern(parsed.pattern, dao.enabledRuleByPattern(parsed.pattern)?.source)
         return true
     }
 
@@ -118,19 +118,18 @@ class BlockListManager(
 
     suspend fun userRules(): List<BlockRuleEntity> = dao.all()
 
-    suspend fun deleteRule(id: Long) {
-        val rules = dao.all()
-        val rule = rules.find { it.id == id }
-        if (rule != null) {
-            dao.deleteById(id)
-            cache.reload(dao)
-        }
+    suspend fun deleteRule(id: Long): String? {
+        val pattern = dao.patternById(id) ?: return null
+        dao.deleteById(id)
+        cache.syncPattern(pattern, null)
+        return pattern
     }
 
-    suspend fun toggleRule(id: Long, enabled: Boolean) {
+    suspend fun toggleRule(id: Long, enabled: Boolean): String? {
+        val pattern = dao.patternById(id) ?: return null
         dao.setEnabled(id, enabled)
-        // 切换启用状态后需全量刷新（禁用需移除，启用需添加）
-        cache.reload(dao)
+        cache.syncPattern(pattern, dao.enabledRuleByPattern(pattern)?.source)
+        return pattern
     }
 
     suspend fun setRulesEnabledBySource(source: String, enabled: Boolean) {
@@ -154,6 +153,11 @@ class BlockListManager(
     }
 
     suspend fun countBySource(source: String): Int = dao.countBySource(source)
+
+    suspend fun syncCachedPattern(pattern: String) {
+        val normalized = pattern.lowercase().trimEnd('.')
+        cache.syncPattern(normalized, dao.enabledRuleByPattern(normalized)?.source)
+    }
 
     suspend fun parsedRulesBySource(source: String): List<AdGuardRuleParser.ParsedRule> =
         dao.bySource(source).map { AdGuardRuleParser.ParsedRule(it.pattern, it.rawLine) }
