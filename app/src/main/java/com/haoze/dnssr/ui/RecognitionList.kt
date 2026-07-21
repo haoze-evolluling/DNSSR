@@ -23,8 +23,8 @@ import com.haoze.dnssr.ui.components.SettingsGroup
 
 data class RecognitionMember(
     val name: String,
-    @param:DrawableRes val avatarRes: Int,
-    val acknowledgement: String
+    val acknowledgement: String,
+    @param:DrawableRes val avatarRes: Int
 )
 
 @Composable
