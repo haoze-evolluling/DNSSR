@@ -354,11 +354,18 @@ class SubscriptionManager(
             _importing.value = true
             _importingSubscriptionId.value = id
             subscriptionDao.setImportState(id, SubscriptionImportState.IMPORTING, null)
+            val pending = subscription.copy(
+                name = trimmedName,
+                url = trimmedUrl,
+                mirrorTemplate = normalizedMirror,
+                mirrorFallback = mirrorFallback,
+                importState = SubscriptionImportState.IMPORTING,
+                importError = null
+            )
+            // Preserve the saved source configuration even when its immediate refresh fails.
+            subscriptionDao.update(pending)
             try {
-                val download = downloadRules(subscription.copy(
-                    url = trimmedUrl,
-                    mirrorTemplate = normalizedMirror,
-                    mirrorFallback = mirrorFallback,
+                val download = downloadRules(pending.copy(
                     httpEtag = null,
                     httpLastModified = null,
                     ruleSetHash = null
