@@ -20,6 +20,22 @@ interface HttpRequestLogDao {
     @Query("SELECT outcome, COUNT(*) AS count FROM http_request_log WHERE timestamp >= :since GROUP BY outcome")
     suspend fun dailyStats(since: Long): List<HttpDailyStatRow>
 
+    @Query("SELECT COUNT(*) FROM http_request_log WHERE timestamp >= :since")
+    suspend fun countSince(since: Long): Int
+
+    @Query("""
+        SELECT blockSubscriptionId AS subscriptionId, COUNT(*) AS hits
+        FROM http_request_log
+        WHERE timestamp >= :since
+            AND outcome = :blockedOutcome
+            AND blockSubscriptionId IS NOT NULL
+        GROUP BY blockSubscriptionId
+    """)
+    suspend fun subscriptionInterceptionStats(
+        since: Long,
+        blockedOutcome: String
+    ): List<SubscriptionInterceptionStatRow>
+
     @Query("DELETE FROM http_request_log WHERE timestamp < :before")
     suspend fun deleteBefore(before: Long)
 

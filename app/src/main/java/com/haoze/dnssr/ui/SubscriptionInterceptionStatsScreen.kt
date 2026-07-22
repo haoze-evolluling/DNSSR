@@ -62,14 +62,14 @@ fun SubscriptionInterceptionStatsScreen(
                 SettingsGroup {
                     SubscriptionInterceptionRangeSelector(range, viewModel::setRange)
                 }
-                SettingsInfoText("拦截率为所选时间范围内，该订阅拦截请求数占全部 DNS 请求数的比例。")
+                SettingsInfoText("拦截率为所选时间范围内，该订阅拦截请求数占全部已记录请求（DNS + HTTPS）的比例。")
             }
             item {
                 SettingsGroupTitle("概览")
                 SettingsGroup {
                     SettingsItem(
-                        title = "全部 DNS 请求",
-                        subtitle = if (loading) "正在加载统计数据" else "包含通过、屏蔽和失败请求"
+                        title = "全部已记录请求",
+                        subtitle = if (loading) "正在加载统计数据" else "DNS 与 HTTPS 日志合计，含通过、屏蔽和失败"
                     ) {
                         Text("$totalRequests", style = MaterialTheme.typography.bodyMedium)
                     }
@@ -81,7 +81,7 @@ fun SubscriptionInterceptionStatsScreen(
                     if (items.isEmpty()) {
                         SettingsItem(
                             title = if (loading) "正在加载" else "暂无屏蔽订阅",
-                            subtitle = "导入屏蔽订阅并产生 DNS 请求后，此处将显示其拦截率。"
+                            subtitle = "导入屏蔽订阅并产生 DNS 或 HTTPS 请求后，此处将显示其拦截率。"
                         )
                     } else {
                         items.forEachIndexed { index, item ->

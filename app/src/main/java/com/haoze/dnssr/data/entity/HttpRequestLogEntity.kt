@@ -9,7 +9,11 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["timestamp"], name = "index_http_request_log_timestamp"),
         Index(value = ["outcome", "timestamp"], name = "index_http_request_log_outcome_timestamp"),
-        Index(value = ["authority"], name = "index_http_request_log_authority")
+        Index(value = ["authority"], name = "index_http_request_log_authority"),
+        Index(
+            value = ["blockSubscriptionId", "timestamp"],
+            name = "index_http_request_log_block_subscription_timestamp"
+        )
     ]
 )
 data class HttpRequestLogEntity(
@@ -19,5 +23,6 @@ data class HttpRequestLogEntity(
     val authority: String?,
     val protocol: String,
     val outcome: String,
-    val matchedRule: String? = null
+    val matchedRule: String? = null,
+    val blockSubscriptionId: Long? = null
 )

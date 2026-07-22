@@ -26,7 +26,7 @@ data class SubscriptionInterceptionStatItem(
 class SubscriptionInterceptionStatsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getInstance(application)
-    private val repository = DnsLogRepository(database.dnsLogDao())
+    private val repository = DnsLogRepository(database.dnsLogDao(), database.httpRequestLogDao())
 
     private val _range = MutableStateFlow(SubscriptionInterceptionStatsRange.TODAY)
     val range: StateFlow<SubscriptionInterceptionStatsRange> = _range.asStateFlow()

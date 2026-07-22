@@ -10,12 +10,17 @@ import com.haoze.dnssr.data.SubscriptionInterceptionStats
 import com.haoze.dnssr.data.SubscriptionInterceptionStatsRange
 import com.haoze.dnssr.data.dao.DailyStatRow
 import com.haoze.dnssr.data.dao.DnsLogDao
+import com.haoze.dnssr.data.dao.HttpRequestLogDao
+import com.haoze.dnssr.vpn.HttpRequestOutcome
 import com.haoze.dnssr.data.entity.DnsLogEntity
 import com.haoze.dnssr.vpn.LogResult
 import com.haoze.dnssr.util.dayStartMillis
 import com.haoze.dnssr.ui.DnsLogMode
 
-class DnsLogRepository(private val dao: DnsLogDao) {
+class DnsLogRepository(
+    private val dao: DnsLogDao,
+    private val httpRequestLogDao: HttpRequestLogDao? = null
+) {
 
     companion object {
         const val PAGE_SIZE = 50
@@ -89,10 +94,20 @@ class DnsLogRepository(private val dao: DnsLogDao) {
             SubscriptionInterceptionStatsRange.SEVEN_DAYS -> System.currentTimeMillis() - SEVEN_DAYS_MS
             SubscriptionInterceptionStatsRange.ALL -> 0L
         }
+        val dnsTotal = dao.countSince(since)
+        val httpsTotal = httpRequestLogDao?.countSince(since) ?: 0
+        val hits = mutableMapOf<Long, Int>()
+        dao.subscriptionInterceptionStats(since, LogResult.BLOCKED.value).forEach { row ->
+            hits[row.subscriptionId] = (hits[row.subscriptionId] ?: 0) + row.hits
+        }
+        httpRequestLogDao
+            ?.subscriptionInterceptionStats(since, HttpRequestOutcome.BLOCKED.storageValue)
+            ?.forEach { row ->
+                hits[row.subscriptionId] = (hits[row.subscriptionId] ?: 0) + row.hits
+            }
         return SubscriptionInterceptionStats(
-            totalRequests = dao.countSince(since),
-            hitsBySubscriptionId = dao.subscriptionInterceptionStats(since, LogResult.BLOCKED.value)
-                .associate { it.subscriptionId to it.hits }
+            totalRequests = dnsTotal + httpsTotal,
+            hitsBySubscriptionId = hits
         )
     }
 

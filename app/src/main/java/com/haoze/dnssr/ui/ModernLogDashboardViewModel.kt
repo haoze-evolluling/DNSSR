@@ -33,7 +33,7 @@ data class ModernLogDashboardUiState(
 
 class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getInstance(application)
-    private val dnsLogRepository = DnsLogRepository(database.dnsLogDao())
+    private val dnsLogRepository = DnsLogRepository(database.dnsLogDao(), database.httpRequestLogDao())
     private val dnsCacheRepository = DnsCacheRepository(database.dnsCacheDao())
     private val raceLogRepository = RaceLogRepository(database.raceLogDao())
     private val bootstrapLogRepository = BootstrapLogRepository(application, database.bootstrapLogDao())

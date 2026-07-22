@@ -35,7 +35,8 @@ class HttpRequestLogger(
         authority: String?,
         protocol: String,
         outcome: HttpRequestOutcome,
-        matchedRule: String? = null
+        matchedRule: String? = null,
+        blockSubscriptionId: Long? = null
     ) {
         val mode = modeProvider()
         if (mode == DnsLogMode.OFF) return
@@ -48,7 +49,8 @@ class HttpRequestLogger(
                 authority = authority?.lowercase(Locale.ROOT),
                 protocol = protocol,
                 outcome = outcome.storageValue,
-                matchedRule = matchedRule
+                matchedRule = matchedRule,
+                blockSubscriptionId = blockSubscriptionId
             )
             if (pending.size >= BATCH_SIZE) flushLocked()
         }

@@ -47,7 +47,7 @@ import com.haoze.dnssr.data.dao.MirrorTemplateDao
         HttpRequestLogEntity::class
         ,RewriteRuleEntity::class, RewriteRuleSourceEntity::class, MirrorTemplateEntity::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -83,7 +83,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_15_16,
                         MIGRATION_16_17,
                         MIGRATION_17_18
-                        ,MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22
+                        ,MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23
                     )
                     .fallbackToDestructiveMigration(true)
                     .build().also { INSTANCE = it }
@@ -298,5 +298,14 @@ abstract class AppDatabase : RoomDatabase() {
             db.execSQL("CREATE TABLE IF NOT EXISTS `mirror_template` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `template` TEXT NOT NULL, `addedAt` INTEGER NOT NULL)")
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_mirror_template_name` ON `mirror_template` (`name`)")
         }}
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `http_request_log` ADD COLUMN `blockSubscriptionId` INTEGER")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_http_request_log_block_subscription_timestamp` " +
+                        "ON `http_request_log` (`blockSubscriptionId`, `timestamp`)"
+                )
+            }
+        }
     }
 }

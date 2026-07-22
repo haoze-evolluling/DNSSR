@@ -139,12 +139,15 @@ class GoInspectionTunnel(
                 matchedRule: String
             ) {
                 scope.launch {
+                    val httpOutcome = outcome.toHttpRequestOutcome()
+                    val blockSubscriptionId = resolveHttpBlockSubscriptionId(authority, httpOutcome)
                     httpRequestLogger.log(
                         packageName = packageName,
                         authority = authority.ifBlank { null },
                         protocol = protocol,
-                        outcome = outcome.toHttpRequestOutcome(),
-                        matchedRule = matchedRule.ifBlank { null }
+                        outcome = httpOutcome,
+                        matchedRule = matchedRule.ifBlank { null },
+                        blockSubscriptionId = blockSubscriptionId
                     )
                 }
             }
@@ -164,6 +167,17 @@ class GoInspectionTunnel(
         }
     }
 
+
+    private fun resolveHttpBlockSubscriptionId(
+        authority: String,
+        outcome: HttpRequestOutcome
+    ): Long? {
+        if (outcome != HttpRequestOutcome.BLOCKED) return null
+        if (authority.isBlank()) return null
+        val decision = policy.evaluate(authority)
+        val source = (decision as? DomainDecision.Block)?.source ?: return null
+        return if (source.startsWith("sub_")) source.removePrefix("sub_").toLongOrNull() else null
+    }
     private fun HttpsDnsConfigSnapshot.toJson(): String = JSONObject()
             .put("mode", mode.storageValue)
             .put("blockResponse", blockResponseMode.goValue)
@@ -249,6 +263,7 @@ private fun buildDnsLogMessage(
     errorMessage.takeIf { it.isNotBlank() }?.let { "error=$it" },
     responseTimeMs.takeIf { it > 0 }?.let { "elapsed=${it}ms" }
 ).joinToString(", ").takeIf { it.isNotEmpty() }
+
 
 private fun String.toHttpRequestOutcome(): HttpRequestOutcome = when (this) {
     "blocked" -> HttpRequestOutcome.BLOCKED
