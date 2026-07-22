@@ -112,9 +112,7 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
     fun addMirrorTemplate(name: String, template: String, onResult: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
-                require(name.trim().isNotEmpty()) { "镜像站名称不能为空" }
-                require(template.trim().startsWith("http://") || template.trim().startsWith("https://")) { "模板必须使用 HTTP 或 HTTPS" }
-                require(listOf("{url}", "{urlEncoded}", "{scheme}", "{host}", "{path}", "{pathAndQuery}").any { it in template }) { "模板缺少 URL 占位符" }
+                validateMirrorTemplate(name, template)
                 AppDatabase.getInstance(getApplication<Application>()).mirrorTemplateDao().insert(
                     MirrorTemplateEntity(name = name.trim(), template = template.trim())
                 )
@@ -123,10 +121,28 @@ class RuleManagementViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    fun editMirrorTemplate(template: MirrorTemplateEntity, name: String, address: String, onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                validateMirrorTemplate(name, address)
+                AppDatabase.getInstance(getApplication<Application>()).mirrorTemplateDao().update(
+                    template.copy(name = name.trim(), template = address.trim())
+                )
+            }
+            withContext(Dispatchers.Main) { onResult(if (result.isSuccess) "已更新镜像站模板" else result.exceptionOrNull()?.message ?: "更新失败") }
+        }
+    }
+
     fun deleteMirrorTemplate(template: MirrorTemplateEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             AppDatabase.getInstance(getApplication<Application>()).mirrorTemplateDao().delete(template)
         }
+    }
+
+    private fun validateMirrorTemplate(name: String, template: String) {
+        require(name.trim().isNotEmpty()) { "镜像站名称不能为空" }
+        require(template.trim().startsWith("http://") || template.trim().startsWith("https://")) { "模板必须使用 HTTP 或 HTTPS" }
+        require(listOf("{url}", "{urlEncoded}", "{scheme}", "{host}", "{path}", "{pathAndQuery}").any { it in template }) { "模板缺少 URL 占位符" }
     }
 
     fun importHostsRules(uri: Uri, onResult: (String) -> Unit) {

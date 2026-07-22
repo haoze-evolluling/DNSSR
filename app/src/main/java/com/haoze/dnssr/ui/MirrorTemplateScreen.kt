@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import com.haoze.dnssr.ui.components.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Icon
@@ -55,6 +56,7 @@ fun MirrorTemplateScreen(
 ) {
     val templates by viewModel.mirrorTemplates.collectAsStateWithLifecycle(initialValue = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingTemplate by remember { mutableStateOf<MirrorTemplateEntity?>(null) }
     var pendingDeletion by remember { mutableStateOf<MirrorTemplateEntity?>(null) }
 
     SettingsScaffold(title = "镜像站模板", onBack = onBack) { padding ->
@@ -95,8 +97,13 @@ fun MirrorTemplateScreen(
                                 title = template.name,
                                 subtitle = template.template,
                                 trailing = {
-                                    IconButton(onClick = { pendingDeletion = template }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "删除 ${template.name}", tint = MaterialTheme.colorScheme.error)
+                                    Row {
+                                        IconButton(onClick = { editingTemplate = template }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "编辑 ${template.name}")
+                                        }
+                                        IconButton(onClick = { pendingDeletion = template }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "删除 ${template.name}", tint = MaterialTheme.colorScheme.error)
+                                        }
                                     }
                                 }
                             )
@@ -108,10 +115,19 @@ fun MirrorTemplateScreen(
     }
 
     if (showAddDialog) {
-        AddMirrorTemplateDialog(
+        MirrorTemplateDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { name, template, onResult -> viewModel.addMirrorTemplate(name, template, onResult) },
-            onAdded = { showAddDialog = false }
+            onSubmit = { name, template, onResult -> viewModel.addMirrorTemplate(name, template, onResult) },
+            onSaved = { showAddDialog = false }
+        )
+    }
+
+    editingTemplate?.let { template ->
+        MirrorTemplateDialog(
+            template = template,
+            onDismiss = { editingTemplate = null },
+            onSubmit = { name, address, onResult -> viewModel.editMirrorTemplate(template, name, address, onResult) },
+            onSaved = { editingTemplate = null }
         )
     }
 
@@ -132,22 +148,24 @@ fun MirrorTemplateScreen(
 }
 
 @Composable
-private fun AddMirrorTemplateDialog(
+private fun MirrorTemplateDialog(
+    template: MirrorTemplateEntity? = null,
     onDismiss: () -> Unit,
-    onAdd: (String, String, (String) -> Unit) -> Unit,
-    onAdded: () -> Unit
+    onSubmit: (String, String, (String) -> Unit) -> Unit,
+    onSaved: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var template by remember { mutableStateOf("") }
+    val isEditing = template != null
+    var name by remember(template?.id) { mutableStateOf(template?.name.orEmpty()) }
+    var address by remember(template?.id) { mutableStateOf(template?.template.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
     var submitting by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
-        title = { Text("添加镜像站模板") },
+        title = { Text(if (isEditing) "编辑镜像站模板" else "添加镜像站模板") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("保存后，可在添加规则订阅时直接选择。", style = MaterialTheme.typography.bodyMedium)
+                Text(if (isEditing) "修改后，已使用此模板的订阅不会被自动更新。" else "保存后，可在添加规则订阅时直接选择。", style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; error = null },
@@ -157,8 +175,8 @@ private fun AddMirrorTemplateDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
-                    value = template,
-                    onValueChange = { template = it; error = null },
+                    value = address,
+                    onValueChange = { address = it; error = null },
                     label = { Text("模板地址") },
                     placeholder = { Text("https://mirror.example.com/{url}") },
                     supportingText = { Text(error ?: "必须使用 HTTP(S) 并包含至少一个占位符") },
@@ -175,7 +193,7 @@ private fun AddMirrorTemplateDialog(
                             rowPlaceholders.forEachIndexed { index, placeholder ->
                                 OutlinedButton(
                                     onClick = {
-                                        template += placeholder
+                                        address += placeholder
                                         error = null
                                     },
                                     modifier = Modifier.weight(if (index == 2) 0.4f else 0.3f),
@@ -191,15 +209,15 @@ private fun AddMirrorTemplateDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = !submitting && name.isNotBlank() && template.isNotBlank(),
+                enabled = !submitting && name.isNotBlank() && address.isNotBlank(),
                 onClick = {
                     submitting = true
-                    onAdd(name, template) { message ->
+                    onSubmit(name, address) { message ->
                         submitting = false
-                        if (message == "已添加镜像站模板") onAdded() else error = message
+                        if (message == "已添加镜像站模板" || message == "已更新镜像站模板") onSaved() else error = message
                     }
                 }
-            ) { Text(if (submitting) "添加中..." else "添加") }
+            ) { Text(if (submitting) if (isEditing) "保存中..." else "添加中..." else if (isEditing) "保存" else "添加") }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !submitting) { Text("取消") } }
     )
