@@ -117,15 +117,17 @@ class GoInspectionTunnel(
                 errorMessage: String
             ) {
                 scope.launch {
+                    val result = when {
+                        errorMessage.isNotBlank() -> LogResult.ERROR
+                        blocked -> LogResult.BLOCKED
+                        else -> LogResult.PASSED
+                    }
                     dnsLogger.log(
                         queryName = domain,
                         queryType = queryType.toInt(),
-                        result = when {
-                            errorMessage.isNotBlank() -> LogResult.ERROR
-                            blocked -> LogResult.BLOCKED
-                            else -> LogResult.PASSED
-                        },
-                        message = buildDnsLogMessage(appName, resolvedIPs, blockedBy, errorMessage, responseTimeMs)
+                        result = result,
+                        message = buildDnsLogMessage(appName, resolvedIPs, blockedBy, errorMessage, responseTimeMs),
+                        blockSubscriptionId = resolveDnsBlockSubscriptionId(domain, result, blockedBy)
                     )
                 }
             }
@@ -173,10 +175,29 @@ class GoInspectionTunnel(
         outcome: HttpRequestOutcome
     ): Long? {
         if (outcome != HttpRequestOutcome.BLOCKED) return null
+        return resolveBlockSubscriptionId(authority)
+    }
+
+    private fun resolveDnsBlockSubscriptionId(
+        domain: String,
+        result: LogResult,
+        blockedBy: String
+    ): Long? {
+        if (result != LogResult.BLOCKED) return null
+        resolveBlockSubscriptionId(domain)?.let { return it }
+        // Go may pass comma-joined filter ids; accept a direct sub_<id> token.
+        return blockedBy
+            .split(',')
+            .map { it.trim() }
+            .firstNotNullOfOrNull { token ->
+                if (token.startsWith("sub_")) token.removePrefix("sub_").toLongOrNull() else null
+            }
+    }
+
+    private fun resolveBlockSubscriptionId(authority: String): Long? {
         if (authority.isBlank()) return null
-        val decision = policy.evaluate(authority)
-        val source = (decision as? DomainDecision.Block)?.source ?: return null
-        return if (source.startsWith("sub_")) source.removePrefix("sub_").toLongOrNull() else null
+        val source = (policy.evaluate(authority) as? DomainDecision.Block)?.source ?: return null
+        return source.subscriptionIdOrNull()
     }
     private fun HttpsDnsConfigSnapshot.toJson(): String = JSONObject()
             .put("mode", mode.storageValue)
@@ -264,6 +285,9 @@ private fun buildDnsLogMessage(
     responseTimeMs.takeIf { it > 0 }?.let { "elapsed=${it}ms" }
 ).joinToString(", ").takeIf { it.isNotEmpty() }
 
+
+private fun String.subscriptionIdOrNull(): Long? =
+    if (startsWith("sub_")) removePrefix("sub_").toLongOrNull() else null
 
 private fun String.toHttpRequestOutcome(): HttpRequestOutcome = when (this) {
     "blocked" -> HttpRequestOutcome.BLOCKED
