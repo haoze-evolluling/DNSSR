@@ -80,6 +80,8 @@ private val mirrorFormatMarkdown = """
 * 只添加你信任的镜像服务。订阅地址会被发送给镜像站处理。
 """.trimIndent()
 
+private val mirrorCodeToken = Regex("""(https?://[^\s{}]+|[{][A-Za-z]+[}])""")
+
 @Composable
 fun MirrorFormatGuideScreen(onBack: () -> Unit) {
     SettingsScaffold(title = "镜像站格式示例", onBack = onBack) { padding ->
@@ -142,9 +144,8 @@ private fun mirrorInlineMarkdown(
         } else {
             val code = value.removeSurrounding("`")
             pushStyle(SpanStyle(color = codeColor, fontFamily = FontFamily.Monospace))
-            val codeToken = Regex("(https?://[^\\s{}]+|\\{[A-Za-z]+\\})")
             var codeCursor = 0
-            codeToken.findAll(code).forEach { codeMatch ->
+            mirrorCodeToken.findAll(code).forEach { codeMatch ->
                 append(code.substring(codeCursor, codeMatch.range.first))
                 pushStyle(SpanStyle(color = if (codeMatch.value.startsWith("http")) linkColor else keywordColor))
                 append(codeMatch.value)

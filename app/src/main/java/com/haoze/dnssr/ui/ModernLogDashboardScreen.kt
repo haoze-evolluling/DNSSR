@@ -1,9 +1,9 @@
 package com.haoze.dnssr.ui
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -31,26 +33,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.json.JSONObject
 import java.util.Locale
 
-private object DashboardWebViewCache {
-    val webViews = mutableMapOf<String, WebView>()
-    val readyUrls = mutableSetOf<String>()
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-internal fun preloadLogDashboard(context: Context) {
-    val assetUrl = dashboardAssetUrl(AppSettings.getDnsLogMode(context))
-    if (DashboardWebViewCache.webViews[assetUrl] != null) return
-    DashboardWebViewCache.webViews[assetUrl] = WebView(context.applicationContext).apply {
-        configureLocalPageSettings()
-        webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String?) {
-                DashboardWebViewCache.readyUrls.add(assetUrl)
-            }
-        }
-        loadUrl(assetUrl)
-    }
-}
-
 @Composable
 fun ModernLogDashboardScreen(
     onBack: () -> Unit,
@@ -64,11 +46,9 @@ fun ModernLogDashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val assetUrl = dashboardAssetUrl(AppSettings.getDnsLogMode(LocalContext.current))
     val dashboardTheme = rememberDashboardThemeColors()
-    val cachedWebView = DashboardWebViewCache.webViews[assetUrl]
-    var webView by remember { mutableStateOf(cachedWebView) }
-    // A cached WebView may still contain the asset's default light theme. Keep it
-    // covered until the current Compose theme has been pushed into the page.
+    var webView by remember { mutableStateOf<WebView?>(null) }
     var pageReady by remember(assetUrl) { mutableStateOf(false) }
+    var webViewGeneration by remember { mutableStateOf(0) }
     var webViewAttached by rememberSaveable { mutableStateOf(false) }
     val hasDashboardData = uiState.dashboardJson != EMPTY_DASHBOARD_JSON
     LaunchedEffect(viewModel) {
@@ -98,27 +78,29 @@ fun ModernLogDashboardScreen(
             .fillMaxSize()
             .background(dashboardTheme.background)
     ) {
-        if (webViewAttached) DashboardWebView(
-            cachedWebView = cachedWebView,
-            assetUrl = assetUrl,
-            themeColors = dashboardTheme,
-            onPageReady = {
-                DashboardWebViewCache.readyUrls.add(assetUrl)
-                pageReady = true
-            },
-            onWebViewCreated = {
-                webView = it
-                DashboardWebViewCache.webViews[assetUrl] = it
-            },
-            onBack = onBack,
-            onRefresh = viewModel::refresh,
-            onNavigateToDnsLogs = onNavigateToDnsLogs,
-            onNavigateToDnsCache = onNavigateToDnsCache,
-            onNavigateToRaceStats = onNavigateToRaceStats,
-            onNavigateToBootstrapStats = onNavigateToBootstrapStats,
-            onNavigateToSubscriptionInterceptionStats = onNavigateToSubscriptionInterceptionStats,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (webViewAttached) key(assetUrl, webViewGeneration) {
+            DashboardWebView(
+                assetUrl = assetUrl,
+                themeColors = dashboardTheme,
+                onPageReady = { pageReady = true },
+                onWebViewCreated = { webView = it },
+                onRendererGone = { view ->
+                    if (webView === view) {
+                        pageReady = false
+                        webView = null
+                        webViewGeneration += 1
+                    }
+                },
+                onBack = onBack,
+                onRefresh = viewModel::refresh,
+                onNavigateToDnsLogs = onNavigateToDnsLogs,
+                onNavigateToDnsCache = onNavigateToDnsCache,
+                onNavigateToRaceStats = onNavigateToRaceStats,
+                onNavigateToBootstrapStats = onNavigateToBootstrapStats,
+                onNavigateToSubscriptionInterceptionStats = onNavigateToSubscriptionInterceptionStats,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         if (!webViewAttached || !pageReady || (uiState.loading && !hasDashboardData)) {
             Box(
                 modifier = Modifier
@@ -135,11 +117,11 @@ fun ModernLogDashboardScreen(
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun DashboardWebView(
-    cachedWebView: WebView?,
     assetUrl: String,
     themeColors: DashboardThemeColors,
     onPageReady: () -> Unit,
     onWebViewCreated: (WebView) -> Unit,
+    onRendererGone: (WebView) -> Unit,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onNavigateToDnsLogs: () -> Unit,
@@ -149,6 +131,8 @@ private fun DashboardWebView(
     onNavigateToSubscriptionInterceptionStats: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var ownedWebView by remember { mutableStateOf<WebView?>(null) }
+    var rendererGone by remember { mutableStateOf(false) }
     val webViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(
             view: WebView,
@@ -169,19 +153,28 @@ private fun DashboardWebView(
         override fun onPageFinished(view: WebView, url: String?) {
             onPageReady()
         }
+
+        override fun onRenderProcessGone(
+            view: WebView,
+            detail: RenderProcessGoneDetail
+        ): Boolean {
+            rendererGone = true
+            onRendererGone(view)
+            view.destroy()
+            return true
+        }
     }
 
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            val view = cachedWebView ?: WebView(context.applicationContext).apply {
+            val view = WebView(context.applicationContext).apply {
                 configureLocalPageSettings()
             }
+            ownedWebView = view
             view.webViewClient = webViewClient
             view.setBackgroundColor(themeColors.background.toArgb())
-            if (cachedWebView == null) {
-                view.loadUrl(assetUrl)
-            }
+            view.loadUrl(assetUrl)
             onWebViewCreated(view)
             view
         },
@@ -191,6 +184,17 @@ private fun DashboardWebView(
             onWebViewCreated(view)
         }
     )
+    DisposableEffect(Unit) {
+        onDispose {
+            if (!rendererGone) {
+                ownedWebView?.let { view ->
+                    view.stopLoading()
+                    view.loadUrl("about:blank")
+                    view.destroy()
+                }
+            }
+        }
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")

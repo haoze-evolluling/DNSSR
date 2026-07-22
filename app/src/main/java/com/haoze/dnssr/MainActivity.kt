@@ -42,8 +42,6 @@ import com.haoze.dnssr.ui.AppThemeMode
 import com.haoze.dnssr.ui.LauncherIconManager
 import com.haoze.dnssr.ui.MainViewModel
 import com.haoze.dnssr.ui.PermissionDisclosureSettings
-import com.haoze.dnssr.ui.preloadAboutPage
-import com.haoze.dnssr.ui.preloadLogDashboard
 import com.haoze.dnssr.ui.theme.DNSSRTheme
 import com.haoze.dnssr.ui.theme.ThemeColorStyle
 import com.haoze.dnssr.vpn.DnsVpnService
@@ -55,9 +53,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val DATABASE_WARMUP_DELAY_MS = 500L
-private const val LOG_DASHBOARD_WARMUP_DELAY_MS = 900L
-private const val ABOUT_PAGE_WARMUP_DELAY_MS = 700L
-private const val PREFERRED_REFRESH_RATE_HZ = 120f
 
 private enum class PermissionDisclosure {
     NOTIFICATION,
@@ -92,9 +87,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.attributes = window.attributes.apply {
-            preferredRefreshRate = PREFERRED_REFRESH_RATE_HZ
-        }
         enableEdgeToEdge()
         applyRecentsPrivacySetting()
         LauncherIconManager.applyPreferredIcon(this)
@@ -181,12 +173,6 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.IO) {
                 AppDatabase.getInstance(applicationContext).openHelper.writableDatabase
             }
-        }
-        lifecycleScope.launch {
-            delay(LOG_DASHBOARD_WARMUP_DELAY_MS)
-            preloadLogDashboard(applicationContext)
-            delay(ABOUT_PAGE_WARMUP_DELAY_MS)
-            preloadAboutPage(applicationContext)
         }
         handleAutoStartIfNeeded(intent)
         ensureMonitorServiceState()

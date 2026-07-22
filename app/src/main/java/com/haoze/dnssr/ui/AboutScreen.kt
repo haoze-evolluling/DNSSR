@@ -1,10 +1,10 @@
 package com.haoze.dnssr.ui
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -33,25 +35,6 @@ import java.util.Locale
 
 private const val PROJECT_REPOSITORY_URL = "https://github.com/haoze-evolluling/DNSSR"
 private const val ABOUT_ASSET_URL = "file:///android_asset/app_info.html"
-
-private object AboutWebViewCache {
-    var webView: WebView? = null
-    var pageReady: Boolean = false
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-internal fun preloadAboutPage(context: Context) {
-    if (AboutWebViewCache.webView != null) return
-    AboutWebViewCache.webView = WebView(context.applicationContext).apply {
-        configureAboutPageSettings()
-        webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String?) {
-                AboutWebViewCache.pageReady = true
-            }
-        }
-        loadUrl(ABOUT_ASSET_URL)
-    }
-}
 
 @Composable
 fun AboutScreen(
@@ -72,8 +55,10 @@ fun AboutScreen(
             .put("repositoryUrl", PROJECT_REPOSITORY_URL)
             .toString()
     }
-    var webView by remember { mutableStateOf(AboutWebViewCache.webView) }
-    var pageReady by remember { mutableStateOf(AboutWebViewCache.pageReady) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var pageReady by remember { mutableStateOf(false) }
+    var webViewGeneration by remember { mutableStateOf(0) }
+    var rendererGoneWebView by remember { mutableStateOf<WebView?>(null) }
     var webViewAttached by rememberSaveable { mutableStateOf(false) }
     val webViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(
@@ -88,8 +73,21 @@ fun AboutScreen(
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
-            AboutWebViewCache.pageReady = true
             pageReady = true
+        }
+
+        override fun onRenderProcessGone(
+            view: WebView,
+            detail: RenderProcessGoneDetail
+        ): Boolean {
+            pageReady = false
+            if (webView === view) {
+                rendererGoneWebView = view
+                webView = null
+                webViewGeneration += 1
+            }
+            view.destroy()
+            return true
         }
     }
 
@@ -115,28 +113,40 @@ fun AboutScreen(
             .fillMaxSize()
             .background(themeColors.background)
     ) {
-        if (webViewAttached) AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { viewContext ->
-                val cachedWebView = AboutWebViewCache.webView
-                val view = cachedWebView ?: WebView(viewContext.applicationContext).apply {
-                    configureAboutPageSettings()
-                }
-                view.webViewClient = webViewClient
-                view.setBackgroundColor(themeColors.background.toArgb())
-                if (cachedWebView == null) {
-                    AboutWebViewCache.webView = view
+        if (webViewAttached) key(webViewGeneration) {
+            var ownedWebView by remember { mutableStateOf<WebView?>(null) }
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { viewContext ->
+                    val view = WebView(viewContext.applicationContext).apply {
+                        configureAboutPageSettings()
+                    }
+                    ownedWebView = view
+                    view.webViewClient = webViewClient
+                    view.setBackgroundColor(themeColors.background.toArgb())
                     view.loadUrl(ABOUT_ASSET_URL)
+                    webView = view
+                    view
+                },
+                update = { view ->
+                    webView = view
+                    view.webViewClient = webViewClient
+                    view.setBackgroundColor(themeColors.background.toArgb())
                 }
-                webView = view
-                view
-            },
-            update = { view ->
-                webView = view
-                view.webViewClient = webViewClient
-                view.setBackgroundColor(themeColors.background.toArgb())
+            )
+            DisposableEffect(Unit) {
+                onDispose {
+                    ownedWebView?.let { view ->
+                        if (webView === view) webView = null
+                        if (rendererGoneWebView !== view) {
+                            view.stopLoading()
+                            view.loadUrl("about:blank")
+                            view.destroy()
+                        }
+                    }
+                }
             }
-        )
+        }
         if (!webViewAttached || !pageReady) {
             Box(
                 modifier = Modifier
