@@ -49,12 +49,12 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun exportRules(uri: Uri) {
+    fun exportRules(uri: Uri, type: RuleExportType) {
         _ruleExportProgress.value = 0f
         _ruleExportProgressText.value = "正在准备导出"
         runOperation(ConfigTransferOperation.EXPORTING) {
             val context = getApplication<Application>()
-            val result = manager.exportRules { progress, text ->
+            val result = manager.exportRules(type) { progress, text ->
                 _ruleExportProgress.value = progress
                 _ruleExportProgressText.value = text
             }
@@ -69,7 +69,7 @@ class ConfigTransferViewModel(application: Application) : AndroidViewModel(appli
                     _ruleExportProgressText.value = "正在写入文件"
                 }
             }
-            "规则已导出：拦截 ${result.blockRuleCount} 条，白名单 ${result.allowRuleCount} 条"
+            "${type.displayName}已导出：拦截 ${result.blockRuleCount} 条，白名单 ${result.allowRuleCount} 条"
         }
     }
 

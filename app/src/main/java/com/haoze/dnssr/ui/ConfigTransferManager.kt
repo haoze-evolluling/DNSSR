@@ -37,6 +37,15 @@ data class ConfigImportProgress(
     val currentItem: String
 )
 
+enum class RuleExportType(
+    val fileNameSuffix: String,
+    val displayName: String
+) {
+    SUBSCRIPTIONS("subscriptions", "订阅规则"),
+    MANUAL("manual", "手动添加规则"),
+    ALL("all", "全部规则")
+}
+
 class ConfigTransferManager(private val context: Context) {
     private val database = AppDatabase.getInstance(context)
     private val subscriptionManager = SubscriptionManager(
@@ -96,13 +105,30 @@ class ConfigTransferManager(private val context: Context) {
         return root.toString(2)
     }
 
-    suspend fun exportRules(onProgress: (Float, String) -> Unit = { _, _ -> }): RuleExportResult {
+    suspend fun exportRules(
+        type: RuleExportType,
+        onProgress: (Float, String) -> Unit = { _, _ -> }
+    ): RuleExportResult {
         onProgress(0f, "正在读取白名单规则")
-        val allowPatterns = database.allowRuleDao().enabledPatterns()
+        val allowRules = when (type) {
+            RuleExportType.SUBSCRIPTIONS -> database.allowRuleDao().enabledSubscriptionRules()
+            RuleExportType.MANUAL -> database.allowRuleDao().enabledCustomRules()
+            RuleExportType.ALL -> database.allowRuleDao().enabledSubscriptionRules() +
+                database.allowRuleDao().enabledCustomRules()
+        }
+        val allowPatterns = allowRules
+            .map { it.pattern }
             .mapNotNull(AdGuardRuleParser::parseAllowLine)
             .mapTo(sortedSetOf()) { it.pattern }
         onProgress(0.2f, "正在读取拦截规则")
-        val blockPatterns = database.blockRuleDao().enabledPatterns()
+        val blockRules = when (type) {
+            RuleExportType.SUBSCRIPTIONS -> database.blockRuleDao().enabledSubscriptionRules()
+            RuleExportType.MANUAL -> database.blockRuleDao().enabledCustomRules()
+            RuleExportType.ALL -> database.blockRuleDao().enabledSubscriptionRules() +
+                database.blockRuleDao().enabledCustomRules()
+        }
+        val blockPatterns = blockRules
+            .map { it.pattern }
             .mapNotNull(AdGuardRuleParser::parseLine)
             .mapTo(sortedSetOf()) { it.pattern }
             .apply { removeAll(allowPatterns) }
