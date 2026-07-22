@@ -58,13 +58,15 @@ fun ModernLogDashboardScreen(
         webViewAttached = true
     }
 
-    LaunchedEffect(webView, uiState.dashboardJson, dashboardTheme) {
+    // Wait until onPageFinished so window.DNSSR exists; first render otherwise no-ops.
+    LaunchedEffect(webView, pageReady, uiState.dashboardJson, dashboardTheme) {
         val view = webView
-        if (view != null) {
+        if (view != null && pageReady) {
             view.post {
                 view.evaluateJavascript(
                     "window.DNSSR && window.DNSSR.setTheme(${dashboardTheme.toJson()});",
-                ) { pageReady = true }
+                    null
+                )
                 if (hasDashboardData) view.evaluateJavascript(
                     "window.DNSSR && window.DNSSR.render(${uiState.dashboardJson});",
                     null
