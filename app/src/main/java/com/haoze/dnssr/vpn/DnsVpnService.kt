@@ -647,7 +647,7 @@ class DnsVpnService : VpnService() {
         val output = FileOutputStream(iface.fileDescriptor)
         val buffer = ByteBuffer.allocate(BUFFER_SIZE)
         val packetQueue = Channel<DnsPacketWork>(capacity = MAX_QUEUED_DNS_PACKETS)
-        val workers = List(MAX_CONCURRENT_DNS_QUERIES) {
+        val workers = List(dnsWorkerCount()) {
             launch {
                 for (work in packetQueue) {
                     handleDnsPacket(work.dnsInfo, work.resolvers, output)
@@ -702,6 +702,11 @@ class DnsVpnService : VpnService() {
         } catch (_: Exception) {
             if (vpnInterface != null) delay(READ_ERROR_RETRY_DELAY_MS)
         }
+    }
+
+    private fun dnsWorkerCount(): Int {
+        return (Runtime.getRuntime().availableProcessors() * DNS_WORKERS_PER_CPU)
+            .coerceIn(MIN_DNS_WORKERS, MAX_DNS_WORKERS)
     }
 
     private fun stopInspectionDataPlane() {
@@ -1317,7 +1322,9 @@ class DnsVpnService : VpnService() {
         private const val TUN_POLL_TIMEOUT_MS = 1_000
         private const val READ_ERROR_RETRY_DELAY_MS = 50L
         private const val OLD_RESOLVER_CLOSE_DELAY_MS = 2_000L
-        private const val MAX_CONCURRENT_DNS_QUERIES = 64
+        private const val MIN_DNS_WORKERS = 8
+        private const val MAX_DNS_WORKERS = 16
+        private const val DNS_WORKERS_PER_CPU = 2
         private const val MAX_QUEUED_DNS_PACKETS = 128
         private const val PREFS_NAME = "dns_vpn_prefs"
         private const val KEY_VPN_RUNNING = "vpn_running"
