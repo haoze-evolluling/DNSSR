@@ -22,13 +22,90 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
+
+data class DashboardDailyStats(
+    val total: Int = 0,
+    val passed: Int = 0,
+    val blocked: Int = 0,
+    val error: Int = 0,
+    val bypassed: Int = 0,
+    val cached: Int = 0
+)
+
+data class DashboardRequestLogItem(
+    val timestamp: Long,
+    val source: String,
+    val name: String,
+    val meta: String,
+    val status: String,
+    val resultLabel: String
+)
+
+data class DashboardCacheEntryItem(
+    val queryName: String,
+    val queryType: String,
+    val expiresAt: Long,
+    val remainingSeconds: Long,
+    val hitCount: Int,
+    val responseSize: Int,
+    val originalTtlSeconds: Long,
+    val lastHitAt: Long
+)
+
+data class DashboardRaceWinnerItem(
+    val name: String,
+    val wins: Int,
+    val avgElapsedMs: Double
+)
+
+data class DashboardRaceSummary(
+    val requests: Int = 0,
+    val successes: Int = 0,
+    val avgElapsedMs: Double = 0.0,
+    val winners: List<DashboardRaceWinnerItem> = emptyList()
+)
+
+data class DashboardBootstrapIpItem(
+    val name: String,
+    val ip: String,
+    val attempts: Int,
+    val successRate: Double,
+    val avgElapsedMs: Double
+)
+
+data class DashboardBootstrapSummary(
+    val attempts: Int = 0,
+    val successes: Int = 0,
+    val successRate: Double = 0.0,
+    val avgElapsedMs: Double = 0.0,
+    val fallbackUses: Int = 0,
+    val ips: List<DashboardBootstrapIpItem> = emptyList()
+)
+
+data class DashboardSubscriptionItem(
+    val name: String,
+    val enabled: Boolean,
+    val deleted: Boolean,
+    val hits: Int,
+    val rate: Double
+)
+
+data class DashboardSubscriptionSummary(
+    val items: List<DashboardSubscriptionItem> = emptyList()
+)
 
 data class ModernLogDashboardUiState(
     val loading: Boolean = true,
-    val dashboardJson: String = "{}",
-    val error: String? = null
+    val hasData: Boolean = false,
+    val generatedAt: Long = 0L,
+    val logMode: DnsLogMode = DnsLogMode.ALL,
+    val error: String? = null,
+    val dailyStats: DashboardDailyStats = DashboardDailyStats(),
+    val recentLogs: List<DashboardRequestLogItem> = emptyList(),
+    val cacheEntries: List<DashboardCacheEntryItem> = emptyList(),
+    val race: DashboardRaceSummary = DashboardRaceSummary(),
+    val bootstrap: DashboardBootstrapSummary = DashboardBootstrapSummary(),
+    val subscriptions: DashboardSubscriptionSummary = DashboardSubscriptionSummary()
 )
 
 class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,13 +121,14 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(loading = true, error = null)
-            val result = runCatching { buildDashboardJson() }
+            val result = runCatching { buildDashboardState() }
             _uiState.value = result.fold(
-                onSuccess = { ModernLogDashboardUiState(loading = false, dashboardJson = it) },
+                onSuccess = { it },
                 onFailure = { error ->
-                    ModernLogDashboardUiState(
+                    _uiState.value.copy(
                         loading = false,
-                        dashboardJson = errorJson(error),
+                        hasData = _uiState.value.hasData,
+                        generatedAt = System.currentTimeMillis(),
                         error = error.message ?: "加载失败"
                     )
                 }
@@ -58,7 +136,7 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
         }
     }
 
-    private suspend fun buildDashboardJson(): String {
+    private suspend fun buildDashboardState(): ModernLogDashboardUiState {
         val now = System.currentTimeMillis()
         val logMode = AppSettings.getDnsLogMode(getApplication())
         val storedDailyStats = if (logMode == DnsLogMode.OFF) null else dnsLogRepository.dailyStats(dayStartMillis())
@@ -66,194 +144,174 @@ class ModernLogDashboardViewModel(application: Application) : AndroidViewModel(a
             if (logMode == DnsLogMode.BLOCKED_AND_ERRORS) it.copy(passed = 0, cached = 0) else it
         }
         val recentLogs = dnsLogRepository.recentLogs(RECENT_LOG_LIMIT, logMode)
-        val recentHttpLogs = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
-            .filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }
-        val httpStats = if (logMode == DnsLogMode.OFF) emptyList() else database.httpRequestLogDao().dailyStats(dayStartMillis())
+        val recentHttpLogs = if (logMode == DnsLogMode.OFF) {
+            emptyList()
+        } else {
+            database.httpRequestLogDao().recent(RECENT_LOG_LIMIT)
+                .filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }
+        }
+        val httpStats = if (logMode == DnsLogMode.OFF) {
+            emptyList()
+        } else {
+            database.httpRequestLogDao().dailyStats(dayStartMillis())
+        }
         var httpPassed = 0
         var httpBlocked = 0
         var httpError = 0
         var httpBypassed = 0
-        httpStats.filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }.forEach { row ->
-            when (normalizeHttpOutcome(row.outcome)) {
-                "passed" -> httpPassed += row.count
-                "blocked" -> httpBlocked += row.count
-                "bypassed" -> httpBypassed += row.count
-                else -> httpError += row.count
+        httpStats.filter { logMode == DnsLogMode.ALL || normalizeHttpOutcome(it.outcome) != "passed" }
+            .forEach { row ->
+                when (normalizeHttpOutcome(row.outcome)) {
+                    "passed" -> httpPassed += row.count
+                    "blocked" -> httpBlocked += row.count
+                    "bypassed" -> httpBypassed += row.count
+                    else -> httpError += row.count
+                }
             }
-        }
         val recentCacheEntries = dnsCacheRepository.recentEntries(now, RECENT_CACHE_LIMIT)
         val raceStats = raceLogRepository.stats(RaceStatsRange.TODAY)
         val bootstrapStats = bootstrapLogRepository.stats(BootstrapStatsRange.TODAY)
-        val subscriptionStats = if (logMode == DnsLogMode.OFF) null else
+        val subscriptionStats = if (logMode == DnsLogMode.OFF) {
+            null
+        } else {
             dnsLogRepository.subscriptionInterceptionStats(SubscriptionInterceptionStatsRange.TODAY)
-        val subscriptions = if (logMode == DnsLogMode.OFF) emptyList() else
+        }
+        val subscriptions = if (logMode == DnsLogMode.OFF) {
+            emptyList()
+        } else {
             database.subscriptionDao().allByKind(SubscriptionKind.BLOCK)
+        }
         val subscriptionsById = subscriptions.associateBy { it.id }
         val subscriptionItems = (subscriptionsById.keys + subscriptionStats?.hitsBySubscriptionId.orEmpty().keys)
             .map { id ->
                 val subscription = subscriptionsById[id]
                 val hits = subscriptionStats?.hitsBySubscriptionId?.get(id) ?: 0
-                JSONObject()
-                    .put("name", subscription?.name ?: "已删除订阅 #$id")
-                    .put("enabled", subscription?.enabled ?: false)
-                    .put("deleted", subscription == null)
-                    .put("hits", hits)
-                    .put(
-                        "rate",
-                        if (subscriptionStats == null || subscriptionStats.totalRequests == 0) 0.0
-                        else hits.toDouble() / subscriptionStats.totalRequests
-                    )
+                DashboardSubscriptionItem(
+                    name = subscription?.name ?: "已删除订阅 #$id",
+                    enabled = subscription?.enabled ?: false,
+                    deleted = subscription == null,
+                    hits = hits,
+                    rate = if (subscriptionStats == null || subscriptionStats.totalRequests == 0) {
+                        0.0
+                    } else {
+                        hits.toDouble() / subscriptionStats.totalRequests
+                    }
+                )
             }
-            .sortedByDescending { it.optInt("hits") }
+            .sortedByDescending { it.hits }
             .take(SUBSCRIPTION_LIST_LIMIT)
 
         val passed = (dailyStats?.passed ?: 0) + httpPassed
         val blocked = (dailyStats?.blocked ?: 0) + httpBlocked
         val errors = (dailyStats?.error ?: 0) + httpError
         val totalLogs = passed + blocked + errors + httpBypassed
-        return JSONObject()
-            .put("generatedAt", now)
-            .put("logMode", logMode.storageValue)
-            .put(
-                "dailyStats",
-                JSONObject()
-                    .put("total", totalLogs)
-                    .put("passed", passed)
-                    .put("blocked", blocked)
-                    .put("error", errors)
-                    .put("bypassed", httpBypassed)
-                    .put("cached", dailyStats?.cached ?: 0)
-            )
-            .put("recentLogs", mergedRequestLogs(recentLogs, recentHttpLogs))
-            .put("cacheEntries", recentCacheEntries.toCacheArray(now))
-            .put(
-                "race",
-                JSONObject()
-                    .put("requests", raceStats.strategyStats.sumOf { it.requests })
-                    .put("successes", raceStats.strategyStats.sumOf { it.successes })
-                    .put("avgElapsedMs", raceStats.strategyStats.weightedAverage { it.avgElapsedMs to it.requests })
-                    .put("strategies", JSONArray().also { array ->
-                        raceStats.strategyStats.take(TOP_LIST_LIMIT).forEach { item ->
-                            array.put(
-                                JSONObject()
-                                    .put("name", item.displayName)
-                                    .put("requests", item.requests)
-                                    .put("successRate", item.successRate)
-                                    .put("avgElapsedMs", item.avgElapsedMs)
-                            )
-                        }
-                    })
-                    .put("winners", JSONArray().also { array ->
-                        raceStats.winnerStats.take(TOP_LIST_LIMIT).forEach { item ->
-                            array.put(
-                                JSONObject()
-                                    .put("name", item.providerName)
-                                    .put("wins", item.wins)
-                                    .put("avgElapsedMs", item.avgWinnerElapsedMs)
-                            )
-                        }
-                    })
-            )
-            .put(
-                "bootstrap",
-                JSONObject()
-                    .put("attempts", bootstrapStats.overall.attempts)
-                    .put("successes", bootstrapStats.overall.successes)
-                    .put("successRate", bootstrapStats.overall.successRate)
-                    .put("avgElapsedMs", bootstrapStats.overall.avgElapsedMs)
-                    .put("fallbackUses", bootstrapStats.overall.fallbackUses)
-                    .put("ips", JSONArray().also { array ->
-                        bootstrapStats.ipStats.take(TOP_LIST_LIMIT).forEach { item ->
-                            array.put(
-                                JSONObject()
-                                    .put("name", item.ipName)
-                                    .put("ip", item.ip)
-                                    .put("attempts", item.attempts)
-                                    .put("successRate", item.successRate)
-                                    .put("avgElapsedMs", item.avgElapsedMs)
-                                    .put("weight", item.predictionWeight)
-                            )
-                        }
-                    })
-            )
-            .put(
-                "subscriptions",
-                JSONObject()
-                    .put("totalRequests", subscriptionStats?.totalRequests ?: 0)
-                    .put("items", JSONArray(subscriptionItems))
-            )
-            .toString()
-    }
 
-    private fun List<DnsLogEntity>.toLogArray(): JSONArray {
-        return JSONArray().also { array ->
-            forEach { log ->
-                array.put(
-                    JSONObject()
-                        .put("timestamp", log.timestamp)
-                        .put("queryName", log.queryName)
-                        .put("queryType", dnsTypeName(log.queryType))
-                        .put("result", log.result)
-                        .put("resultLabel", resultLabel(log.result))
-                        .put("cached", log.cached)
-                        .put("message", log.message.orEmpty())
-                )
-            }
-        }
+        return ModernLogDashboardUiState(
+            loading = false,
+            hasData = true,
+            generatedAt = now,
+            logMode = logMode,
+            error = null,
+            dailyStats = DashboardDailyStats(
+                total = totalLogs,
+                passed = passed,
+                blocked = blocked,
+                error = errors,
+                bypassed = httpBypassed,
+                cached = dailyStats?.cached ?: 0
+            ),
+            recentLogs = mergedRequestLogs(recentLogs, recentHttpLogs),
+            cacheEntries = recentCacheEntries.toCacheItems(now),
+            race = DashboardRaceSummary(
+                requests = raceStats.strategyStats.sumOf { it.requests },
+                successes = raceStats.strategyStats.sumOf { it.successes },
+                avgElapsedMs = raceStats.strategyStats.weightedAverage { it.avgElapsedMs to it.requests },
+                winners = raceStats.winnerStats.take(TOP_LIST_LIMIT).map { item ->
+                    DashboardRaceWinnerItem(
+                        name = item.providerName,
+                        wins = item.wins,
+                        avgElapsedMs = item.avgWinnerElapsedMs
+                    )
+                }
+            ),
+            bootstrap = DashboardBootstrapSummary(
+                attempts = bootstrapStats.overall.attempts,
+                successes = bootstrapStats.overall.successes,
+                successRate = bootstrapStats.overall.successRate,
+                avgElapsedMs = bootstrapStats.overall.avgElapsedMs,
+                fallbackUses = bootstrapStats.overall.fallbackUses,
+                ips = bootstrapStats.ipStats.take(TOP_LIST_LIMIT).map { item ->
+                    DashboardBootstrapIpItem(
+                        name = item.ipName,
+                        ip = item.ip,
+                        attempts = item.attempts,
+                        successRate = item.successRate,
+                        avgElapsedMs = item.avgElapsedMs
+                    )
+                }
+            ),
+            subscriptions = DashboardSubscriptionSummary(items = subscriptionItems)
+        )
     }
 
     private fun mergedRequestLogs(
         dnsLogs: List<DnsLogEntity>,
         httpLogs: List<HttpRequestLogEntity>
-    ): JSONArray {
+    ): List<DashboardRequestLogItem> {
         val rows = dnsLogs.map { log ->
-            JSONObject()
-                .put("timestamp", log.timestamp)
-                .put("source", "DNS")
-                .put("name", log.queryName)
-                .put("meta", "${dnsTypeName(log.queryType)}${if (log.cached) " · 命中缓存" else ""}${log.message?.let { " · $it" } ?: ""}")
-                .put("status", when (log.result) {
+            DashboardRequestLogItem(
+                timestamp = log.timestamp,
+                source = "DNS",
+                name = log.queryName,
+                meta = buildString {
+                    append(dnsTypeName(log.queryType))
+                    if (log.cached) append(" · 命中缓存")
+                    log.message?.let { append(" · ").append(it) }
+                },
+                status = when (log.result) {
                     LogResult.PASSED.value -> "passed"
                     LogResult.BLOCKED.value -> "blocked"
                     else -> "error"
-                })
-                .put("resultLabel", resultLabel(log.result))
+                },
+                resultLabel = resultLabel(log.result)
+            )
         } + httpLogs.map { log ->
             val status = normalizeHttpOutcome(log.outcome)
-            JSONObject()
-                .put("timestamp", log.timestamp)
-                .put("source", "HTTPS")
-                .put("name", log.authority ?: "未取得 authority")
-                .put("meta", "${log.protocol} · ${log.packageName}${log.matchedRule?.let { " · $it" } ?: ""}")
-                .put("status", status)
-                .put("resultLabel", when (status) { "passed" -> "通过"; "blocked" -> "过滤"; "bypassed" -> "旁路"; else -> "失败" })
+            DashboardRequestLogItem(
+                timestamp = log.timestamp,
+                source = "HTTPS",
+                name = log.authority ?: "未取得 authority",
+                meta = buildString {
+                    append(log.protocol)
+                    append(" · ")
+                    append(log.packageName)
+                    log.matchedRule?.let { append(" · ").append(it) }
+                },
+                status = status,
+                resultLabel = when (status) {
+                    "passed" -> "通过"
+                    "blocked" -> "过滤"
+                    "bypassed" -> "旁路"
+                    else -> "失败"
+                }
+            )
         }
-        return JSONArray().also { array -> rows.sortedByDescending { it.optLong("timestamp") }.take(RECENT_LOG_LIMIT).forEach(array::put) }
+        return rows.sortedByDescending { it.timestamp }.take(RECENT_LOG_LIMIT)
     }
 
-    private fun List<DnsCacheEntity>.toCacheArray(now: Long): JSONArray {
-        return JSONArray().also { array ->
-            forEach { entry ->
-                array.put(
-                    JSONObject()
-                        .put("queryName", entry.queryName)
-                        .put("queryType", dnsTypeName(entry.queryType))
-                        .put("expiresAt", entry.expiresAt)
-                        .put("remainingSeconds", ((entry.expiresAt - now).coerceAtLeast(0L) + 999L) / 1000L)
-                        .put("hitCount", entry.hitCount)
-                        .put("responseSize", entry.responseSize)
-                        .put("originalTtlSeconds", entry.originalTtlSeconds)
-                        .put("lastHitAt", entry.lastHitAt ?: 0L)
-                )
-            }
+    private fun List<DnsCacheEntity>.toCacheItems(now: Long): List<DashboardCacheEntryItem> {
+        return map { entry ->
+            DashboardCacheEntryItem(
+                queryName = entry.queryName,
+                queryType = dnsTypeName(entry.queryType),
+                expiresAt = entry.expiresAt,
+                remainingSeconds = ((entry.expiresAt - now).coerceAtLeast(0L) + 999L) / 1000L,
+                hitCount = entry.hitCount,
+                responseSize = entry.responseSize,
+                originalTtlSeconds = entry.originalTtlSeconds,
+                lastHitAt = entry.lastHitAt ?: 0L
+            )
         }
-    }
-
-    private fun errorJson(error: Throwable): String {
-        return JSONObject()
-            .put("generatedAt", System.currentTimeMillis())
-            .put("error", error.message ?: "加载失败")
-            .toString()
     }
 
     private fun resultLabel(result: String): String {
